@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>Haitch.Roslyn</RootNamespace>
+    <AssemblyName>Haitch.Roslyn</AssemblyName>
+    <IsPackable>true</IsPackable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeSymbols>false</IncludeSymbols>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+    <PackageId>Haitch.Roslyn</PackageId>
+    <Description>Source-only utilities for building Roslyn incremental source generators.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Collections.Immutable" Version="9.0.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="**/*.cs" Exclude="bin/**;obj/**" Pack="true" PackagePath="contentFiles/cs/any/Haitch.Roslyn/%(RecursiveDir)%(Filename)%(Extension)" BuildAction="Compile" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Haitch.Roslyn.Tests" />
+  </ItemGroup>
+
+</Project>
