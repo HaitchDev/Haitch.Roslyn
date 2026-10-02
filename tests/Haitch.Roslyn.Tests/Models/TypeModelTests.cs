@@ -327,6 +327,29 @@ public class TypeModelTests
     }
 
     [Test]
+    public async Task Should_skip_indexers_when_members_are_included()
+    {
+        const string source =
+            """
+            namespace Example;
+
+            public class Sample
+            {
+                public string Name { get; set; } = "";
+
+                public int this[int index] => index;
+            }
+            """;
+
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "Example.Sample");
+
+        TypeModel model = TypeModel.From(type, includeMembers: true);
+
+        await Assert.That(model.Properties.Count).IsEqualTo(1);
+        await Assert.That(model.Properties[0].Name).IsEqualTo("Name");
+    }
+
+    [Test]
     public async Task Should_throw_for_an_enum()
     {
         const string source = "namespace Example; public enum Sample { A }";

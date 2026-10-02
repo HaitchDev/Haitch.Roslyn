@@ -110,7 +110,7 @@ internal sealed record TypeModel(
         var properties = includeMembers
             ? type.GetMembers()
                 .OfType<IPropertySymbol>()
-                .Where(property => !property.IsImplicitlyDeclared)
+                .Where(property => !property.IsImplicitlyDeclared && !property.IsIndexer)
                 .Select(PropertyModel.From)
                 .ToEquatableArray()
             : default;

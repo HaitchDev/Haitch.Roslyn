@@ -69,6 +69,6 @@ Caveats:
 
 ## Notes
 
-- `TypeModel.From` captures members only when `includeMembers: true`, because members make the model change on every member edit.
+- `TypeModel.From` captures members only when `includeMembers: true`, because members make the model change on every member edit. Indexers are skipped.
 - `ForTypesWithAttribute` yields one item per type, even when several partial declarations carry the attribute; the item carries every application of the attribute across all parts.
 - `default(Result<T>)` is a failure with no diagnostics.
