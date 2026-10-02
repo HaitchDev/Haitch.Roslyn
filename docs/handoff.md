@@ -1,7 +1,8 @@
 # Handoff
 
 ## State (2026-10-02)
-- Every planned issue except 9.4 and 9.5 is implemented and reviewed, with high and medium findings fixed: 0.1–0.8, 1.1–1.2, 2.1–2.5, 3.1–3.5, 4.1–4.2, 5.1–5.2, 6.1–6.6, 7.1–7.2, 8.1–8.2, 9.1–9.3, 10.1–10.7.
+- Every planned issue is implemented and reviewed, with high and medium findings fixed: 0.1–0.8, 1.1–1.2, 2.1–2.5, 3.1–3.5, 4.1–4.2, 5.1–5.2, 6.1–6.6, 7.1–7.2, 8.1–8.2, 9.1–9.5, 10.1–10.7.
+- 9.4/9.5: `.github/workflows/publish.yml` (tag `v*.*.*`, NuGet trusted publishing via `NUGET_USER`) and `ci.yml`. Validated by YAML parse and running their commands locally (`actionlint` not installed). They have never run on GitHub. The review found that the pack-based tests overwrote the shared `bin/Release` DLL with version 1.2.3; the tests now pack into an isolated `--artifacts-path`.
 - Added during this session:
   - 0.7: the smoke consumer proves Polyfill types and records compile in a `netstandard2.0` consumer of the package.
   - 0.8: Roslyn bumped to 4.12.0 (the human's decision), so consumers' generators need 4.12+.
@@ -11,7 +12,7 @@
 - Last green: 364/364. Nothing committed.
 
 ## Held for the human
-- 9.4 (publish workflow) and 9.5 (CI): `actionlint` is not installed; a `NUGET_USER` secret and a nuget.org trusted-publishing policy are needed.
+- First push (CI run) and first `v*` tag (publish): both are the human's call.
 - Scoped-writer limitations, accepted and documented:
   - a parent scope can be written to while a child is open;
   - copying a scope and disposing both closes the block twice;

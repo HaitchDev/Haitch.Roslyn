@@ -25,7 +25,12 @@ public class PackageMetadataTests
                 string projectPath = Path.Combine(RepoPaths.Root, "src", project, $"{project}.csproj");
                 var result = await RunDotNetAsync(
                     RepoPaths.Root,
-                    ["pack", projectPath, "-c", "Release", "-o", outputDirectory, $"-p:Version={Version}", "-nodeReuse:false"]);
+                    [
+                        "pack", projectPath, "-c", "Release", "-o", outputDirectory,
+                        // Isolated bin/obj: a stamped Version must never overwrite the repo's Release build output.
+                        "--artifacts-path", Path.Combine(outputDirectory, "artifacts"),
+                        $"-p:Version={Version}", "-nodeReuse:false"
+                    ]);
 
                 if (result.ExitCode != 0)
                 {

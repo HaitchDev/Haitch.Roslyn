@@ -34,6 +34,8 @@ public class PackageSmokeTests
                 repositoryRoot,
                 [
                     "pack", sourceProjectPath, "-c", "Release", "-o", feedDirectory,
+                    // Isolated bin/obj so packing never touches the repo's Release build output.
+                    "--artifacts-path", Path.Combine(consumerBuildRoot, "pack-artifacts"),
                     $"-p:PackageVersion={packageVersion}", "-nodeReuse:false"
                 ],
                 nugetPackagesDirectory);
