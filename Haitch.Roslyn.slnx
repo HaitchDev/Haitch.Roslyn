@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Haitch.Roslyn/Haitch.Roslyn.csproj" />
+    <File Path="src\Directory.Build.props" />
+    <Project Path="src/Haitch.Roslyn.Testing/Haitch.Roslyn.Testing.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Haitch.Roslyn.Tests/Haitch.Roslyn.Tests.csproj" />

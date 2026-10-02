@@ -1,0 +1,12 @@
+<Project>
+    <PropertyGroup>
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    </PropertyGroup>
+    <ItemGroup>
+        <!-- tests/PackageSmoke/Consumer/Consumer.csproj pins its own Roslyn version (it is shielded from
+             central management); keep it in step with this one. -->
+        <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0" />
+        <PackageVersion Include="Polyfill" Version="11.4.0" />
+        <PackageVersion Include="TUnit" Version="0.90.45" />
+    </ItemGroup>
+</Project>
