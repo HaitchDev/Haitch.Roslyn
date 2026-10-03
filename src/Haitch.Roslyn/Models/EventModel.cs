@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading;
 using Haitch.Roslyn.Types;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Haitch.Roslyn.Models;
 
@@ -18,7 +20,8 @@ namespace Haitch.Roslyn.Models;
 /// <param name="IsFieldLike">
 /// True when the add and remove accessors are implicitly declared (<c>event EventHandler E;</c>), false
 /// when the author wrote them out. Always false for an event read from metadata (a referenced assembly),
-/// where accessors are never implicitly declared, so the two forms cannot be told apart.
+/// where accessors are never implicitly declared, so the two forms cannot be told apart. Always false for a
+/// partial event (see <see cref="IsPartial"/>).
 /// </param>
 internal sealed record EventModel(
     string Name,
@@ -47,6 +50,13 @@ internal sealed record EventModel(
     public bool IsSealed { get; init; }
 
     /// <summary>
+    /// True for a C# 14 partial event: the defining and implementing declarations together are one event,
+    /// so a single model is produced and <see cref="IsFieldLike"/> is false (the implementation writes the
+    /// accessors out).
+    /// </summary>
+    public bool IsPartial { get; init; }
+
+    /// <summary>
     /// The attributes applied to the event itself; attributes targeting its accessors or backing field
     /// (<c>[field: ...]</c>) are not included.
     /// </summary>
@@ -63,6 +73,7 @@ internal sealed record EventModel(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
+        var isPartial = IsPartialEvent(evt, cancellationToken);
         var explicitInterfaceEvent = evt.ExplicitInterfaceImplementations.FirstOrDefault();
 
         var attributes = evt.GetAttributes()
@@ -76,8 +87,10 @@ internal sealed record EventModel(
             TypeRef.From(evt.Type),
             evt.DeclaredAccessibility,
             evt.IsStatic,
-            // Field-like events get compiler-synthesized accessors; written-out ones do not.
-            evt.AddMethod?.IsImplicitlyDeclared ?? false)
+            // Field-like events get compiler-synthesized accessors; written-out ones do not. A partial event is
+            // never field-like: Roslyn can hand back the defining part, whose accessors look synthesized, but
+            // the implementing part always writes them out.
+            !isPartial && (evt.AddMethod?.IsImplicitlyDeclared ?? false))
         {
             ExplicitInterface = explicitInterfaceEvent is null
                 ? null
@@ -87,7 +100,35 @@ internal sealed record EventModel(
             IsVirtual = evt.IsVirtual,
             IsOverride = evt.IsOverride,
             IsSealed = evt.IsSealed,
+            IsPartial = isPartial,
             Attributes = attributes,
         };
+    }
+
+    // IEventSymbol.IsPartialDefinition and PartialImplementationPart arrived after Roslyn 4.12, so read the
+    // modifier from syntax; a metadata event never has partial syntax.
+    private static bool IsPartialEvent(IEventSymbol evt, CancellationToken cancellationToken)
+    {
+        foreach (var reference in evt.DeclaringSyntaxReferences)
+        {
+            var syntax = reference.GetSyntax(cancellationToken);
+
+            // A field-like declaration (including a partial definition) is reported as its declarator.
+            var declaration = syntax is VariableDeclaratorSyntax declarator ? declarator.Parent?.Parent : syntax;
+
+            var modifiers = declaration switch
+            {
+                EventDeclarationSyntax accessorForm => accessorForm.Modifiers,
+                EventFieldDeclarationSyntax fieldForm => fieldForm.Modifiers,
+                _ => default,
+            };
+
+            if (modifiers.Any(SyntaxKind.PartialKeyword))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
