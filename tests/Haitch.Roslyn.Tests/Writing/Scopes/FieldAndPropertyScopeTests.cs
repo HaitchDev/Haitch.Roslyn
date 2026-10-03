@@ -514,6 +514,55 @@ public class FieldAndPropertyScopeTests
     }
 
     [Test]
+    public async Task Should_reject_a_ref_returning_property_with_a_setter_and_leave_the_writer_untouched()
+    {
+        PropertyModel slotWithSetter = PropertyFrom("Slot") with
+        {
+            Accessors = new[]
+            {
+                new PropertyAccessorModel(PropertyAccessorKind.Get, Accessibility.Public),
+                new PropertyAccessorModel(PropertyAccessorKind.Set, Accessibility.Public),
+            }.ToEquatableArray(),
+        };
+        PropertyModel viewWithInit = PropertyFrom("View") with
+        {
+            Accessors = new[]
+            {
+                new PropertyAccessorModel(PropertyAccessorKind.Get, Accessibility.Public),
+                new PropertyAccessorModel(PropertyAccessorKind.Init, Accessibility.Public),
+            }.ToEquatableArray(),
+        };
+
+        foreach (PropertyModel property in new[] { slotWithSetter, viewWithInit })
+        {
+            SourceWriter writer = new();
+            string before = "";
+            string after = "";
+            ArgumentException? thrown = null;
+
+            using (var file = writer.File())
+            {
+                using var type = file.Type(Sample());
+                before = writer.ToString();
+
+                try
+                {
+                    type.Property(property).Dispose();
+                }
+                catch (ArgumentException exception)
+                {
+                    thrown = exception;
+                }
+
+                after = writer.ToString();
+            }
+
+            await Assert.That(thrown).IsNotNull();
+            await Assert.That(after).IsEqualTo(before);
+        }
+    }
+
+    [Test]
     public async Task Should_reject_a_field_on_a_namespace_scope()
     {
         string[] errors = ScopeCompileCheck.Compile(

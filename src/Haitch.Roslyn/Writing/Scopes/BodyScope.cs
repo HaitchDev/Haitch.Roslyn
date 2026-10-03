@@ -8,24 +8,43 @@ namespace Haitch.Roslyn.Writing;
 /// <summary>
 /// An open braced body: a method body, or a nested block inside one. It exposes only
 /// <see cref="Line"/> and <see cref="Block"/>, so a member or type inside a body does not compile.
-/// Shares the accepted copy/parent-reuse limitation documented on <see cref="FileScope"/>.
+/// Every member throws before writing when a nested block opened from this body is still open, or when this
+/// body was already closed through a disposed copy.
 /// Disposing the same instance twice is a no-op.
+/// In a switch section, the section must end in <see cref="Break"/>, <see cref="Continue"/>, <see cref="Return"/>,
+/// <see cref="Throw"/>, <see cref="GotoCase"/>, or a <see cref="Line"/> whose first token is <c>break</c>,
+/// <c>return</c>, <c>throw</c>, <c>continue</c>, <c>goto</c> or <c>yield break</c>; otherwise the next section's
+/// opening throws, or for the last section the writer's <c>ToString()</c> throws. A blank line, a <c>//</c> comment
+/// line or a preprocessor line leaves the state unchanged, and a multi-line text is judged by its last line that is
+/// none of those. A section whose last statement is a nested block counts as
+/// not ending in a jump, even if every path through the block jumps, because nested blocks are not flow-analysed.
 /// </summary>
 internal ref struct BodyScope
 {
     private readonly SourceWriter _writer;
+    private readonly int _blockId;
+    private readonly SwitchSection? _section;
     private SourceWriter.BlockScope _block;
 
-    internal BodyScope(SourceWriter writer, SourceWriter.BlockScope block)
+    internal BodyScope(SourceWriter writer, SourceWriter.BlockScope block, SwitchSection? section = null)
     {
         _writer = writer;
         _block = block;
+        _blockId = writer.InnermostBlockId;
+        _section = section;
     }
 
     /// <summary>Writes <paramref name="text"/> as one or more lines and returns this scope for chaining.</summary>
     public readonly BodyScope Line(string text)
     {
+        RequireInnermost();
         _writer.WriteLine(text);
+        bool? jump = EndsInJump(text);
+
+        if (jump is not null)
+        {
+            Wrote(jump.Value);
+        }
 
         return this;
     }
@@ -37,27 +56,40 @@ internal ref struct BodyScope
     /// <exception cref="ArgumentException"><paramref name="header"/> is null, empty or whitespace.</exception>
     public readonly BodyScope Block(string header)
     {
-        return OpenBlock(_writer, header);
+        RequireInnermost();
+
+        BodyScope scope = OpenBlock(_writer, header);
+        Wrote(false);
+
+        return scope;
     }
 
     // Shared by every scope that exposes Block so the header check and output stay in one place.
-    internal static BodyScope OpenBlock(SourceWriter writer, string header)
+    internal static BodyScope OpenBlock(SourceWriter writer, string header, string? label = null, bool isLoop = true)
     {
         if (string.IsNullOrWhiteSpace(header))
         {
             throw new ArgumentException("A block header is required.", nameof(header));
         }
 
+        writer.WriteLabel(label);
         writer.WriteLine(header);
+        BodyScope scope = new(writer, writer.Block());
+        writer.PushLabel(label, isLoop);
 
-        return new BodyScope(writer, writer.Block());
+        return scope;
     }
 
     /// <summary>Writes <c>if (condition)</c> and opens its braced body; chain <c>ElseIf</c>/<c>Else</c> on the result.</summary>
     /// <exception cref="ArgumentException"><paramref name="condition"/> is null, empty or whitespace.</exception>
     public readonly IfScope If(string condition)
     {
-        return OpenIf(_writer, condition);
+        RequireInnermost();
+
+        IfScope scope = OpenIf(_writer, condition);
+        Wrote(false);
+
+        return scope;
     }
 
     internal static IfScope OpenIf(SourceWriter writer, string condition)
@@ -76,56 +108,92 @@ internal ref struct BodyScope
     /// Writes <c>foreach (type identifier in collection)</c> and opens its braced body.
     /// The identifier is written verbatim: it is neither validated nor escaped with <c>@</c>.
     /// </summary>
-    /// <exception cref="ArgumentException">Any argument is null, empty or whitespace.</exception>
-    public readonly BodyScope ForEach(string type, string identifier, string collection)
+    /// <exception cref="ArgumentException">
+    /// Any argument is null, empty or whitespace, or <paramref name="label"/> is not an identifier.
+    /// </exception>
+    public readonly BodyScope ForEach(string type, string identifier, string collection, string? label = null)
     {
-        return OpenForEach(_writer, type, identifier, collection);
+        RequireInnermost();
+
+        BodyScope scope = OpenForEach(_writer, type, identifier, collection, label);
+        Wrote(false);
+
+        return scope;
     }
 
-    internal static BodyScope OpenForEach(SourceWriter writer, string type, string identifier, string collection)
+    internal static BodyScope OpenForEach(
+        SourceWriter writer,
+        string type,
+        string identifier,
+        string collection,
+        string? label
+    )
     {
         RequireText(type, nameof(type));
         RequireText(identifier, nameof(identifier));
         RequireText(collection, nameof(collection));
 
-        return OpenBlock(writer, $"foreach ({type} {identifier} in {collection})");
+        return OpenBlock(writer, $"foreach ({type} {identifier} in {collection})", label);
     }
 
     /// <summary>
     /// Writes <c>for (initializer; condition; iterator)</c> and opens its braced body. Any part may be empty,
     /// so all three empty renders <c>for (;;)</c>.
     /// </summary>
-    public readonly BodyScope For(string initializer, string condition, string iterator)
+    public readonly BodyScope For(string initializer, string condition, string iterator, string? label = null)
     {
-        return OpenFor(_writer, initializer, condition, iterator);
+        RequireInnermost();
+
+        BodyScope scope = OpenFor(_writer, initializer, condition, iterator, label);
+        Wrote(false);
+
+        return scope;
     }
 
-    internal static BodyScope OpenFor(SourceWriter writer, string initializer, string condition, string iterator)
+    internal static BodyScope OpenFor(
+        SourceWriter writer,
+        string initializer,
+        string condition,
+        string iterator,
+        string? label
+    )
     {
         string header = $"for ({initializer.Trim()};{Padded(condition)};{Padded(iterator)})";
 
-        return OpenBlock(writer, header);
+        return OpenBlock(writer, header, label);
     }
 
     /// <summary>Writes <c>while (condition)</c> and opens its braced body.</summary>
-    /// <exception cref="ArgumentException"><paramref name="condition"/> is null, empty or whitespace.</exception>
-    public readonly BodyScope While(string condition)
+    /// <exception cref="ArgumentException">
+    /// <paramref name="condition"/> is null, empty or whitespace, or <paramref name="label"/> is not an identifier.
+    /// </exception>
+    public readonly BodyScope While(string condition, string? label = null)
     {
-        return OpenWhile(_writer, condition);
+        RequireInnermost();
+
+        BodyScope scope = OpenWhile(_writer, condition, label);
+        Wrote(false);
+
+        return scope;
     }
 
-    internal static BodyScope OpenWhile(SourceWriter writer, string condition)
+    internal static BodyScope OpenWhile(SourceWriter writer, string condition, string? label)
     {
         RequireText(condition, nameof(condition));
 
-        return OpenBlock(writer, $"while ({condition})");
+        return OpenBlock(writer, $"while ({condition})", label);
     }
 
     /// <summary>Writes <c>using (resource)</c> and opens its braced body; a using declaration is a plain <see cref="Line"/>.</summary>
     /// <exception cref="ArgumentException"><paramref name="resource"/> is null, empty or whitespace.</exception>
     public readonly BodyScope Using(string resource)
     {
-        return OpenUsing(_writer, resource);
+        RequireInnermost();
+
+        BodyScope scope = OpenUsing(_writer, resource);
+        Wrote(false);
+
+        return scope;
     }
 
     internal static BodyScope OpenUsing(SourceWriter writer, string resource)
@@ -137,11 +205,17 @@ internal ref struct BodyScope
 
     /// <summary>
     /// Writes <c>try</c> and opens its braced body; chain <c>Catch</c>/<c>Finally</c> on the result. A try with
-    /// neither is a caller error (CS1524) that <c>Dispose</c> does not detect.
+    /// neither is a caller error (CS1524): <c>Dispose</c> records it and the writer's <c>ToString()</c> and
+    /// <c>ToSourceText()</c> throw it.
     /// </summary>
     public readonly TryScope Try()
     {
-        return OpenTry(_writer);
+        RequireInnermost();
+
+        TryScope scope = OpenTry(_writer);
+        Wrote(false);
+
+        return scope;
     }
 
     internal static TryScope OpenTry(SourceWriter writer)
@@ -154,23 +228,174 @@ internal ref struct BodyScope
     /// <summary>
     /// Writes <c>switch (expression)</c> and opens its braced body; add sections with <c>Case</c>/<c>Default</c>.
     /// </summary>
-    /// <exception cref="ArgumentException"><paramref name="expression"/> is null, empty or whitespace.</exception>
-    public readonly SwitchScope Switch(string expression)
+    /// <exception cref="ArgumentException">
+    /// <paramref name="expression"/> is null, empty or whitespace, or <paramref name="label"/> is not an identifier.
+    /// </exception>
+    public readonly SwitchScope Switch(string expression, string? label = null)
     {
-        return OpenSwitch(_writer, expression);
+        RequireInnermost();
+
+        SwitchScope scope = OpenSwitch(_writer, expression, label);
+        Wrote(false);
+
+        return scope;
     }
 
-    internal static SwitchScope OpenSwitch(SourceWriter writer, string expression)
+    internal static SwitchScope OpenSwitch(SourceWriter writer, string expression, string? label)
     {
         RequireText(expression, nameof(expression));
+        writer.WriteLabel(label);
         writer.WriteLine($"switch ({expression})");
+        SwitchScope scope = new(writer, writer.Block());
+        writer.PushLabel(label, isLoop: false);
 
-        return new SwitchScope(writer, writer.Block());
+        return scope;
+    }
+
+    /// <summary>
+    /// Writes <c>break;</c>, or <c>break label;</c> when <paramref name="label"/> is given.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="label"/> does not name an open labeled loop or switch.</exception>
+    public readonly BodyScope Break(string? label = null)
+    {
+        RequireInnermost();
+        WriteJump(_writer, "break", label, loopOnly: false);
+        Wrote(true);
+
+        return this;
+    }
+
+    /// <summary>
+    /// Writes <c>continue;</c>, or <c>continue label;</c> when <paramref name="label"/> is given.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="label"/> does not name an open labeled loop.</exception>
+    public readonly BodyScope Continue(string? label = null)
+    {
+        RequireInnermost();
+        WriteJump(_writer, "continue", label, loopOnly: true);
+        Wrote(true);
+
+        return this;
+    }
+
+    /// <summary>Writes <c>return;</c>, or <c>return expression;</c> when <paramref name="expression"/> is given.</summary>
+    public readonly BodyScope Return(string? expression = null)
+    {
+        RequireInnermost();
+        _writer.WriteLine(expression is null ? "return;" : $"return {expression};");
+        Wrote(true);
+
+        return this;
+    }
+
+    /// <summary>Writes <c>throw;</c>, or <c>throw expression;</c> when <paramref name="expression"/> is given.</summary>
+    public readonly BodyScope Throw(string? expression = null)
+    {
+        RequireInnermost();
+        _writer.WriteLine(expression is null ? "throw;" : $"throw {expression};");
+        Wrote(true);
+
+        return this;
+    }
+
+    /// <summary>Writes <c>goto case label;</c>.</summary>
+    /// <exception cref="ArgumentException"><paramref name="label"/> is null, empty or whitespace.</exception>
+    public readonly BodyScope GotoCase(string label)
+    {
+        RequireInnermost();
+        RequireText(label, nameof(label));
+        _writer.WriteLine($"goto case {label};");
+        Wrote(true);
+
+        return this;
+    }
+
+    internal static void WriteJump(SourceWriter writer, string keyword, string? label, bool loopOnly)
+    {
+        writer.RequireJumpTarget(label, loopOnly, nameof(label));
+        writer.WriteLine(label is null ? $"{keyword};" : $"{keyword} {label};");
     }
 
     private static string Padded(string part)
     {
         return string.IsNullOrWhiteSpace(part) ? "" : " " + part.Trim();
+    }
+
+    private readonly void Wrote(bool jump)
+    {
+        if (_section is not null)
+        {
+            _section.EndsInJump = jump;
+        }
+    }
+
+    // Null when the text has no statement line (blank, comment or directive only), so the previous state stands.
+    private static bool? EndsInJump(string text)
+    {
+        int end = text.Length;
+
+        while (end > 0)
+        {
+            int lineStart = text.LastIndexOf('\n', end - 1) + 1;
+            int start = lineStart;
+            int stop = end;
+
+            while (start < stop && char.IsWhiteSpace(text[start]))
+            {
+                start++;
+            }
+
+            while (stop > start && char.IsWhiteSpace(text[stop - 1]))
+            {
+                stop--;
+            }
+
+            bool neutral =
+                start == stop || text[start] == '#' || (stop - start >= 2 && text[start] == '/' && text[start + 1] == '/');
+
+            if (!neutral)
+            {
+                return IsJumpStatement(text, start, stop);
+            }
+
+            end = lineStart == 0 ? 0 : lineStart - 1;
+        }
+
+        return null;
+    }
+
+    private static bool IsJumpStatement(string text, int start, int stop)
+    {
+        int tokenEnd = ReadToken(text, start, stop);
+        string token = text.Substring(start, tokenEnd - start);
+
+        if (token == "yield")
+        {
+            int next = tokenEnd;
+
+            while (next < stop && char.IsWhiteSpace(text[next]))
+            {
+                next++;
+            }
+
+            int nextEnd = ReadToken(text, next, stop);
+
+            return text.Substring(next, nextEnd - next) == "break";
+        }
+
+        return token is "break" or "return" or "throw" or "continue" or "goto";
+    }
+
+    private static int ReadToken(string text, int start, int stop)
+    {
+        int end = start;
+
+        while (end < stop && (char.IsLetterOrDigit(text[end]) || text[end] == '_'))
+        {
+            end++;
+        }
+
+        return end;
     }
 
     private static void RequireText(string value, string name)
@@ -181,7 +406,28 @@ internal ref struct BodyScope
         }
     }
 
-    /// <summary>Closes the body's brace.</summary>
+    // Comparing block ids, not depths, so a stale copy cannot pass for a sibling opened at the same depth.
+    private readonly void RequireInnermost()
+    {
+        if (_writer.InnermostBlockId == _blockId)
+        {
+            return;
+        }
+
+        if (_writer.IsBlockOpen(_blockId))
+        {
+            throw new InvalidOperationException(
+                "BodyScope was used while a nested block opened from it is still open; dispose the nested scope first.");
+        }
+
+        throw new InvalidOperationException(
+            "BodyScope was used after its block was closed, likely through a copy that was disposed.");
+    }
+
+    /// <summary>
+    /// Closes the body's brace, first closing any nested blocks left open inside it. Never throws, and is a
+    /// no-op when the block is already closed, including through a copy.
+    /// </summary>
     public void Dispose()
     {
         _block.Dispose();

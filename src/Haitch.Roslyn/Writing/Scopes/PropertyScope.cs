@@ -9,13 +9,14 @@ namespace Haitch.Roslyn.Writing;
 /// <summary>
 /// An open property block. It exposes only <see cref="Get"/>, <see cref="Set"/> and <see cref="Init"/>, so a
 /// line or a member directly inside a property does not compile.
-/// Shares the accepted copy/parent-reuse limitation documented on <see cref="FileScope"/>.
-/// Disposing the same instance twice is a no-op. Opening an accessor while a previous accessor's body is
-/// still open writes it inside that body, so dispose each accessor scope before opening the next.
+/// Opening an accessor while a previous accessor's body is still open throws, so dispose each accessor
+/// scope before opening the next; see <see cref="FileScope"/>. Disposing the same instance twice, or a
+/// copy, is a no-op.
 /// </summary>
 internal ref struct PropertyScope
 {
     private readonly SourceWriter _writer;
+    private readonly int _blockId;
     private readonly PropertyModel _model;
     private SourceWriter.BlockScope _block;
 
@@ -27,12 +28,13 @@ internal ref struct PropertyScope
         _writer = writer;
         _model = model;
         _block = block;
+        _blockId = writer.InnermostBlockId;
         _state = new State();
     }
 
     /// <summary>Writes the <c>get</c> accessor line and opens its braced body.</summary>
     /// <exception cref="ArgumentException">The model has no get accessor.</exception>
-    /// <exception cref="InvalidOperationException">Called a second time on this scope.</exception>
+    /// <exception cref="InvalidOperationException">Called a second time on this scope, or while an accessor body is open.</exception>
     public readonly BodyScope Get()
     {
         return Open(PropertyAccessorKind.Get);
@@ -40,7 +42,7 @@ internal ref struct PropertyScope
 
     /// <summary>Writes the <c>set</c> accessor line and opens its braced body.</summary>
     /// <exception cref="ArgumentException">The model has no set accessor (an init accessor does not count).</exception>
-    /// <exception cref="InvalidOperationException">Called a second time on this scope.</exception>
+    /// <exception cref="InvalidOperationException">Called a second time on this scope, or while an accessor body is open.</exception>
     public readonly BodyScope Set()
     {
         return Open(PropertyAccessorKind.Set);
@@ -48,7 +50,7 @@ internal ref struct PropertyScope
 
     /// <summary>Writes the <c>init</c> accessor line and opens its braced body.</summary>
     /// <exception cref="ArgumentException">The model has no init accessor.</exception>
-    /// <exception cref="InvalidOperationException">Called a second time on this scope.</exception>
+    /// <exception cref="InvalidOperationException">Called a second time on this scope, or while an accessor body is open.</exception>
     public readonly BodyScope Init()
     {
         return Open(PropertyAccessorKind.Init);
@@ -72,6 +74,7 @@ internal ref struct PropertyScope
             throw new ArgumentException($"'{_model.Name}' has no {kind.ToString().ToLowerInvariant()} accessor.");
         }
 
+        RequireInnermost();
         MarkOpened(kind);
 
         _writer.WriteLine(SourceWriterExtensions.RenderAccessorKeyword(accessor, _model.Accessibility));
@@ -106,6 +109,23 @@ internal ref struct PropertyScope
                 _state.OpenedInit = true;
                 break;
         }
+    }
+
+    private readonly void RequireInnermost()
+    {
+        if (_writer.InnermostBlockId == _blockId)
+        {
+            return;
+        }
+
+        if (_writer.IsBlockOpen(_blockId))
+        {
+            throw new InvalidOperationException(
+                "PropertyScope was used while an accessor body opened from it is still open; dispose the accessor scope first.");
+        }
+
+        throw new InvalidOperationException(
+            "PropertyScope was used after its block was closed, likely through a copy that was disposed.");
     }
 
     /// <summary>Closes the property's brace.</summary>

@@ -2,6 +2,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 
 namespace Haitch.Roslyn.Writing;
 
@@ -9,34 +10,50 @@ namespace Haitch.Roslyn.Writing;
 /// An open <c>try</c> or <c>catch</c> block. Like <see cref="BodyScope"/> it exposes statement members, plus
 /// <see cref="Catch"/> and <see cref="Finally"/>, which close this block and open the next.
 /// <see cref="Finally"/> returns a <see cref="BodyScope"/>, so nothing can follow it in the chain.
-/// Shares the accepted copy/parent-reuse limitation documented on <see cref="FileScope"/>.
 /// Disposing the same instance twice, or disposing a block that was already chained, is a no-op.
-/// A <c>try</c> with neither <see cref="Catch"/> nor <see cref="Finally"/> renders a lone <c>try</c> block that
-/// does not compile (CS1524); this is a caller error and <see cref="Dispose"/> never throws for it.
-/// Catch ordering is also the caller's job: a more-derived exception type after a less-derived one does not
-/// compile (CS0160), and the scope does not check it.
+/// A <c>try</c> with neither <see cref="Catch"/> nor <see cref="Finally"/> would not compile (CS1524);
+/// <see cref="Dispose"/> never throws, so it records the error and the writer's <c>ToString()</c> throws it.
+/// A catch whose type text repeats an earlier unfiltered one throws immediately, filtered or not; a repeat of
+/// an earlier filtered catch is legal. Catch types compare by trimmed text only: a more-derived type after a
+/// less-derived one (CS0160) is not checked.
 /// A catch identifier the body never uses compiles with warning CS0168.
+/// Every write member throws while a nested block opened from this block is still open, before writing anything.
 /// Writing through a block after chaining it lands in the newest open block, so write each block's
 /// content before opening the next.
 /// Calling <see cref="Catch"/> or <see cref="Finally"/> while a nested block opened from this block is still
-/// open closes that innermost brace first, misnesting the output, so dispose nested scopes before chaining.
+/// open throws, so dispose nested scopes before chaining.
 /// </summary>
 internal ref struct TryScope
 {
     private readonly SourceWriter _writer;
+    private readonly int _blockId;
 
     // Shared across copies: a using local is readonly, so flags on the struct would be lost on a defensive copy.
     private readonly State _state;
 
-    internal TryScope(SourceWriter writer, SourceWriter.BlockScope block, bool generalCatch = false)
+    internal TryScope(
+        SourceWriter writer,
+        SourceWriter.BlockScope block,
+        bool isTry = true,
+        bool generalCatch = false,
+        List<string>? seenCatchTypes = null
+    )
     {
         _writer = writer;
-        _state = new State { Block = block, GeneralCatch = generalCatch };
+        _blockId = writer.InnermostBlockId;
+        _state = new State
+        {
+            Block = block,
+            IsTry = isTry,
+            GeneralCatch = generalCatch,
+            SeenCatchTypes = seenCatchTypes ?? new List<string>(),
+        };
     }
 
     /// <summary>Writes <paramref name="text"/> as one or more lines and returns this scope for chaining.</summary>
     public readonly TryScope Line(string text)
     {
+        RequireInnermost();
         _writer.WriteLine(text);
 
         return this;
@@ -49,41 +66,77 @@ internal ref struct TryScope
     /// <exception cref="ArgumentException"><paramref name="header"/> is null, empty or whitespace.</exception>
     public readonly BodyScope Block(string header)
     {
+        RequireInnermost();
+
         return BodyScope.OpenBlock(_writer, header);
     }
 
-    public readonly BodyScope ForEach(string type, string identifier, string collection)
+    public readonly BodyScope ForEach(string type, string identifier, string collection, string? label = null)
     {
-        return BodyScope.OpenForEach(_writer, type, identifier, collection);
+        RequireInnermost();
+
+        return BodyScope.OpenForEach(_writer, type, identifier, collection, label);
     }
 
-    public readonly BodyScope For(string initializer, string condition, string iterator)
+    public readonly BodyScope For(string initializer, string condition, string iterator, string? label = null)
     {
-        return BodyScope.OpenFor(_writer, initializer, condition, iterator);
+        RequireInnermost();
+
+        return BodyScope.OpenFor(_writer, initializer, condition, iterator, label);
     }
 
-    public readonly BodyScope While(string condition)
+    public readonly BodyScope While(string condition, string? label = null)
     {
-        return BodyScope.OpenWhile(_writer, condition);
+        RequireInnermost();
+
+        return BodyScope.OpenWhile(_writer, condition, label);
     }
 
-    public readonly SwitchScope Switch(string expression)
+    public readonly SwitchScope Switch(string expression, string? label = null)
     {
-        return BodyScope.OpenSwitch(_writer, expression);
+        RequireInnermost();
+
+        return BodyScope.OpenSwitch(_writer, expression, label);
+    }
+
+    /// <summary>Writes <c>break;</c>, or <c>break label;</c> when <paramref name="label"/> is given.</summary>
+    /// <exception cref="ArgumentException"><paramref name="label"/> does not name an open labeled loop or switch.</exception>
+    public readonly TryScope Break(string? label = null)
+    {
+        RequireInnermost();
+        BodyScope.WriteJump(_writer, "break", label, loopOnly: false);
+
+        return this;
+    }
+
+    /// <summary>Writes <c>continue;</c>, or <c>continue label;</c> when <paramref name="label"/> is given.</summary>
+    /// <exception cref="ArgumentException"><paramref name="label"/> does not name an open labeled loop.</exception>
+    public readonly TryScope Continue(string? label = null)
+    {
+        RequireInnermost();
+        BodyScope.WriteJump(_writer, "continue", label, loopOnly: true);
+
+        return this;
     }
 
     public readonly BodyScope Using(string resource)
     {
+        RequireInnermost();
+
         return BodyScope.OpenUsing(_writer, resource);
     }
 
     public readonly IfScope If(string condition)
     {
+        RequireInnermost();
+
         return BodyScope.OpenIf(_writer, condition);
     }
 
     public readonly TryScope Try()
     {
+        RequireInnermost();
+
         return BodyScope.OpenTry(_writer);
     }
 
@@ -96,6 +149,7 @@ internal ref struct TryScope
     /// </exception>
     /// <exception cref="InvalidOperationException">
     /// This block was already chained, or an unfiltered general <c>catch</c> already precedes it.
+    /// Or an unfiltered catch repeats the type text of an earlier unfiltered catch.
     /// </exception>
     public readonly TryScope Catch(string? type = null, string? identifier = null, string? filter = null)
     {
@@ -113,6 +167,17 @@ internal ref struct TryScope
             throw new InvalidOperationException("A catch cannot follow a general catch.");
         }
 
+        RequireNoOpenNested();
+
+        string? trimmedType = type?.Trim();
+        bool unfiltered = filter is null;
+
+        // CS0160 depends on the earlier catch having no filter, whatever this catch's own filter is.
+        if (trimmedType is not null && _state.SeenCatchTypes.Contains(trimmedType))
+        {
+            throw new InvalidOperationException($"A catch for '{trimmedType}' already precedes this one (CS0160).");
+        }
+
         string header = "catch";
 
         if (type is not null)
@@ -128,7 +193,16 @@ internal ref struct TryScope
         CloseForChain();
         _writer.WriteLine(header);
 
-        return new TryScope(_writer, _writer.Block(), generalCatch: type is null && filter is null);
+        List<string> seen = _state.SeenCatchTypes;
+
+        if (unfiltered && trimmedType is not null)
+        {
+            seen.Add(trimmedType);
+        }
+
+        bool general = unfiltered && (trimmedType is null || IsExceptionSpelling(trimmedType));
+
+        return new TryScope(_writer, _writer.Block(), isTry: false, generalCatch: general, seenCatchTypes: seen);
     }
 
     /// <summary>Closes this block, writes <c>finally</c> and opens its braced body.</summary>
@@ -139,6 +213,11 @@ internal ref struct TryScope
         _writer.WriteLine("finally");
 
         return new BodyScope(_writer, _writer.Block());
+    }
+
+    private static bool IsExceptionSpelling(string type)
+    {
+        return type == "Exception" || type == "System.Exception" || type == "global::System.Exception";
     }
 
     private static void RequireTextIfGiven(string? value, string name)
@@ -156,20 +235,60 @@ internal ref struct TryScope
             throw new InvalidOperationException("This block was already followed by a catch or finally.");
         }
 
+        RequireNoOpenNested();
+
         _state.Chained = true;
         _state.Block.Dispose();
+    }
+
+    private readonly void RequireInnermost()
+    {
+        RequireInnermost("used");
+    }
+
+    private readonly void RequireNoOpenNested()
+    {
+        RequireInnermost("chained");
+    }
+
+    private readonly void RequireInnermost(string action)
+    {
+        if (_writer.InnermostBlockId == _blockId)
+        {
+            return;
+        }
+
+        if (_writer.IsBlockOpen(_blockId))
+        {
+            throw new InvalidOperationException(
+                $"TryScope was {action} while a nested block opened from it is still open; dispose the nested scope first.");
+        }
+
+        throw new InvalidOperationException(
+            $"TryScope was {action} after its block was closed, likely through a copy that was disposed.");
     }
 
     /// <summary>Closes the block's brace unless it was already closed by chaining.</summary>
     public void Dispose()
     {
+        bool first = !_state.Disposed;
+
+        _state.Disposed = true;
         _state.Block.Dispose();
+
+        if (first && _state.IsTry && !_state.Chained)
+        {
+            _writer.RecordError("A try block has neither a catch nor a finally (TryScope).");
+        }
     }
 
     private sealed class State
     {
         public SourceWriter.BlockScope Block;
+        public bool IsTry;
+        public bool Disposed;
         public bool Chained;
         public bool GeneralCatch;
+        public List<string> SeenCatchTypes = new();
     }
 }

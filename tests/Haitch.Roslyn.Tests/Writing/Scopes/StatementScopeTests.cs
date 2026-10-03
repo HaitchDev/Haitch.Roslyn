@@ -1019,9 +1019,14 @@ public class StatementScopeTests
             }
 
             using var attempt = branch.Try();
-            using var inTry = attempt.Switch("n");
-            using var tail = inTry.Default();
-            tail.Line("break;");
+
+            using (var inTry = attempt.Switch("n"))
+            {
+                using var tail = inTry.Default();
+                tail.Line("break;");
+            }
+
+            attempt.Finally().Dispose();
         });
 
         await Assert.That(output).IsEqualTo(
@@ -1031,6 +1036,7 @@ public class StatementScopeTests
                 + "            try\n            {\n"
                 + "                switch (n)\n                {\n                    default:\n                    {\n                        break;\n                    }\n                }\n"
                 + "            }\n"
+                + "            finally\n            {\n            }\n"
                 + "        }\n"));
     }
 
@@ -1097,7 +1103,182 @@ public class StatementScopeTests
     }
 
     [Test]
-    public async Task Should_report_fall_through_as_a_caller_error()
+    public async Task Should_throw_on_the_next_case_after_a_section_that_falls_through_without_writing_it()
+    {
+        SourceWriter writer = new();
+        string before = null!;
+        string after = null!;
+
+        await Assert
+            .That(() =>
+            {
+                using var file = writer.File();
+                using var type = file.Type(Sample());
+                using var method = type.Method(Other());
+                using var sw = method.Switch("n");
+
+                using (var falling = sw.Case("1"))
+                {
+                    falling.Line("System.Console.WriteLine(1);");
+                }
+
+                before = writer.ToString();
+
+                try
+                {
+                    sw.Case("2");
+                }
+                finally
+                {
+                    after = writer.ToString();
+                }
+            })
+            .Throws<InvalidOperationException>();
+
+        await Assert.That(after).IsEqualTo(before);
+    }
+
+    [Test]
+    public async Task Should_render_each_jump_method_exactly()
+    {
+        string output = RenderMethod(body =>
+        {
+            using var sw = body.Switch("n");
+
+            using (var one = sw.Case("1"))
+            {
+                one.Return();
+            }
+
+            using (var two = sw.Case("2"))
+            {
+                two.Return("n");
+            }
+
+            using (var three = sw.Case("3"))
+            {
+                three.Throw();
+            }
+
+            using (var four = sw.Case("4"))
+            {
+                four.Throw("new System.Exception()");
+            }
+
+            using var fallback = sw.Default();
+            fallback.GotoCase("1");
+        });
+
+        await Assert.That(output).IsEqualTo(
+            Expected(
+                "        switch (n)\n        {\n"
+                + "            case 1:\n            {\n                return;\n            }\n"
+                + "            case 2:\n            {\n                return n;\n            }\n"
+                + "            case 3:\n            {\n                throw;\n            }\n"
+                + "            case 4:\n            {\n                throw new System.Exception();\n            }\n"
+                + "            default:\n            {\n                goto case 1;\n            }\n"
+                + "        }\n"));
+    }
+
+    [Test]
+    [Arguments(" ")]
+    [Arguments("")]
+    public async Task Should_reject_a_blank_goto_case_label(string label)
+    {
+        await Assert
+            .That(() =>
+                RenderMethod(body =>
+                {
+                    using var sw = body.Switch("n");
+                    using var section = sw.Case("1");
+                    section.GotoCase(label);
+                })
+            )
+            .Throws<ArgumentException>();
+    }
+
+    [Test]
+    [Arguments("break;")]
+    [Arguments("return x;")]
+    [Arguments("throw new System.Exception();")]
+    [Arguments("continue;")]
+    [Arguments("goto case 1;")]
+    [Arguments("  return;")]
+    [Arguments("yield break;")]
+    [Arguments("  yield   break;")]
+    public async Task Should_accept_a_section_ending_in_a_raw_jump_line(string jump)
+    {
+        string output = RenderMethod(body =>
+        {
+            using var sw = body.Switch("n");
+
+            using (var first = sw.Case("1"))
+            {
+                first.Line("x();").Line(jump);
+            }
+
+            using var last = sw.Case("2");
+            last.Line(jump);
+        });
+
+        await Assert.That(output).Contains("case 2:");
+    }
+
+    [Test]
+    [Arguments("empty")]
+    [Arguments("statement")]
+    [Arguments("jump then statement")]
+    [Arguments("keyword prefix")]
+    [Arguments("nested block")]
+    public async Task Should_throw_on_the_next_case_or_default_after_a_section_without_a_jump(string shape)
+    {
+        foreach (bool useDefault in new[] { false, true })
+        {
+            await Assert
+                .That(() =>
+                    RenderMethod(body =>
+                    {
+                        using var sw = body.Switch("n");
+
+                        using (var section = sw.Case("1"))
+                        {
+                            switch (shape)
+                            {
+                                case "statement":
+                                    section.Line("x();");
+                                    break;
+                                case "jump then statement":
+                                    section.Break().Line("x();");
+                                    break;
+                                case "keyword prefix":
+                                    section.Line("returnValue = 1;");
+                                    break;
+                                case "nested block":
+                                    using (var inner = section.If("a"))
+                                    {
+                                        inner.Line("break;");
+                                    }
+
+                                    break;
+                            }
+                        }
+
+                        if (useDefault)
+                        {
+                            sw.Default();
+                        }
+                        else
+                        {
+                            sw.Case("2");
+                        }
+                    })
+                )
+                .Throws<InvalidOperationException>();
+        }
+    }
+
+    [Test]
+    public async Task Should_make_to_string_throw_for_a_last_section_without_a_jump_while_dispose_does_not()
     {
         SourceWriter writer = new();
 
@@ -1105,29 +1286,29 @@ public class StatementScopeTests
         {
             using var type = file.Type(Sample());
             using var method = type.Method(Other());
-            method.Line("int n = 1;");
             using var sw = method.Switch("n");
-
-            using (var falling = sw.Case("1"))
-            {
-                falling.Line("System.Console.WriteLine(1);");
-            }
-
-            using var last = sw.Case("2");
-            last.Line("break;");
+            using var last = sw.Case("1");
+            last.Line("x();");
         }
 
-        CSharpCompilation compilation = CompilationHelper.Compile(
-            "public partial class Sample { }\n" + writer,
-            allowErrors: true);
+        await Assert.That(() => writer.ToString()).Throws<InvalidOperationException>();
+        await Assert.That(() => writer.ToSourceText()).Throws<InvalidOperationException>();
+    }
 
-        string[] errors = compilation
-            .GetDiagnostics()
-            .Where(d => d.Severity is DiagnosticSeverity.Error)
-            .Select(d => d.Id)
-            .ToArray();
+    [Test]
+    public async Task Should_make_to_string_throw_for_an_empty_last_section()
+    {
+        SourceWriter writer = new();
 
-        await Assert.That(errors).IsEquivalentTo(new[] { "CS0163" });
+        using (var file = writer.File())
+        {
+            using var type = file.Type(Sample());
+            using var method = type.Method(Other());
+            using var sw = method.Switch("n");
+            sw.Default().Dispose();
+        }
+
+        await Assert.That(() => writer.ToString()).Throws<InvalidOperationException>();
     }
 
     [Test]
@@ -1217,6 +1398,56 @@ public class StatementScopeTests
 
         await Assert.That(before).EndsWith("        switch (n)\n        {\n");
         await Assert.That(after).IsEqualTo(before);
+    }
+
+    [Test]
+    [Arguments("")]
+    [Arguments("   ")]
+    [Arguments("// trailing note")]
+    [Arguments("  // indented note")]
+    [Arguments("#pragma warning disable CS0168")]
+    [Arguments("return;\n// note")]
+    [Arguments("return;\n\n#region r")]
+    public async Task Should_keep_a_jump_when_a_neutral_line_follows_it(string neutral)
+    {
+        string output = RenderMethod(body =>
+        {
+            using var sw = body.Switch("n");
+
+            using (var first = sw.Case("1"))
+            {
+                first.Break().Line(neutral);
+            }
+
+            using var last = sw.Case("2");
+            last.Break().Line(neutral);
+        });
+
+        await Assert.That(output).Contains("case 2:");
+    }
+
+    [Test]
+    [Arguments("// return;")]
+    [Arguments("#if X")]
+    [Arguments("")]
+    [Arguments("x();\n// return;")]
+    public async Task Should_not_count_a_neutral_line_as_a_jump_in_an_empty_or_non_jumping_section(string text)
+    {
+        await Assert
+            .That(() =>
+                RenderMethod(body =>
+                {
+                    using var sw = body.Switch("n");
+
+                    using (var first = sw.Case("1"))
+                    {
+                        first.Line(text);
+                    }
+
+                    using var next = sw.Case("2");
+                })
+            )
+            .Throws<InvalidOperationException>();
     }
 
     private static async Task AssertRejectedWithoutWriting(Action<BodyScope> open)

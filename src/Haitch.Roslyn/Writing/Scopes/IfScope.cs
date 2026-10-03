@@ -9,17 +9,17 @@ namespace Haitch.Roslyn.Writing;
 /// An open <c>if</c> or <c>else if</c> branch. Like <see cref="BodyScope"/> it exposes <see cref="Line"/> and
 /// <see cref="Block"/>, plus <see cref="ElseIf"/> and <see cref="Else"/>, which close this branch and open the next.
 /// <see cref="Else"/> returns a <see cref="BodyScope"/>, so nothing can follow it in the chain.
-/// Shares the accepted copy/parent-reuse limitation documented on <see cref="FileScope"/>.
 /// Disposing the same instance twice, or disposing a branch that was already chained, is a no-op.
+/// Every write member throws while a nested block opened from this branch is still open, before writing anything.
 /// Writing through a branch after chaining it lands in the newest open branch, so write each branch's
 /// content before opening the next.
 /// Calling <see cref="ElseIf"/> or <see cref="Else"/> while a nested block or <c>if</c> opened from this
-/// branch is still open closes that innermost brace first, misnesting the output, so dispose nested
-/// scopes before chaining.
+/// branch is still open throws, so dispose nested scopes before chaining.
 /// </summary>
 internal ref struct IfScope
 {
     private readonly SourceWriter _writer;
+    private readonly int _blockId;
 
     // Shared across copies: a using local is readonly, so flags on the struct would be lost on a defensive copy.
     private readonly State _state;
@@ -27,12 +27,14 @@ internal ref struct IfScope
     internal IfScope(SourceWriter writer, SourceWriter.BlockScope block)
     {
         _writer = writer;
+        _blockId = writer.InnermostBlockId;
         _state = new State { Block = block };
     }
 
     /// <summary>Writes <paramref name="text"/> as one or more lines and returns this scope for chaining.</summary>
     public readonly IfScope Line(string text)
     {
+        RequireInnermost();
         _writer.WriteLine(text);
 
         return this;
@@ -45,41 +47,77 @@ internal ref struct IfScope
     /// <exception cref="ArgumentException"><paramref name="header"/> is null, empty or whitespace.</exception>
     public readonly BodyScope Block(string header)
     {
+        RequireInnermost();
+
         return BodyScope.OpenBlock(_writer, header);
     }
 
-    public readonly BodyScope ForEach(string type, string identifier, string collection)
+    public readonly BodyScope ForEach(string type, string identifier, string collection, string? label = null)
     {
-        return BodyScope.OpenForEach(_writer, type, identifier, collection);
+        RequireInnermost();
+
+        return BodyScope.OpenForEach(_writer, type, identifier, collection, label);
     }
 
-    public readonly BodyScope For(string initializer, string condition, string iterator)
+    public readonly BodyScope For(string initializer, string condition, string iterator, string? label = null)
     {
-        return BodyScope.OpenFor(_writer, initializer, condition, iterator);
+        RequireInnermost();
+
+        return BodyScope.OpenFor(_writer, initializer, condition, iterator, label);
     }
 
-    public readonly BodyScope While(string condition)
+    public readonly BodyScope While(string condition, string? label = null)
     {
-        return BodyScope.OpenWhile(_writer, condition);
+        RequireInnermost();
+
+        return BodyScope.OpenWhile(_writer, condition, label);
     }
 
-    public readonly SwitchScope Switch(string expression)
+    public readonly SwitchScope Switch(string expression, string? label = null)
     {
-        return BodyScope.OpenSwitch(_writer, expression);
+        RequireInnermost();
+
+        return BodyScope.OpenSwitch(_writer, expression, label);
+    }
+
+    /// <summary>Writes <c>break;</c>, or <c>break label;</c> when <paramref name="label"/> is given.</summary>
+    /// <exception cref="ArgumentException"><paramref name="label"/> does not name an open labeled loop or switch.</exception>
+    public readonly IfScope Break(string? label = null)
+    {
+        RequireInnermost();
+        BodyScope.WriteJump(_writer, "break", label, loopOnly: false);
+
+        return this;
+    }
+
+    /// <summary>Writes <c>continue;</c>, or <c>continue label;</c> when <paramref name="label"/> is given.</summary>
+    /// <exception cref="ArgumentException"><paramref name="label"/> does not name an open labeled loop.</exception>
+    public readonly IfScope Continue(string? label = null)
+    {
+        RequireInnermost();
+        BodyScope.WriteJump(_writer, "continue", label, loopOnly: true);
+
+        return this;
     }
 
     public readonly BodyScope Using(string resource)
     {
+        RequireInnermost();
+
         return BodyScope.OpenUsing(_writer, resource);
     }
 
     public readonly IfScope If(string condition)
     {
+        RequireInnermost();
+
         return BodyScope.OpenIf(_writer, condition);
     }
 
     public readonly TryScope Try()
     {
+        RequireInnermost();
+
         return BodyScope.OpenTry(_writer);
     }
 
@@ -116,8 +154,32 @@ internal ref struct IfScope
             throw new InvalidOperationException("This branch was already followed by an else or else if.");
         }
 
+        RequireInnermost("chained");
+
         _state.Chained = true;
         _state.Block.Dispose();
+    }
+
+    private readonly void RequireInnermost()
+    {
+        RequireInnermost("used");
+    }
+
+    private readonly void RequireInnermost(string action)
+    {
+        if (_writer.InnermostBlockId == _blockId)
+        {
+            return;
+        }
+
+        if (_writer.IsBlockOpen(_blockId))
+        {
+            throw new InvalidOperationException(
+                $"IfScope was {action} while a nested block opened from it is still open; dispose the nested scope first.");
+        }
+
+        throw new InvalidOperationException(
+            $"IfScope was {action} after its block was closed, likely through a copy that was disposed.");
     }
 
     /// <summary>Closes the branch's brace unless it was already closed by chaining.</summary>

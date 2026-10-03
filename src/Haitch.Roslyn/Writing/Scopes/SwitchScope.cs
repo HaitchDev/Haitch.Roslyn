@@ -8,17 +8,18 @@ namespace Haitch.Roslyn.Writing;
 /// <summary>
 /// An open <c>switch</c> statement. It exposes only <see cref="Case"/> and <see cref="Default"/>, so a statement
 /// directly inside a switch, outside any section, does not compile. Each section is a braced <see cref="BodyScope"/>.
-/// Shares the accepted copy/parent-reuse limitation documented on <see cref="FileScope"/>.
 /// Disposing the same instance twice is a no-op.
-/// The caller writes each section's <c>break;</c> or <c>return</c>: a section that can fall through renders
-/// output that does not compile (CS0163, or CS8070 for the final section); this is a caller error and nothing detects it.
+/// Each section must end in a jump (see <see cref="BodyScope"/>), or it would not compile (CS0163, or CS8070 for the
+/// final section): opening the next section throws, and a final section without one is recorded when the switch is
+/// disposed (<see cref="Dispose"/> never throws) so the writer's <c>ToString()</c> throws.
 /// Calling <see cref="Case"/> or <see cref="Default"/> while the previous section's <see cref="BodyScope"/> is still
-/// open misnests the output, so dispose each section before opening the next.
+/// open throws, so dispose each section before opening the next.
 /// Switch expressions are not supported.
 /// </summary>
 internal ref struct SwitchScope
 {
     private readonly SourceWriter _writer;
+    private readonly int _blockId;
 
     // Shared across copies: a using local is readonly, so a flag on the struct would be lost on a defensive copy.
     private readonly State _state;
@@ -28,6 +29,7 @@ internal ref struct SwitchScope
     internal SwitchScope(SourceWriter writer, SourceWriter.BlockScope block)
     {
         _writer = writer;
+        _blockId = writer.InnermostBlockId;
         _block = block;
         _state = new State();
     }
@@ -38,6 +40,7 @@ internal ref struct SwitchScope
     /// and <c>_</c> gives <c>case _:</c> (the discard pattern). Do not include <c>case</c> or the colon: <c>"1:"</c> writes <c>case 1::</c>.
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="labels"/> is null or empty, or a label is null, empty or whitespace.</exception>
+    /// <exception cref="InvalidOperationException">The previous section does not end in a jump.</exception>
     public readonly BodyScope Case(params string[] labels)
     {
         if (labels is null || labels.Length == 0)
@@ -53,18 +56,26 @@ internal ref struct SwitchScope
             }
         }
 
+        RequireNoOpenSection();
+        RequirePreviousSectionJumped();
+
         foreach (string label in labels)
         {
             _writer.WriteLine($"case {label}:");
         }
 
-        return new BodyScope(_writer, _writer.Block());
+        return OpenSection();
     }
 
     /// <summary>Writes <c>default:</c> and opens a braced section body under it.</summary>
-    /// <exception cref="InvalidOperationException">This switch already has a default section.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// This switch already has a default section, or the previous section does not end in a jump.
+    /// </exception>
     public readonly BodyScope Default()
     {
+        RequireNoOpenSection();
+        RequirePreviousSectionJumped();
+
         if (_state.DefaultWritten)
         {
             throw new InvalidOperationException("A switch can have only one default section.");
@@ -73,17 +84,69 @@ internal ref struct SwitchScope
         _state.DefaultWritten = true;
         _writer.WriteLine("default:");
 
-        return new BodyScope(_writer, _writer.Block());
+        return OpenSection();
     }
 
-    /// <summary>Closes the switch's brace.</summary>
+    private readonly BodyScope OpenSection()
+    {
+        SwitchSection section = new();
+        _state.Last = section;
+
+        return new BodyScope(_writer, _writer.Block(), section);
+    }
+
+    private readonly void RequirePreviousSectionJumped()
+    {
+        if (_state.Last is { EndsInJump: false })
+        {
+            throw new InvalidOperationException(
+                "The previous switch section does not end in break, continue, return, throw or goto (it would fall through).");
+        }
+    }
+
+    private readonly void RequireNoOpenSection()
+    {
+        if (_writer.InnermostBlockId == _blockId)
+        {
+            return;
+        }
+
+        if (_writer.IsBlockOpen(_blockId))
+        {
+            throw new InvalidOperationException(
+                "SwitchScope was used while a section opened from it is still open; dispose the section first.");
+        }
+
+        throw new InvalidOperationException(
+            "SwitchScope was used after its block was closed, likely through a copy that was disposed.");
+    }
+
+    /// <summary>
+    /// Closes the switch's brace. Never throws: a last section without a jump is recorded on the writer instead.
+    /// </summary>
     public void Dispose()
     {
+        bool first = !_state.Disposed;
+
+        _state.Disposed = true;
         _block.Dispose();
+
+        if (first && _state.Last is { EndsInJump: false })
+        {
+            _writer.RecordError("The last switch section does not end in a jump (SwitchScope).");
+        }
     }
 
     private sealed class State
     {
         public bool DefaultWritten;
+        public bool Disposed;
+        public SwitchSection? Last;
     }
+}
+
+// A class so BodyScope copies, which a using local forces, all update the same flag.
+internal sealed class SwitchSection
+{
+    public bool EndsInJump;
 }

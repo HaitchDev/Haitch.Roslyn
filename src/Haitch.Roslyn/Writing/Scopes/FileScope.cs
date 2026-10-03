@@ -2,6 +2,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using Haitch.Roslyn.Models;
 
 namespace Haitch.Roslyn.Writing;
@@ -12,17 +13,18 @@ namespace Haitch.Roslyn.Writing;
 /// only the children that are legal at its position, so illegal nesting fails to compile.
 /// </summary>
 /// <remarks>
-/// Known limitation, accepted: a parent scope stays usable while a child is open, so text written to the
-/// parent lands inside the child's block; and copying a scope then disposing both copies closes the block
-/// twice. A ref struct cannot track borrow state without an allocation or a runtime check, so neither is
-/// guarded. Calling <see cref="Using"/> after a namespace has been opened writes the directive inside or
-/// after that namespace, which is invalid C# (CS1529); write all usings first.
-/// Likewise, an <c>Attribute</c> call on any scope with no type or member written after it leaves a
-/// dangling attribute (CS1519 / CS1022); it is a caller error and disposing does not throw for it.
+/// Writing to a scope while one of its child scopes is still open throws <see cref="InvalidOperationException"/>,
+/// checked against the writer's open-block depth. Disposing a copy of a scope after the original is a
+/// no-op. Calling <see cref="Using"/> after a namespace has been closed writes the directive after that
+/// namespace, which is invalid C# (CS1529); write all usings first.
+/// An <c>Attribute</c> call is buffered until the next type or member is accepted, so a rejected write
+/// leaves no attribute behind. Disposing a scope with an attribute still buffered would leave it unwritten,
+/// so the writer's <c>ToString()</c> throws instead (<c>Dispose</c> itself never throws).
 /// </remarks>
 internal readonly ref struct FileScope
 {
     private readonly SourceWriter _writer;
+    private readonly int _blockId;
 
     // Shared across copies of this ref struct; a readonly struct held by a `using` variable cannot
     // hold mutable state itself.
@@ -31,6 +33,7 @@ internal readonly ref struct FileScope
     internal FileScope(SourceWriter writer)
     {
         _writer = writer;
+        _blockId = writer.InnermostBlockId;
         _state = new State();
     }
 
@@ -38,6 +41,7 @@ internal readonly ref struct FileScope
     /// <exception cref="InvalidOperationException">An <see cref="Attribute"/> is still waiting for its type.</exception>
     public void Using(string namespaceName)
     {
+        RequireInnermost();
         ThrowIfAttributePending("a using directive");
 
         _writer.WriteLine($"using {namespaceName};");
@@ -53,6 +57,7 @@ internal readonly ref struct FileScope
     /// <exception cref="InvalidOperationException">An <see cref="Attribute"/> is still waiting for its type.</exception>
     public NamespaceScope Namespace(string name)
     {
+        RequireInnermost();
         ThrowIfAttributePending("a namespace");
 
         if (string.IsNullOrWhiteSpace(name))
@@ -84,22 +89,28 @@ internal readonly ref struct FileScope
     /// </exception>
     public TypeScope Type(TypeModel type)
     {
-        if (_state.AfterAttribute && type.ContainingTypes.Count > 0)
+        try
         {
-            throw new ArgumentException(
-                $"A pending attribute would land on the outermost containing type of '{type.Name}'.",
-                nameof(type));
-        }
+            RequireInnermost();
 
-        if (_state.NeedsBlankLine && !_state.AfterAttribute)
+            if (_state.Pending.Count > 0 && type.ContainingTypes.Count > 0)
+            {
+                throw new ArgumentException(
+                    $"A pending attribute would land on the outermost containing type of '{type.Name}'.",
+                    nameof(type));
+            }
+
+            TypeScope.ThrowIfFileLocal(type);
+            BeginMember();
+
+            return new TypeScope(_writer, type, _writer.WriteTypeDeclaration(type));
+        }
+        catch
         {
-            _writer.WriteLine();
+            _state.Pending.Clear();
+
+            throw;
         }
-
-        _state.NeedsBlankLine = true;
-        _state.AfterAttribute = false;
-
-        return new TypeScope(_writer, type, _writer.WriteTypeDeclaration(type));
     }
 
     /// <summary>
@@ -117,60 +128,98 @@ internal readonly ref struct FileScope
     /// </exception>
     public TypeScope NewType(NewTypeModel type)
     {
-        TypeScope.ThrowIfNestedOnlyAccessibility(type);
-        SourceWriterExtensions.ValidateNewType(type);
-
-        if (_state.NeedsBlankLine && !_state.AfterAttribute)
+        try
         {
-            _writer.WriteLine();
+            RequireInnermost();
+            TypeScope.ThrowIfNestedOnlyAccessibility(type);
+            SourceWriterExtensions.ValidateNewType(type);
+            BeginMember();
+
+            return TypeScope.OpenNewType(_writer, type);
         }
+        catch
+        {
+            _state.Pending.Clear();
 
-        _state.NeedsBlankLine = true;
-        _state.AfterAttribute = false;
-
-        return TypeScope.OpenNewType(_writer, type);
+            throw;
+        }
     }
 
     /// <summary>
-    /// Writes <paramref name="attribute"/> on its own line directly above the next type this scope writes,
-    /// after a blank line when one is due; the type then adds no blank line of its own. Call it again to
-    /// stack attributes. Returns this scope for chaining.
+    /// Buffers <paramref name="attribute"/> to be written on its own line directly above the next type this
+    /// scope writes, after a blank line when one is due. Call it again to stack attributes. Returns this
+    /// scope for chaining. Nothing is written if that type is rejected.
+    /// A rejected type consumes the pending attributes, so retry with fresh <c>Attribute</c> calls.
     /// </summary>
     /// <exception cref="ArgumentException">
     /// An argument of <paramref name="attribute"/> is an error constant; nothing is written.
     /// </exception>
     public FileScope Attribute(AttributeModel attribute)
     {
+        RequireInnermost();
+
         var line = SourceWriterExtensions.RenderAttribute(attribute);
-
-        if (_state.NeedsBlankLine && !_state.AfterAttribute)
-        {
-            _writer.WriteLine();
-        }
-
-        _state.AfterAttribute = true;
-        _writer.WriteLine(line);
+        _state.Pending.Add(line);
 
         return this;
     }
 
-    /// <summary>Nothing is open at file level, so disposing is a no-op that exists for <c>using</c>.</summary>
+    /// <summary>Nothing is open at file level; disposing only records a still-buffered attribute as an error.</summary>
     public void Dispose()
     {
+        if (_state.Pending.Count > 0)
+        {
+            _state.Pending.Clear();
+            _writer.RecordError("An attribute was written on a FileScope with no type after it.");
+        }
     }
 
     private void ThrowIfAttributePending(string what)
     {
-        if (_state.AfterAttribute)
+        if (_state.Pending.Count > 0)
         {
             throw new InvalidOperationException($"Cannot write {what} while an attribute is waiting for its type.");
         }
     }
 
+    // Called only after the member passed validation, so buffered attributes never precede a rejected write.
+    private readonly void BeginMember()
+    {
+        if (_state.NeedsBlankLine)
+        {
+            _writer.WriteLine();
+        }
+
+        for (var i = 0; i < _state.Pending.Count; i++)
+        {
+            _writer.WriteLine(_state.Pending[i]);
+        }
+
+        _state.Pending.Clear();
+        _state.NeedsBlankLine = true;
+    }
+
+    private readonly void RequireInnermost()
+    {
+        if (_writer.InnermostBlockId == _blockId)
+        {
+            return;
+        }
+
+        if (_writer.IsBlockOpen(_blockId))
+        {
+            throw new InvalidOperationException(
+                "FileScope was used while a nested block opened from it is still open; dispose the nested scope first.");
+        }
+
+        throw new InvalidOperationException(
+            "FileScope was used after the block it was created in was closed.");
+    }
+
     private sealed class State
     {
         public bool NeedsBlankLine;
-        public bool AfterAttribute;
+        public readonly List<string> Pending = new();
     }
 }
 

@@ -2,6 +2,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using Haitch.Roslyn.Models;
 using Microsoft.CodeAnalysis;
 
@@ -9,12 +10,13 @@ namespace Haitch.Roslyn.Writing;
 
 /// <summary>
 /// An open type block. It exposes no <c>Namespace</c> member, so a namespace inside a type does not
-/// compile. Shares the accepted copy/parent-reuse limitation documented on <see cref="FileScope"/>.
-/// Disposing the same instance twice is a no-op.
+/// compile. Writing to it while a child scope is open throws; see <see cref="FileScope"/>.
+/// Disposing the same instance twice, or a copy, is a no-op.
 /// </summary>
 internal ref struct TypeScope
 {
     private readonly SourceWriter _writer;
+    private readonly int _blockId;
     private readonly TypeModel _model;
     private SourceWriterExtensions.TypeDeclarationScope _declaration;
 
@@ -24,6 +26,7 @@ internal ref struct TypeScope
     internal TypeScope(SourceWriter writer, TypeModel model, SourceWriterExtensions.TypeDeclarationScope declaration)
     {
         _writer = writer;
+        _blockId = writer.InnermostBlockId;
         _model = model;
         _declaration = declaration;
         _state = new State();
@@ -40,32 +43,35 @@ internal ref struct TypeScope
     /// </exception>
     public TypeScope Type(TypeModel type)
     {
-        if (type.IsFileLocal)
+        try
         {
-            throw new ArgumentException(
-                "Cannot write a partial declaration for a file-local type: file-local types cannot be split "
-                    + "across a generated partial declaration in a different file.",
-                nameof(type));
-        }
+            ThrowIfFileLocal(type);
 
-        if (type.ContainingTypes.Count > 0 && !IsThisType(type.ContainingTypes[type.ContainingTypes.Count - 1]))
+            if (type.ContainingTypes.Count > 0 && !IsThisType(type.ContainingTypes[type.ContainingTypes.Count - 1]))
+            {
+                throw new ArgumentException(
+                    $"'{type.Name}' is not nested in '{_model.Name}': its innermost containing type is different.",
+                    nameof(type));
+            }
+
+            BeginMember();
+
+            SourceWriterExtensions.WriteTypeDeclarationLine(
+                _writer,
+                type.IsReadOnly,
+                type.IsRefLikeType,
+                type.Kind,
+                type.Name,
+                type.TypeParameters);
+
+            return new TypeScope(_writer, type, new SourceWriterExtensions.TypeDeclarationScope([_writer.Block()]));
+        }
+        catch
         {
-            throw new ArgumentException(
-                $"'{type.Name}' is not nested in '{_model.Name}': its innermost containing type is different.",
-                nameof(type));
+            _state.Pending.Clear();
+
+            throw;
         }
-
-        BeginMember();
-
-        SourceWriterExtensions.WriteTypeDeclarationLine(
-            _writer,
-            type.IsReadOnly,
-            type.IsRefLikeType,
-            type.Kind,
-            type.Name,
-            type.TypeParameters);
-
-        return new TypeScope(_writer, type, new SourceWriterExtensions.TypeDeclarationScope([_writer.Block()]));
     }
 
     /// <summary>
@@ -83,24 +89,44 @@ internal ref struct TypeScope
     /// </exception>
     public TypeScope NewType(NewTypeModel type)
     {
+        try
+        {
+            if (type.IsFileLocal)
+            {
+                throw new ArgumentException($"'{type.Name}' is file-local, which is illegal on a nested type.", nameof(type));
+            }
+
+            if (type.Accessibility is Accessibility.Protected or Accessibility.ProtectedOrInternal
+                    or Accessibility.ProtectedAndInternal
+                && (_model.IsStatic || _model.Kind is TypeDeclarationKind.Struct or TypeDeclarationKind.RecordStruct))
+            {
+                throw new ArgumentException(
+                    $"'{type.Name}' is {type.Accessibility}, which is illegal inside struct or static class '{_model.Name}'.",
+                    nameof(type));
+            }
+
+            SourceWriterExtensions.ValidateNewType(type);
+            BeginMember();
+
+            return OpenNewType(_writer, type);
+        }
+        catch
+        {
+            _state.Pending.Clear();
+
+            throw;
+        }
+    }
+
+    internal static void ThrowIfFileLocal(TypeModel type)
+    {
         if (type.IsFileLocal)
         {
-            throw new ArgumentException($"'{type.Name}' is file-local, which is illegal on a nested type.", nameof(type));
-        }
-
-        if (type.Accessibility is Accessibility.Protected or Accessibility.ProtectedOrInternal
-                or Accessibility.ProtectedAndInternal
-            && (_model.IsStatic || _model.Kind is TypeDeclarationKind.Struct or TypeDeclarationKind.RecordStruct))
-        {
             throw new ArgumentException(
-                $"'{type.Name}' is {type.Accessibility}, which is illegal inside struct or static class '{_model.Name}'.",
+                "Cannot write a partial declaration for a file-local type: file-local types cannot be split "
+                    + "across a generated partial declaration in a different file.",
                 nameof(type));
         }
-
-        SourceWriterExtensions.ValidateNewType(type);
-        BeginMember();
-
-        return OpenNewType(_writer, type);
     }
 
     internal static void ThrowIfNestedOnlyAccessibility(NewTypeModel type)
@@ -138,7 +164,8 @@ internal ref struct TypeScope
             default,
             default);
 
-        var declaration = new SourceWriterExtensions.TypeDeclarationScope([writer.WriteNewTypeDeclaration(type)]);
+        var declaration = new SourceWriterExtensions.TypeDeclarationScope(
+            [SourceWriterExtensions.WriteNewTypeDeclaration(writer, type)]);
 
         return new TypeScope(writer, model, declaration);
     }
@@ -153,18 +180,30 @@ internal ref struct TypeScope
     /// </exception>
     public BodyScope Method(MethodModel method)
     {
-        if (method.IsAbstract || method.IsExtern)
+        try
         {
-            throw new ArgumentException(
-                $"'{method.Name}' is abstract or extern and cannot have a body; use WriteMethodSignature.",
-                nameof(method));
+            if (method.IsAbstract || method.IsExtern)
+            {
+                throw new ArgumentException(
+                    $"'{method.Name}' is abstract or extern and cannot have a body; use WriteMethodSignature.",
+                    nameof(method));
+            }
+
+            // Rendered first: a model that cannot be rendered must not leave attributes behind.
+            var header = SourceWriterExtensions.RenderMethodHeader(method);
+
+            BeginMember();
+
+            _writer.WriteLine(header);
+
+            return new BodyScope(_writer, _writer.Block());
         }
+        catch
+        {
+            _state.Pending.Clear();
 
-        BeginMember();
-
-        SourceWriterExtensions.WriteMethodHeader(_writer, method);
-
-        return new BodyScope(_writer, _writer.Block());
+            throw;
+        }
     }
 
     /// <summary>
@@ -178,77 +217,127 @@ internal ref struct TypeScope
     /// </exception>
     public void Field(FieldModel field, string? initializer = null)
     {
-        if (_model.Kind == TypeDeclarationKind.Interface && !field.IsStatic && !field.IsConst)
+        try
         {
-            throw new ArgumentException($"'{field.Name}' is an instance field; interfaces cannot declare them.", nameof(field));
+            if (_model.Kind == TypeDeclarationKind.Interface && !field.IsStatic && !field.IsConst)
+            {
+                throw new ArgumentException($"'{field.Name}' is an instance field; interfaces cannot declare them.", nameof(field));
+            }
+
+            var line = SourceWriterExtensions.RenderField(field, initializer);
+
+            WriteMember(line);
         }
+        catch
+        {
+            _state.Pending.Clear();
 
-        var line = SourceWriterExtensions.RenderField(field, initializer);
-
-        WriteMember(line);
+            throw;
+        }
     }
 
     /// <summary>
     /// Writes one auto-property declaration line such as <c>public int X { get; private set; }</c>, whatever
     /// the source property's shape (accessor bodies, expression bodies and <c>field</c>-keyword accessors all
-    /// become auto accessors). Ref returns, <c>volatile</c> and ref fields are not represented by the models
-    /// and are not written. A blank line separates it from a preceding sibling.
+    /// become auto accessors). A ref-returning model is rejected because a ref property cannot be an auto
+    /// property. A blank line separates it from a preceding sibling.
     /// </summary>
     /// <exception cref="ArgumentException">
     /// <paramref name="property"/> is abstract (including interface members), an explicit interface
-    /// implementation (its name contains '.'), or has no get accessor; or this scope is an interface and the
-    /// property is not static.
+    /// implementation (<see cref="PropertyModel.ExplicitInterface"/> is set), returns by ref, or has no get
+    /// accessor; or this scope is an interface and the property is not static.
     /// </exception>
     public void AutoProperty(PropertyModel property)
     {
-        if (_model.Kind == TypeDeclarationKind.Interface && !property.IsStatic)
+        try
         {
-            throw new ArgumentException(
-                $"'{property.Name}' is an instance property; interfaces cannot declare auto-properties.",
-                nameof(property));
+            if (_model.Kind == TypeDeclarationKind.Interface && !property.IsStatic)
+            {
+                throw new ArgumentException(
+                    $"'{property.Name}' is an instance property; interfaces cannot declare auto-properties.",
+                    nameof(property));
+            }
+
+            var line = SourceWriterExtensions.RenderAutoProperty(property);
+
+            WriteMember(line);
         }
+        catch
+        {
+            _state.Pending.Clear();
 
-        var line = SourceWriterExtensions.RenderAutoProperty(property);
-
-        WriteMember(line);
+            throw;
+        }
     }
 
     /// <summary>
     /// Writes <paramref name="property"/>'s header and opens its braced accessor list; the returned scope's
     /// <see cref="PropertyScope.Get"/>, <see cref="PropertyScope.Set"/> and <see cref="PropertyScope.Init"/>
-    /// open the accessor bodies. A blank line separates it from a preceding sibling.
+    /// open the accessor bodies. A ref or <c>ref readonly</c> model is written with that modifier. A blank
+    /// line separates it from a preceding sibling.
     /// </summary>
     /// <exception cref="ArgumentException">
     /// <paramref name="property"/> is abstract (including interface members without a default body), an
-    /// explicit interface implementation (its name contains '.'), or has no accessors.
+    /// explicit interface implementation (<see cref="PropertyModel.ExplicitInterface"/> is set), has no
+    /// accessors, or returns by ref yet has a <c>set</c> or <c>init</c> accessor (CS8147).
     /// </exception>
     public PropertyScope Property(PropertyModel property)
     {
-        if (property.IsAbstract)
+        try
         {
-            throw new ArgumentException(
-                $"'{property.Name}' is abstract (or an interface member) and cannot have accessor bodies.",
-                nameof(property));
+            if (property.IsAbstract)
+            {
+                throw new ArgumentException(
+                    $"'{property.Name}' is abstract (or an interface member) and cannot have accessor bodies.",
+                    nameof(property));
+            }
+
+            if (property.ExplicitInterface is not null)
+            {
+                throw new ArgumentException(
+                    $"'{property.Name}' is an explicit interface implementation, which cannot be written with a public header.",
+                    nameof(property));
+            }
+
+            if (property.Accessors.Count == 0)
+            {
+                throw new ArgumentException($"'{property.Name}' has no accessors.", nameof(property));
+            }
+
+            if (property.ReturnRefKind != ReturnRefKind.None && HasSetOrInit(property))
+            {
+                throw new ArgumentException(
+                    $"'{property.Name}' returns by ref and cannot have a set or init accessor.",
+                    nameof(property));
+            }
+
+            var header = SourceWriterExtensions.RenderPropertyHeader(property);
+
+            BeginMember();
+
+            _writer.WriteLine(header);
+
+            return new PropertyScope(_writer, property, _writer.Block());
+        }
+        catch
+        {
+            _state.Pending.Clear();
+
+            throw;
+        }
+    }
+
+    private static bool HasSetOrInit(PropertyModel property)
+    {
+        for (var i = 0; i < property.Accessors.Count; i++)
+        {
+            if (property.Accessors[i].Kind is PropertyAccessorKind.Set or PropertyAccessorKind.Init)
+            {
+                return true;
+            }
         }
 
-        // The model carries an explicit interface implementation's name as "IFoo.Member".
-        if (property.Name.IndexOf('.') >= 0)
-        {
-            throw new ArgumentException(
-                $"'{property.Name}' is an explicit interface implementation, which cannot be written with a public header.",
-                nameof(property));
-        }
-
-        if (property.Accessors.Count == 0)
-        {
-            throw new ArgumentException($"'{property.Name}' has no accessors.", nameof(property));
-        }
-
-        BeginMember();
-
-        _writer.WriteLine(SourceWriterExtensions.RenderPropertyHeader(property));
-
-        return new PropertyScope(_writer, property, _writer.Block());
+        return false;
     }
 
     // Renders before writing so a rejected model leaves the writer untouched.
@@ -259,45 +348,56 @@ internal ref struct TypeScope
         _writer.WriteLine(line);
     }
 
-    // An attribute written just before already separated this member from its predecessor.
+    // Called only after the member passed validation, so buffered attributes never precede a rejected write.
     private readonly void BeginMember()
     {
-        if (_state.NeedsBlankLine && !_state.AfterAttribute)
+        RequireInnermost();
+
+        if (_state.NeedsBlankLine)
         {
             _writer.WriteLine();
         }
 
+        for (var i = 0; i < _state.Pending.Count; i++)
+        {
+            _writer.WriteLine(_state.Pending[i]);
+        }
+
+        _state.Pending.Clear();
         _state.NeedsBlankLine = true;
-        _state.AfterAttribute = false;
     }
 
     /// <summary>
-    /// Writes <paramref name="attribute"/> on its own line directly above the next type or member this scope
-    /// writes, after a blank line when one is due; that member then adds no blank line of its own. Call it
-    /// again to stack attributes. Returns this scope for chaining. If the following member is rejected, the
-    /// attribute already written stays in the output.
+    /// Buffers <paramref name="attribute"/> to be written on its own line directly above the next type or
+    /// member this scope writes, after a blank line when one is due. Call it again to stack attributes.
+    /// Returns this scope for chaining. Nothing is written if that member is rejected.
+    /// A rejected member consumes the pending attributes, so retry with fresh <c>Attribute</c> calls.
     /// </summary>
     /// <exception cref="ArgumentException">
     /// An argument of <paramref name="attribute"/> is an error constant; nothing is written.
     /// </exception>
     public TypeScope Attribute(AttributeModel attribute)
     {
+        RequireInnermost();
+
         var line = SourceWriterExtensions.RenderAttribute(attribute);
-
-        if (_state.NeedsBlankLine && !_state.AfterAttribute)
-        {
-            _writer.WriteLine();
-        }
-
-        _state.AfterAttribute = true;
-        _writer.WriteLine(line);
+        _state.Pending.Add(line);
 
         return this;
     }
 
-    /// <summary>Closes the type's block, and those of its containing types when it opened them.</summary>
+    /// <summary>
+    /// Closes the type's block, and those of its containing types when it opened them, recording a
+    /// still-buffered attribute as an error.
+    /// </summary>
     public void Dispose()
     {
+        if (_state.Pending.Count > 0)
+        {
+            _state.Pending.Clear();
+            _writer.RecordError($"An attribute was written on TypeScope '{_model.Name}' with no member after it.");
+        }
+
         _declaration.Dispose();
     }
 
@@ -308,9 +408,26 @@ internal ref struct TypeScope
             && containingType.TypeParameters.Equals(_model.TypeParameters);
     }
 
+    private readonly void RequireInnermost()
+    {
+        if (_writer.InnermostBlockId == _blockId)
+        {
+            return;
+        }
+
+        if (_writer.IsBlockOpen(_blockId))
+        {
+            throw new InvalidOperationException(
+                "TypeScope was used while a nested block opened from it is still open; dispose the nested scope first.");
+        }
+
+        throw new InvalidOperationException(
+            "TypeScope was used after its block was closed, likely through a copy that was disposed.");
+    }
+
     private sealed class State
     {
         public bool NeedsBlankLine;
-        public bool AfterAttribute;
+        public readonly List<string> Pending = new();
     }
 }

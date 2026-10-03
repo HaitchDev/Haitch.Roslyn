@@ -60,9 +60,9 @@ public class MethodScopeTests
             using var body = type.Method(method);
             body.Line("var copy = input;");
 
-            using (body.Block("if (copy.Equals(default(U)))"))
+            using (var inner = body.Block("if (copy.Equals(default(U)))"))
             {
-                body.Line("return new T();");
+                inner.Line("return new T();");
             }
 
             body.Line("return new T();");
@@ -128,9 +128,9 @@ public class MethodScopeTests
             using var body = type.Method(method);
             body.Line("var copy = input;");
 
-            using (body.Block("if (copy.Equals(default(U)))"))
+            using (var inner = body.Block("if (copy.Equals(default(U)))"))
             {
-                body.Line("return new T();");
+                inner.Line("return new T();");
             }
 
             body.Line("return new T();");

@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Haitch.Roslyn.Writing;
@@ -20,6 +21,49 @@ internal sealed class SourceWriter
     private readonly List<string> _indentCache = new() { string.Empty };
     private int _indentLevel;
     private bool _atLineStart = true;
+
+    // Open labeled loops and switches, innermost last; each entry is dropped when its body's brace closes.
+    private readonly List<OpenLabel> _labels = new();
+
+    // Close text and unique id of each open block, innermost last, so a scope can close blocks left open
+    // inside it. Ids never repeat, which lets a stale scope tell its block is gone even when a sibling
+    // has since opened at the same depth.
+    private readonly List<OpenBlock> _closers = new();
+    private int _nextBlockId;
+
+    // First misuse found while closing a scope; thrown from ToString because Dispose must not throw.
+    private string? _error;
+
+    /// <summary>
+    /// Number of blocks currently open. Scopes record it when they open and compare it before writing or
+    /// closing, which catches a child left open and a copy disposed after its original.
+    /// </summary>
+    internal int Depth => _indentLevel;
+
+    /// <summary>
+    /// Id of the innermost open block, or 0 when none is open. Scopes record it when they open and compare it
+    /// before writing, so a stale copy cannot write into a sibling block that opened at the same depth.
+    /// </summary>
+    internal int InnermostBlockId => _closers.Count == 0 ? 0 : _closers[_closers.Count - 1].Id;
+
+    /// <summary>True while the block with <paramref name="id"/> is open; id 0 (no block) is always open.</summary>
+    internal bool IsBlockOpen(int id)
+    {
+        if (id == 0)
+        {
+            return true;
+        }
+
+        for (int i = _closers.Count - 1; i >= 0; i--)
+        {
+            if (_closers[i].Id == id)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>
     /// Writes <paramref name="text"/> as one or more lines at the current indent level.
@@ -61,13 +105,133 @@ internal sealed class SourceWriter
     {
         WriteLine(open);
         _indentLevel++;
+        int id = ++_nextBlockId;
+        _closers.Add(new OpenBlock(close, id));
 
-        return new BlockScope(this, close);
+        return new BlockScope(this, id);
     }
 
     public override string ToString()
     {
+        if (_error is not null)
+        {
+            throw new InvalidOperationException(_error);
+        }
+
         return _builder.ToString();
+    }
+
+    /// <summary>
+    /// Remembers a misuse found while closing a scope, where throwing would mask an exception already in flight.
+    /// Only the first error is kept; <see cref="ToString"/> throws it.
+    /// When a scope throws, the unwinding disposals may record close-time errors (a bare try, a pending
+    /// attribute), so after any scope exception <see cref="ToString"/> may throw and the output is unusable.
+    /// </summary>
+    internal void RecordError(string message)
+    {
+        _error ??= message;
+    }
+
+    /// <summary>
+    /// Validates <paramref name="label"/> and writes <c>label:</c> on its own line; a null label writes nothing.
+    /// A label may be written as <c>@name</c> to use a keyword.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="label"/> is not an identifier, is an unescaped keyword, or is already open.</exception>
+    internal void WriteLabel(string? label)
+    {
+        if (label is null)
+        {
+            return;
+        }
+
+        if (!IsIdentifier(label))
+        {
+            throw new ArgumentException("A label must be an identifier that is not an unescaped keyword.", nameof(label));
+        }
+
+        RequireNotOpen(label);
+        WriteLine(label + ":");
+    }
+
+    /// <summary>
+    /// Records <paramref name="label"/> as open until the block just opened closes. Call it right after
+    /// <see cref="Block"/>; a null label records nothing.
+    /// </summary>
+    /// <exception cref="ArgumentException">The label is already open (CS0158).</exception>
+    internal void PushLabel(string? label, bool isLoop)
+    {
+        if (label is not null)
+        {
+            RequireNotOpen(label);
+            _labels.Add(new OpenLabel(label, isLoop, _indentLevel));
+        }
+    }
+
+    /// <summary>
+    /// Throws unless <paramref name="label"/> is null or names an open labeled loop (or switch, unless
+    /// <paramref name="loopOnly"/>).
+    /// The label stack follows blocks only. It does not model lambda or local-function boundaries or jumps
+    /// out of a <c>finally</c> block, so a jump the writer accepts there is left for the compiler to report
+    /// (CS0159, CS0157).
+    /// </summary>
+    /// <exception cref="ArgumentException">The label is not open, or names a switch where a loop is required.</exception>
+    internal void RequireJumpTarget(string? label, bool loopOnly, string paramName)
+    {
+        if (label is null)
+        {
+            return;
+        }
+
+        for (int i = _labels.Count - 1; i >= 0; i--)
+        {
+            OpenLabel open = _labels[i];
+
+            if (Normalize(open.Name) != Normalize(label))
+            {
+                continue;
+            }
+
+            if (loopOnly && !open.IsLoop)
+            {
+                throw new ArgumentException($"Label '{label}' names a switch; continue needs a loop.", paramName);
+            }
+
+            return;
+        }
+
+        throw new ArgumentException($"Label '{label}' is not an open labeled loop or switch.", paramName);
+    }
+
+    private void RequireNotOpen(string label)
+    {
+        string name = Normalize(label);
+
+        for (int i = 0; i < _labels.Count; i++)
+        {
+            if (Normalize(_labels[i].Name) == name)
+            {
+                throw new ArgumentException($"Label '{label}' is already open.", nameof(label));
+            }
+        }
+    }
+
+    private static string Normalize(string label)
+    {
+        return label.Length > 0 && label[0] == '@' ? label.Substring(1) : label;
+    }
+
+    // One leading '@' escapes a keyword; the name after it must be a plain identifier.
+    private static bool IsIdentifier(string text)
+    {
+        bool escaped = text.Length > 0 && text[0] == '@';
+        string name = Normalize(text);
+
+        if (!SyntaxFacts.IsValidIdentifier(name))
+        {
+            return false;
+        }
+
+        return escaped || SyntaxFacts.GetKeywordKind(name) == SyntaxKind.None;
     }
 
     public SourceText ToSourceText()
@@ -154,28 +318,84 @@ internal sealed class SourceWriter
         return _indentCache[level];
     }
 
-    private void EndBlock(string close)
+    // Closes the block with `id` and every block inside it, innermost first; a no-op when that block is already closed.
+    private void CloseTo(int id)
     {
-        _indentLevel--;
-        WriteLine(close);
+        int index = -1;
+
+        for (int i = _closers.Count - 1; i >= 0; i--)
+        {
+            if (_closers[i].Id == id)
+            {
+                index = i;
+
+                break;
+            }
+        }
+
+        if (index < 0)
+        {
+            return;
+        }
+
+        while (_closers.Count > index)
+        {
+            string close = _closers[_closers.Count - 1].Close;
+            _closers.RemoveAt(_closers.Count - 1);
+            _indentLevel--;
+
+            while (_labels.Count > 0 && _labels[_labels.Count - 1].Depth > _indentLevel)
+            {
+                _labels.RemoveAt(_labels.Count - 1);
+            }
+
+            WriteLine(close);
+        }
+    }
+
+    private readonly struct OpenBlock
+    {
+        public OpenBlock(string close, int id)
+        {
+            Close = close;
+            Id = id;
+        }
+
+        public string Close { get; }
+        public int Id { get; }
+    }
+
+    private readonly struct OpenLabel
+    {
+        public OpenLabel(string name, bool isLoop, int depth)
+        {
+            Name = name;
+            IsLoop = isLoop;
+            Depth = depth;
+        }
+
+        public string Name { get; }
+        public bool IsLoop { get; }
+        public int Depth { get; }
     }
 
     internal struct BlockScope : IDisposable
     {
         private readonly SourceWriter? _writer;
-        private readonly string? _close;
+        private readonly int _id;
         private bool _disposed;
 
-        internal BlockScope(SourceWriter writer, string close)
+        internal BlockScope(SourceWriter writer, int id)
         {
             _writer = writer;
-            _close = close;
+            _id = id;
             _disposed = false;
         }
 
         /// <summary>
-        /// Closes the block, if it has not already been closed. Disposing a default
-        /// <see cref="BlockScope"/> or disposing twice is a no-op.
+        /// Closes the block, and any blocks still open inside it, if it has not already been closed.
+        /// Disposing a default <see cref="BlockScope"/>, disposing twice, or disposing a copy after the
+        /// original is a no-op, even when another block has since opened at the same depth. Never throws.
         /// </summary>
         public void Dispose()
         {
@@ -185,7 +405,7 @@ internal sealed class SourceWriter
             }
 
             _disposed = true;
-            _writer.EndBlock(_close!);
+            _writer.CloseTo(_id);
         }
     }
 }

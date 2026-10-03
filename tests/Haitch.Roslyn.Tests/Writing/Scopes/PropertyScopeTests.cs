@@ -208,7 +208,12 @@ public class PropertyScopeTests
     [Test]
     public async Task Should_reject_an_explicit_interface_implementation_property()
     {
-        PropertyModel property = PropertyFrom("Open") with { Name = "ISource.Member" };
+        PropertyModel property = PropertyFrom("Open") with
+        {
+            Name = "Member",
+            ExplicitInterface = new TypeRef("global::ISource", NullableAnnotation.NotAnnotated, SpecialType.None, TypeKind.Interface, false),
+            ExplicitInterfaceMemberName = "Member",
+        };
 
         await Assert
             .That(() =>

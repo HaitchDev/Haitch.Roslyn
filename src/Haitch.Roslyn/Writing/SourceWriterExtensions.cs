@@ -357,15 +357,10 @@ internal static class SourceWriterExtensions
     }
 
     /// <summary>
-    /// Writes the same text as <see cref="WriteMethodSignature"/> without the terminating <c>;</c>, for
-    /// callers that follow it with a body.
+    /// Renders the text <see cref="WriteMethodSignature"/> writes without the terminating <c>;</c>, for
+    /// callers that follow it with a body and want rendering to fail before anything is written.
     /// </summary>
-    internal static void WriteMethodHeader(SourceWriter writer, MethodModel method)
-    {
-        writer.WriteLine(RenderMethodHeader(method));
-    }
-
-    private static string RenderMethodHeader(MethodModel method)
+    internal static string RenderMethodHeader(MethodModel method)
     {
         var builder = new StringBuilder();
         bool isExplicitInterfaceImplementation = method.ExplicitInterfaceMemberName is not null;
