@@ -1,5 +1,6 @@
 using Haitch.Roslyn.Generators;
 using Haitch.Roslyn.Models;
+using Haitch.Roslyn.Testing;
 using Haitch.Roslyn.Tests.Models;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -21,6 +22,10 @@ public class HintNameTests
                                   """;
 
     private const string NamespacedSource = "namespace A.B { public class X { } }";
+
+    private const string CaseSource = "namespace My.App { public class Foo { } public class foo { } }";
+
+    private const string GlobalSource = "public class Foo { }";
 
     [Test]
     [Arguments("My.App.Foo", "My.App.Foo.Equality.g.cs")]
@@ -72,6 +77,79 @@ public class HintNameTests
     }
 
     [Test]
+    public async Task Should_give_case_only_variants_distinct_case_insensitive_names_when_disambiguating()
+    {
+        string upper = HintName.For(CaseModel("My.App.Foo"), "Equality", disambiguateCase: true);
+        string lower = HintName.For(CaseModel("My.App.foo"), "Equality", disambiguateCase: true);
+
+        await Assert.That(upper.ToLowerInvariant()).IsNotEqualTo(lower.ToLowerInvariant());
+    }
+
+    [Test]
+    public async Task Should_leave_case_only_variants_colliding_by_default()
+    {
+        string upper = HintName.For(CaseModel("My.App.Foo"), "Equality");
+        string lower = HintName.For(CaseModel("My.App.foo"), "Equality");
+
+        await Assert.That(upper.ToLowerInvariant()).IsEqualTo(lower.ToLowerInvariant());
+    }
+
+    [Test]
+    [Arguments("My.App.Foo", "My.App.Foo.abdd334c.Equality.g.cs")]
+    [Arguments("My.App.foo", "My.App.foo.49529bac.Equality.g.cs")]
+    public async Task Should_place_a_pinned_hash_before_the_suffix_when_disambiguating(
+        string metadataName,
+        string expected)
+    {
+        await Assert.That(HintName.For(CaseModel(metadataName), "Equality", disambiguateCase: true))
+            .IsEqualTo(expected);
+    }
+
+    [Test]
+    public async Task Should_place_a_pinned_hash_for_a_type_in_the_global_namespace()
+    {
+        TypeModel model = TypeModel.From(CompilationHelper.GetNamedTypeSymbol(GlobalSource, "Foo"));
+
+        await Assert.That(HintName.For(model, "Equality", disambiguateCase: true))
+            .IsEqualTo("Foo.0c7e1677.Equality.g.cs");
+    }
+
+    [Test]
+    public async Task Should_use_the_same_hash_segment_for_different_suffixes()
+    {
+        TypeModel model = CaseModel("My.App.Foo");
+
+        await Assert.That(HintName.For(model, "Equality", disambiguateCase: true))
+            .IsEqualTo("My.App.Foo.abdd334c.Equality.g.cs");
+        await Assert.That(HintName.For(model, "Json", disambiguateCase: true))
+            .IsEqualTo("My.App.Foo.abdd334c.Json.g.cs");
+    }
+
+    [Test]
+    public async Task Should_hash_nested_and_generic_names_when_disambiguating()
+    {
+        TypeModel model = ModelFor("My.App.Outer`1+Inner`1");
+
+        await Assert.That(HintName.For(model, "Equality", disambiguateCase: true))
+            .IsEqualTo("My.App.Outer`1+Inner`1.2074b1e4.Equality.g.cs");
+    }
+
+    [Test]
+    public async Task Should_produce_two_files_when_a_generator_adds_case_only_variants_with_disambiguation()
+    {
+        GeneratorHarnessResult result = GeneratorHarness.Run(new CaseVariantGenerator(true), [CaseSource]);
+
+        await Assert.That(result.RunResult.GeneratedTrees.Length).IsEqualTo(2);
+    }
+
+    [Test]
+    public async Task Should_make_AddSource_reject_case_only_variants_without_disambiguation()
+    {
+        await Assert.That(() => GeneratorHarness.Run(new CaseVariantGenerator(false), [CaseSource]))
+            .Throws<GeneratorTestException>();
+    }
+
+    [Test]
     public async Task Should_produce_names_that_AddSource_accepts_for_every_type_shape()
     {
         CSharpCompilation compilation = CompilationHelper.Compile(Shapes);
@@ -88,6 +166,26 @@ public class HintNameTests
     private static TypeModel ModelFor(string metadataName)
     {
         return TypeModel.From(CompilationHelper.GetNamedTypeSymbol(Shapes, metadataName));
+    }
+
+    private static TypeModel CaseModel(string metadataName)
+    {
+        return TypeModel.From(CompilationHelper.GetNamedTypeSymbol(CaseSource, metadataName));
+    }
+
+    private sealed class CaseVariantGenerator(bool disambiguateCase) : IIncrementalGenerator
+    {
+        public void Initialize(IncrementalGeneratorInitializationContext context)
+        {
+            context.RegisterSourceOutput(context.CompilationProvider, (ctx, compilation) =>
+            {
+                foreach (string name in new[] { "My.App.Foo", "My.App.foo" })
+                {
+                    TypeModel model = TypeModel.From(compilation.GetTypeByMetadataName(name)!);
+                    ctx.AddSource(HintName.For(model, "Equality", disambiguateCase), "// generated");
+                }
+            });
+        }
     }
 
     private sealed class AddSourceGenerator : IIncrementalGenerator

@@ -2,6 +2,7 @@
 #nullable enable
 
 using System;
+using System.Globalization;
 using System.Text;
 using Haitch.Roslyn.Models;
 
@@ -18,13 +19,17 @@ internal static class HintName
     /// <c>X</c> in namespace <c>A.B</c>; generic arity is appended as <c>`N</c> so <c>Foo</c> and
     /// <c>Foo&lt;T&gt;</c> differ.
     /// Roslyn compares hint names case-insensitively, so types whose names differ only in case
-    /// (<c>Foo</c> and <c>foo</c> in one namespace) produce colliding names; this is not disambiguated.
+    /// (<c>Foo</c> and <c>foo</c> in one namespace) produce colliding names unless
+    /// <paramref name="disambiguateCase"/> is set, which inserts an 8-hex-char FNV-1a hash before the
+    /// suffix (<c>Ns.Foo.a1b2c3d4.Suffix.g.cs</c>). The hash covers the case-sensitive hint-name stem
+    /// (namespace, containing types joined with <c>+</c>, arity) and excludes the suffix. It is opt-in
+    /// so existing generators keep their output file names.
     /// </summary>
     /// <exception cref="ArgumentException">
     /// <paramref name="suffix"/> is empty, ends in <c>.cs</c>, starts or ends with <c>.</c>, contains
     /// <c>..</c>, or contains characters other than ASCII letters, digits, <c>.</c>, <c>_</c> and <c>-</c>.
     /// </exception>
-    public static string For(TypeModel type, string suffix)
+    public static string For(TypeModel type, string suffix, bool disambiguateCase = false)
     {
         ValidateSuffix(suffix);
 
@@ -45,7 +50,26 @@ internal static class HintName
         builder.Append(type.Name);
         AppendArity(builder, type.TypeParameters.Count);
 
+        if (disambiguateCase)
+        {
+            var hash = Fnv1a(builder).ToString("x8", CultureInfo.InvariantCulture);
+            builder.Append('.').Append(hash);
+        }
+
         return builder.Append('.').Append(suffix).Append(".g.cs").ToString();
+    }
+
+    // Hand-rolled because string.GetHashCode is randomised per process and System.HashCode is absent
+    // on netstandard2.0; the hash must be identical across runs for stable file names.
+    private static uint Fnv1a(StringBuilder value)
+    {
+        var hash = 2166136261u;
+        for (var i = 0; i < value.Length; i++)
+        {
+            hash = unchecked((hash ^ value[i]) * 16777619u);
+        }
+
+        return hash;
     }
 
     private static void AppendArity(StringBuilder builder, int arity)
