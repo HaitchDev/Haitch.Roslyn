@@ -17,6 +17,8 @@ namespace Haitch.Roslyn.Writing;
 /// twice. A ref struct cannot track borrow state without an allocation or a runtime check, so neither is
 /// guarded. Calling <see cref="Using"/> after a namespace has been opened writes the directive inside or
 /// after that namespace, which is invalid C# (CS1529); write all usings first.
+/// Likewise, an <c>Attribute</c> call on any scope with no type or member written after it leaves a
+/// dangling attribute (CS1519 / CS1022); it is a caller error and disposing does not throw for it.
 /// </remarks>
 internal readonly ref struct FileScope
 {
@@ -33,8 +35,11 @@ internal readonly ref struct FileScope
     }
 
     /// <summary>Writes <c>using <paramref name="namespaceName"/>;</c>.</summary>
+    /// <exception cref="InvalidOperationException">An <see cref="Attribute"/> is still waiting for its type.</exception>
     public void Using(string namespaceName)
     {
+        ThrowIfAttributePending("a using directive");
+
         _writer.WriteLine($"using {namespaceName};");
         _state.NeedsBlankLine = true;
     }
@@ -45,8 +50,11 @@ internal readonly ref struct FileScope
     /// global-namespace scope: write global-namespace code directly on the file scope's writer.
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="name"/> is null, empty or whitespace.</exception>
+    /// <exception cref="InvalidOperationException">An <see cref="Attribute"/> is still waiting for its type.</exception>
     public NamespaceScope Namespace(string name)
     {
+        ThrowIfAttributePending("a namespace");
+
         if (string.IsNullOrWhiteSpace(name))
         {
             throw new ArgumentException("A namespace name is required.", nameof(name));
@@ -70,17 +78,80 @@ internal readonly ref struct FileScope
     /// <paramref name="type"/>'s <see cref="TypeModel.Namespace"/> is ignored: the enclosing
     /// scope is the source of truth for the namespace.
     /// </summary>
-    /// <exception cref="ArgumentException"><paramref name="type"/> is file-local.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="type"/> is file-local, or has containing types while an <see cref="Attribute"/> is
+    /// pending (it would land on the outermost containing type).
+    /// </exception>
     public TypeScope Type(TypeModel type)
     {
-        if (_state.NeedsBlankLine)
+        if (_state.AfterAttribute && type.ContainingTypes.Count > 0)
+        {
+            throw new ArgumentException(
+                $"A pending attribute would land on the outermost containing type of '{type.Name}'.",
+                nameof(type));
+        }
+
+        if (_state.NeedsBlankLine && !_state.AfterAttribute)
         {
             _writer.WriteLine();
         }
 
         _state.NeedsBlankLine = true;
+        _state.AfterAttribute = false;
 
         return new TypeScope(_writer, type, _writer.WriteTypeDeclaration(type));
+    }
+
+    /// <summary>
+    /// Writes a brand-new, non-partial top-level type and opens its block; the returned scope takes members
+    /// like any <see cref="TypeScope"/>. A blank line separates it from preceding usings, namespaces or
+    /// types, unless an <see cref="Attribute"/> is pending.
+    /// </summary>
+    /// <remarks>
+    /// Instance members in a new static class are not rejected (CS0708 is the caller's error). Primary
+    /// constructors and records' positional parameters are not supported.
+    /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="type"/> is an illegal combination (see
+    /// <see cref="SourceWriterExtensions.WriteNewTypeDeclaration"/>), or private or protected (CS1527).
+    /// </exception>
+    public TypeScope NewType(NewTypeModel type)
+    {
+        TypeScope.ThrowIfNestedOnlyAccessibility(type);
+        SourceWriterExtensions.ValidateNewType(type);
+
+        if (_state.NeedsBlankLine && !_state.AfterAttribute)
+        {
+            _writer.WriteLine();
+        }
+
+        _state.NeedsBlankLine = true;
+        _state.AfterAttribute = false;
+
+        return TypeScope.OpenNewType(_writer, type);
+    }
+
+    /// <summary>
+    /// Writes <paramref name="attribute"/> on its own line directly above the next type this scope writes,
+    /// after a blank line when one is due; the type then adds no blank line of its own. Call it again to
+    /// stack attributes. Returns this scope for chaining.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// An argument of <paramref name="attribute"/> is an error constant; nothing is written.
+    /// </exception>
+    public FileScope Attribute(AttributeModel attribute)
+    {
+        var line = SourceWriterExtensions.RenderAttribute(attribute);
+
+        if (_state.NeedsBlankLine && !_state.AfterAttribute)
+        {
+            _writer.WriteLine();
+        }
+
+        _state.AfterAttribute = true;
+        _writer.WriteLine(line);
+
+        return this;
     }
 
     /// <summary>Nothing is open at file level, so disposing is a no-op that exists for <c>using</c>.</summary>
@@ -88,9 +159,18 @@ internal readonly ref struct FileScope
     {
     }
 
+    private void ThrowIfAttributePending(string what)
+    {
+        if (_state.AfterAttribute)
+        {
+            throw new InvalidOperationException($"Cannot write {what} while an attribute is waiting for its type.");
+        }
+    }
+
     private sealed class State
     {
         public bool NeedsBlankLine;
+        public bool AfterAttribute;
     }
 }
 

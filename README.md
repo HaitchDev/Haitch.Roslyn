@@ -65,6 +65,7 @@ Caveats:
 - Name model steps only. Steps that combine with `CompilationProvider` or output syntax nodes are legitimately `Modified` by the trivia edit.
 - The edit targets the first source, so put the code your tracked steps read there.
 - An unknown or never-run step name fails; the message lists the steps that exist.
+- Pass a `CacheabilityOptions` for `UnrelatedEditSourceIndex` (a third run appends `namespace HarnessUnrelatedEdit { }` to that source; a step that depends on the whole compilation fails) and `RequireRecomputationAfterTriviaEdit` (after the trivia edit at least one output of each named step must be `Unchanged`, proving the step re-ran for the edited source and produced an equal value; name the per-item model step, since an aggregate such as `Collect` over unchanged items reports `Cached` and fails). Passing `null` positionally as the fourth argument is ambiguous between the overloads; use named arguments.
 - The walker can report false positives: BCL types with internal state that override `Equals` are walked field by field, and value-equal collection wrappers other than `EquatableArray<T>` are reported if they hold a hazard or lack an `Equals` override. Models nested deeper than 256 levels are reported.
 
 ## Notes

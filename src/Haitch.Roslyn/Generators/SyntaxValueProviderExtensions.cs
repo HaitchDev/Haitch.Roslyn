@@ -30,16 +30,21 @@ internal static class SyntaxValueProviderExtensions
     // node is the first marked declaration (compilation tree order, then span start) and drops it
     // otherwise. No Collect() is involved, so unrelated edits still leave the step cached. The
     // attributes are the symbol's, i.e. those of every part.
+    //
+    // includeMembers fills TypeModel's Fields, Properties and Methods from the symbol (every part
+    // contributes). It ties the item's equality to every member edit, so an edit to any member of
+    // the type recomputes downstream steps; leave it off unless the generator reads members.
     public static IncrementalValuesProvider<(TypeModel Type, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes)>
         ForTypesWithAttribute(
             this SyntaxValueProvider provider,
             string fullyQualifiedMetadataName,
-            string trackingName)
+            string trackingName,
+            bool includeMembers = false)
     {
         return provider.ForAttributeWithMetadataName(
                 fullyQualifiedMetadataName,
                 predicate: static (node, _) => node is TypeDeclarationSyntax,
-                transform: static (context, _) => Transform(context))
+                transform: (context, _) => Transform(context, includeMembers))
             .Where(static item => item is not null)
             .Select(static (item, _) => item!.Value)
             .WithTrackingName(trackingName);
@@ -94,7 +99,8 @@ internal static class SyntaxValueProviderExtensions
     }
 
     private static (TypeModel Type, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes)? Transform(
-        GeneratorAttributeSyntaxContext context)
+        GeneratorAttributeSyntaxContext context,
+        bool includeMembers)
     {
         var typeDeclaration = (TypeDeclarationSyntax)context.TargetNode;
         var typeSymbol = (INamedTypeSymbol)context.TargetSymbol;
@@ -117,7 +123,7 @@ internal static class SyntaxValueProviderExtensions
             .OfType<AttributeModel>()
             .ToEquatableArray();
 
-        var typeModel = TypeModel.From(typeSymbol);
+        var typeModel = TypeModel.From(typeSymbol, includeMembers);
         var syntaxInfo = SyntaxInfo.From(typeDeclaration);
 
         return (typeModel, syntaxInfo, attributes);

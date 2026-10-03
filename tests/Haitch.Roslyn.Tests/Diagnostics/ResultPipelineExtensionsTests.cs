@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Haitch.Roslyn.Diagnostics;
 using Haitch.Roslyn.Testing;
 using Microsoft.CodeAnalysis;
@@ -30,43 +29,15 @@ public class ResultPipelineExtensionsTests
     }
 
     [Test]
-    public async Task Should_report_the_value_step_as_unchanged_for_an_entry_with_a_trivia_only_edit()
+    public void Should_report_the_value_step_as_unchanged_for_an_entry_with_a_trivia_only_edit()
     {
-        // The harness appends a trailing comment to the first source (Widget) and requires the
-        // value step to stay cached or unchanged, plus the caching-hazard check.
-        GeneratorHarnessResult harnessResult = GeneratorHarness.AssertCacheable(
+        // The trivia edit changes Widget's syntax but not its value, so the step must re-run and report
+        // Unchanged; OtherWidget (another tree) stays Cached, which the strict check accepts alongside it.
+        GeneratorHarness.AssertCacheable(
             new TestGenerator(),
             ["class Widget { }", "class OtherWidget { }"],
-            TestGenerator.ValuesStepName);
-
-        GeneratorDriver driver = harnessResult.Driver;
-        Compilation compilation = harnessResult.InputCompilation;
-
-        // Trivia-only edit to Widget itself: the syntax node changes (new trailing comment) but the
-        // transformed value ("Widget") stays equal, so the value step must report Unchanged. Kept
-        // hand-rolled because the harness accepts Cached as well.
-        SyntaxTree treeA = compilation.SyntaxTrees.Single(tree => tree.FilePath == "Source0.cs");
-        SyntaxTree updatedTreeA = CSharpSyntaxTree.ParseText(
-            "class Widget { } // comment", (CSharpParseOptions)treeA.Options, treeA.FilePath);
-        Compilation updatedCompilation = compilation.ReplaceSyntaxTree(treeA, updatedTreeA);
-
-        driver = driver.RunGenerators(updatedCompilation);
-
-        GeneratorDriverRunResult result = driver.GetRunResult();
-        ImmutableArray<IncrementalGeneratorRunStep>
-            steps = result.Results[0].TrackedSteps[TestGenerator.ValuesStepName];
-
-        var widgetOutputs = steps
-            .SelectMany(step => step.Outputs)
-            .Where(output => ((Result<string>)output.Value).TryGetValue(out string? value) && value == "Widget")
-            .ToImmutableArray();
-
-        await Assert.That(widgetOutputs.Length).IsGreaterThan(0);
-
-        foreach (var output in widgetOutputs)
-        {
-            await Assert.That(output.Reason).IsEqualTo(IncrementalStepRunReason.Unchanged);
-        }
+            [TestGenerator.ValuesStepName],
+            options: new CacheabilityOptions { RequireRecomputationAfterTriviaEdit = true });
     }
 
     private static GeneratorDriverRunResult RunGenerator(string source)

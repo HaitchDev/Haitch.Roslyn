@@ -3,10 +3,26 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace Haitch.Roslyn.Types;
 
-internal readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>
+/// <summary>Collection-expression entry point for <see cref="EquatableArray{T}"/>.</summary>
+internal static class EquatableArray
+{
+    /// <summary>Copies <paramref name="items"/> into a new <see cref="EquatableArray{T}"/>; an empty span yields <c>default</c>.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="items">The elements to copy.</param>
+    /// <returns>The populated array.</returns>
+    public static EquatableArray<T> Create<T>(ReadOnlySpan<T> items)
+        where T : IEquatable<T>
+    {
+        return EquatableArray<T>.FromOwnedArray(items.ToArray());
+    }
+}
+
+[CollectionBuilder(typeof(EquatableArray), nameof(EquatableArray.Create))]
+internal readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IReadOnlyList<T>
     where T : IEquatable<T>
 {
     private readonly T[] _array;
@@ -55,6 +71,17 @@ internal readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>
     public Enumerator GetEnumerator()
     {
         return new Enumerator(_array ?? Array.Empty<T>());
+    }
+
+    // LINQ Count()/ElementAt on netstandard2.0 have no IReadOnlyList fast path and walk this boxed enumerator; prefer Count and the indexer.
+    IEnumerator<T> IEnumerable<T>.GetEnumerator()
+    {
+        return ((IEnumerable<T>)(_array ?? Array.Empty<T>())).GetEnumerator();
+    }
+
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+    {
+        return ((IEnumerable<T>)this).GetEnumerator();
     }
 
     public bool Equals(EquatableArray<T> other)

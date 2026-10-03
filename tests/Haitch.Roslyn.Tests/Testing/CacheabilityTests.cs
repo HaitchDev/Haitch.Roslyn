@@ -53,7 +53,8 @@ public class CacheabilityTests
             GeneratorHarness.AssertCacheable(new NamesGenerator(true), [Input], "model")
         );
 
-        await Assert.That(ex.Message).Contains("Step 'model' run 1 output 0 was Modified after an unchanged compilation clone");
+        await Assert.That(ex.Message)
+            .Contains("Step 'model' run 1 output 0 was Modified after an unchanged compilation clone");
     }
 
     [Test]
@@ -156,5 +157,226 @@ public class CacheabilityTests
         );
 
         await Assert.That(result.Sources.Keys).Contains("Uses.g.cs");
+    }
+
+    private sealed class NamespaceCountGenerator : IIncrementalGenerator
+    {
+        public void Initialize(IncrementalGeneratorInitializationContext context)
+        {
+            var tracked = context
+                .CompilationProvider.Select(static (c, _) => c.GlobalNamespace.GetNamespaceMembers().Count())
+                .WithTrackingName("model");
+            context.RegisterSourceOutput(tracked, static (ctx, n) => ctx.AddSource("Count.g.cs", $"// {n}"));
+        }
+    }
+
+    private static readonly CacheabilityOptions UnrelatedEdit = new() { UnrelatedEditSourceIndex = 1 };
+
+    [Test]
+    public async Task Should_pass_the_unrelated_edit_when_models_are_value_equal()
+    {
+        var result = GeneratorHarness.AssertCacheable(
+            new NamesGenerator(false),
+            ["class A { }\n", "class B { }\n"],
+            ["model"],
+            UnrelatedEdit
+        );
+
+        await Assert.That(result.Sources.Keys).Contains("B.g.cs");
+    }
+
+    [Test]
+    public async Task Should_pass_a_compilation_dependent_step_without_the_unrelated_edit()
+    {
+        var result = GeneratorHarness.AssertCacheable(
+            new NamespaceCountGenerator(),
+            ["class A { }\n", "class B { }\n"],
+            "model"
+        );
+
+        await Assert.That(result.Sources.Keys).Contains("Count.g.cs");
+    }
+
+    [Test]
+    public async Task Should_fail_the_unrelated_edit_when_a_model_captures_the_compilation_namespace_count()
+    {
+        var ex = Assert.Throws<GeneratorTestException>(() =>
+            GeneratorHarness.AssertCacheable(
+                new NamespaceCountGenerator(),
+                ["class A { }\n", "class B { }\n"],
+                ["model"],
+                UnrelatedEdit
+            )
+        );
+
+        await Assert.That(ex.Message)
+            .IsEqualTo(
+                "Step 'model' run 3 output 0 was Modified after an unrelated edit in Source1.cs; expected Cached or Unchanged."
+            );
+    }
+
+    [Test]
+    public async Task Should_fail_when_unrelated_edit_index_is_zero()
+    {
+        var ex = Assert.Throws<GeneratorTestException>(() =>
+            GeneratorHarness.AssertCacheable(
+                new NamesGenerator(false),
+                ["class A { }\n", "class B { }\n"],
+                ["model"],
+                new CacheabilityOptions { UnrelatedEditSourceIndex = 0 }
+            )
+        );
+
+        await Assert.That(ex.Message)
+            .IsEqualTo(
+                "UnrelatedEditSourceIndex 0 is out of range; it must be between 1 and 1 (Source0 takes the trivia edit)."
+            );
+    }
+
+    [Test]
+    public async Task Should_fail_when_unrelated_edit_index_is_past_the_last_source()
+    {
+        var ex = Assert.Throws<GeneratorTestException>(() =>
+            GeneratorHarness.AssertCacheable(
+                new NamesGenerator(false),
+                ["class A { }\n", "class B { }\n"],
+                ["model"],
+                new CacheabilityOptions { UnrelatedEditSourceIndex = 2 }
+            )
+        );
+
+        await Assert.That(ex.Message)
+            .IsEqualTo(
+                "UnrelatedEditSourceIndex 2 is out of range; it must be between 1 and 1 (Source0 takes the trivia edit)."
+            );
+    }
+
+    [Test]
+    public async Task Should_fail_when_unrelated_edit_index_is_set_with_one_source()
+    {
+        var ex = Assert.Throws<GeneratorTestException>(() =>
+            GeneratorHarness.AssertCacheable(
+                new NamesGenerator(false),
+                ["class A { }\n"],
+                ["model"],
+                new CacheabilityOptions { UnrelatedEditSourceIndex = 1 }
+            )
+        );
+
+        await Assert.That(ex.Message).IsEqualTo("UnrelatedEditSourceIndex needs at least two sources");
+    }
+
+    [Test]
+    public async Task Should_throw_argument_null_when_options_is_null()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            GeneratorHarness.AssertCacheable(new NamesGenerator(false), [Input], ["model"], options: null!)
+        );
+
+        await Task.CompletedTask;
+    }
+
+    private static readonly CacheabilityOptions Strict = new() { RequireRecomputationAfterTriviaEdit = true };
+
+    [Test]
+    public async Task Should_pass_strict_mode_for_a_two_source_per_item_step()
+    {
+        var result = GeneratorHarness.AssertCacheable(
+            new NamesGenerator(false),
+            ["class A { }\n", "class B { }\n"],
+            ["model"],
+            Strict
+        );
+
+        await Assert.That(result.Sources.Keys).Contains("B.g.cs");
+    }
+
+    private sealed class DownstreamGenerator : IIncrementalGenerator
+    {
+        public void Initialize(IncrementalGeneratorInitializationContext context)
+        {
+            var tracked = context
+                .SyntaxProvider.CreateSyntaxProvider(
+                    static (node, _) => node is ClassDeclarationSyntax,
+                    static (ctx, _) => ((ClassDeclarationSyntax)ctx.Node).Identifier.Text
+                )
+                .Select(static (name, _) => name.ToUpperInvariant())
+                .WithTrackingName("model");
+            context.RegisterSourceOutput(tracked, static (ctx, m) => ctx.AddSource(m + ".g.cs", $"class G{m} {{ }}"));
+        }
+    }
+
+    [Test]
+    public async Task Should_fail_strict_mode_when_every_output_is_cached_after_the_trivia_edit()
+    {
+        var ex = Assert.Throws<GeneratorTestException>(() =>
+            GeneratorHarness.AssertCacheable(
+                new DownstreamGenerator(),
+                ["class A { }\n"],
+                ["model"],
+                Strict
+            )
+        );
+
+        await Assert.That(ex.Message).IsEqualTo(NoUnchangedMessage);
+    }
+
+    private const string NoUnchangedMessage =
+        "Step 'model' run 2 had no Unchanged output after a trivia-only edit, so it did not re-run for the edited source; "
+        + "RequireRecomputationAfterTriviaEdit needs the per-item model step named "
+        + "(an aggregate such as Collect over unchanged items reports Cached).";
+
+    private sealed class ConstantSelectGenerator : IIncrementalGenerator
+    {
+        public void Initialize(IncrementalGeneratorInitializationContext context)
+        {
+            var tracked = context
+                .SyntaxProvider.CreateSyntaxProvider(
+                    static (node, _) => node is ClassDeclarationSyntax,
+                    // The node itself changes with the trivia edit, so the Select re-runs and maps it to an equal constant.
+                    static (ctx, _) => ctx.Node
+                )
+                .Select(static (_, _) => "Same")
+                .WithTrackingName("model");
+            context.RegisterSourceOutput(tracked, static (_, _) => { });
+        }
+    }
+
+    [Test]
+    public async Task Should_pass_strict_mode_when_a_select_maps_every_item_to_a_constant()
+    {
+        var result = GeneratorHarness.AssertCacheable(
+            new ConstantSelectGenerator(),
+            ["class A { }\n", "class B { }\n"],
+            ["model"],
+            Strict
+        );
+
+        await Assert.That(result.Sources).IsEmpty();
+    }
+
+    private sealed class CollectGenerator : IIncrementalGenerator
+    {
+        public void Initialize(IncrementalGeneratorInitializationContext context)
+        {
+            var tracked = context
+                .SyntaxProvider.CreateSyntaxProvider(
+                    static (node, _) => node is ClassDeclarationSyntax,
+                    static (ctx, _) => ((ClassDeclarationSyntax)ctx.Node).Identifier.Text
+                )
+                .Collect()
+                .WithTrackingName("model");
+            context.RegisterSourceOutput(tracked, static (_, _) => { });
+        }
+    }
+
+    [Test]
+    public async Task Should_fail_strict_mode_when_only_a_collect_step_is_named()
+    {
+        var ex = Assert.Throws<GeneratorTestException>(() =>
+            GeneratorHarness.AssertCacheable(new CollectGenerator(), ["class A { }\n"], ["model"], Strict)
+        );
+
+        await Assert.That(ex.Message).IsEqualTo(NoUnchangedMessage);
     }
 }

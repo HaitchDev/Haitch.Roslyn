@@ -61,3 +61,18 @@ Rules that apply to every issue:
 | | [10.5](10.5-property-accessor-scopes.md) | Property accessor scopes |
 | | [10.6](10.6-partial-method-accessibility.md) | Partial method accessibility |
 | | [10.7](10.7-partial-property-implementation.md) | Partial property implementation |
+| 11 Members in ForTypesWithAttribute | [11.1](11.1-for-types-with-attribute-members.md) | ForTypesWithAttribute can include members |
+| | [11.2](11.2-sample-generator-member-conflicts.md) | Sample generator reports member conflicts |
+| 12 Attribute lists | [12.1](12.1-render-attribute-model.md) | Render an attribute list from AttributeModel |
+| | [12.2](12.2-well-known-attributes.md) | Well-known generated-code attributes |
+| | [12.3](12.3-scoped-writer-attributes.md) | Attributes in the typed scoped writer |
+| 13 New types | [13.1](13.1-new-type-declaration.md) | New type declarations |
+| | [13.2](13.2-scoped-new-type.md) | New types in the typed scoped writer |
+| 14 EquatableArray collections | [14.1](14.1-equatable-array-read-only-list.md) | EquatableArray is a read-only list |
+| | [14.2](14.2-equatable-array-collection-expressions.md) | EquatableArray collection expressions |
+| 15 Cacheability scenarios | [15.1](15.1-cacheable-unrelated-edit-and-strict.md) | AssertCacheable unrelated-file edit and strict mode |
+| | [15.2](15.2-migrate-hand-rolled-reruns.md) | Migrate hand-rolled reruns to the harness |
+| 16 Statement scopes | [16.1](16.1-if-else-scope.md) | If/else statement scopes |
+| | [16.2](16.2-loop-and-using-scopes.md) | Loop and using statement scopes |
+| | [16.3](16.3-try-catch-finally-scope.md) | Try/catch/finally statement scopes |
+| | [16.4](16.4-switch-scope.md) | Switch statement scope |

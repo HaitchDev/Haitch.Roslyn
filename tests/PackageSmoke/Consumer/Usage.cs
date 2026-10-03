@@ -11,4 +11,12 @@ internal static class Usage
 
         return leftArray.Equals(rightArray);
     }
+
+    internal static bool CollectionExpressionIsEqual(int[] items)
+    {
+        EquatableArray<int> built = [1, 2, 3];
+        EquatableArray<int> expected = new(items);
+
+        return built.Equals(expected);
+    }
 }

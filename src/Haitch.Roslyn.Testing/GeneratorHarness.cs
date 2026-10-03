@@ -118,8 +118,36 @@ public static class GeneratorHarness
         IEnumerable<string> trackedStepNames,
         IEnumerable<MetadataReference>? additionalReferences = null,
         CSharpParseOptions? parseOptions = null
+    ) => AssertCacheable(generator, sources, trackedStepNames, new CacheabilityOptions(), additionalReferences,
+        parseOptions);
+
+    /// <summary>
+    /// As the other overloads, with the extra scenarios and strictness of <paramref name="options"/>.
+    /// </summary>
+    /// <param name="generator">The generator under test.</param>
+    /// <param name="sources">C# source texts forming the input compilation; at least one.</param>
+    /// <param name="trackedStepNames">Names given with <c>WithTrackingName</c>; at least one.</param>
+    /// <param name="options">Extra scenarios and strictness.</param>
+    /// <param name="additionalReferences">Extra references; the running runtime's platform assemblies are always included.</param>
+    /// <param name="parseOptions">Parse options; defaults to the newest language version Roslyn knows.</param>
+    /// <returns>The first run's result.</returns>
+    /// <exception cref="GeneratorTestException">
+    /// As the other overloads; also <see cref="CacheabilityOptions.UnrelatedEditSourceIndex"/> is out of range, a step
+    /// output is <c>Modified</c> or <c>New</c> after the unrelated edit (run 3), or
+    /// <see cref="CacheabilityOptions.RequireRecomputationAfterTriviaEdit"/> finds no <c>Unchanged</c> output of a named step after the trivia edit.
+    /// </exception>
+    /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
+    public static GeneratorHarnessResult AssertCacheable(
+        IIncrementalGenerator generator,
+        IEnumerable<string> sources,
+        IEnumerable<string> trackedStepNames,
+        CacheabilityOptions options,
+        IEnumerable<MetadataReference>? additionalReferences = null,
+        CSharpParseOptions? parseOptions = null
     )
     {
+        ArgumentNullException.ThrowIfNull(options);
+
         var sourceList = sources.ToList();
         if (sourceList.Count == 0)
         {
@@ -130,6 +158,21 @@ public static class GeneratorHarness
         if (names.Count == 0)
         {
             throw new GeneratorTestException("AssertCacheable needs at least one tracked step name");
+        }
+
+        if (options.UnrelatedEditSourceIndex is { } index)
+        {
+            if (sourceList.Count < 2)
+            {
+                throw new GeneratorTestException("UnrelatedEditSourceIndex needs at least two sources");
+            }
+
+            if (index < 1 || index >= sourceList.Count)
+            {
+                throw new GeneratorTestException(
+                    $"UnrelatedEditSourceIndex {index} is out of range; it must be between 1 and {sourceList.Count - 1} (Source0 takes the trivia edit)."
+                );
+            }
         }
 
         var first = Run(generator, sourceList, additionalReferences, parseOptions);
@@ -153,8 +196,28 @@ public static class GeneratorHarness
             (CSharpParseOptions)firstTree.Options,
             firstTree.FilePath
         );
-        driver = driver.RunGenerators(first.InputCompilation.ReplaceSyntaxTree(firstTree, edited));
-        AssertStepsCached(driver, names, 2, "a trivia-only edit");
+        var triviaCompilation = first.InputCompilation.ReplaceSyntaxTree(firstTree, edited);
+        driver = driver.RunGenerators(triviaCompilation);
+        AssertStepsCached(
+            driver,
+            names,
+            2,
+            "a trivia-only edit",
+            options.RequireRecomputationAfterTriviaEdit
+        );
+
+        if (options.UnrelatedEditSourceIndex is { } unrelated)
+        {
+            var path = $"Source{unrelated}.cs";
+            var target = triviaCompilation.SyntaxTrees.Single(t => t.FilePath == path);
+            var changed = CSharpSyntaxTree.ParseText(
+                target.GetText().ToString() + "\nnamespace HarnessUnrelatedEdit { }\n",
+                (CSharpParseOptions)target.Options,
+                target.FilePath
+            );
+            driver = driver.RunGenerators(triviaCompilation.ReplaceSyntaxTree(target, changed));
+            AssertStepsCached(driver, names, 3, $"an unrelated edit in {path}");
+        }
 
         AssertNoHazards(first.RunResult.Results[0].TrackedSteps, names);
 
@@ -183,7 +246,13 @@ public static class GeneratorHarness
         }
     }
 
-    private static void AssertStepsCached(GeneratorDriver driver, List<string> stepNames, int run, string scenario)
+    private static void AssertStepsCached(
+        GeneratorDriver driver,
+        List<string> stepNames,
+        int run,
+        string scenario,
+        bool requireUnchanged = false
+    )
     {
         var result = driver.GetRunResult().Results[0];
         if (result.Exception is not null)
@@ -199,6 +268,7 @@ public static class GeneratorHarness
                 throw new GeneratorTestException($"Step '{name}' did not run in run {run} after {scenario}.");
             }
 
+            var unchanged = 0;
             foreach (var step in steps)
             {
                 for (var i = 0; i < step.Outputs.Length; i++)
@@ -213,7 +283,21 @@ public static class GeneratorHarness
                             $"Step '{name}' run {run} output {i} was {reason} after {scenario}; expected Cached or Unchanged.{hazard}"
                         );
                     }
+
+                    if (reason is IncrementalStepRunReason.Unchanged)
+                    {
+                        unchanged++;
+                    }
                 }
+            }
+
+            if (requireUnchanged && unchanged == 0)
+            {
+                throw new GeneratorTestException(
+                    $"Step '{name}' run {run} had no Unchanged output after {scenario}, so it did not re-run for the edited source; "
+                    + "RequireRecomputationAfterTriviaEdit needs the per-item model step named "
+                    + "(an aggregate such as Collect over unchanged items reports Cached)."
+                );
             }
         }
     }

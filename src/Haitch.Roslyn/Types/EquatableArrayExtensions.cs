@@ -29,6 +29,13 @@ internal static class EquatableArrayExtensions
         return EquatableArray<T>.FromOwnedArray(array.ToArray());
     }
 
+    // Without this, an EquatableArray binds to the IEnumerable<T> overload, which boxes and copies.
+    public static EquatableArray<T> ToEquatableArray<T>(this EquatableArray<T> source)
+        where T : IEquatable<T>
+    {
+        return source;
+    }
+
     public static EquatableArray<T> ToEquatableArray<T>(this IEnumerable<T> source)
         where T : IEquatable<T>
     {

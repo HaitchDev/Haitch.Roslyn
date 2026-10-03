@@ -37,14 +37,148 @@ internal ref struct BodyScope
     /// <exception cref="ArgumentException"><paramref name="header"/> is null, empty or whitespace.</exception>
     public readonly BodyScope Block(string header)
     {
+        return OpenBlock(_writer, header);
+    }
+
+    // Shared by every scope that exposes Block so the header check and output stay in one place.
+    internal static BodyScope OpenBlock(SourceWriter writer, string header)
+    {
         if (string.IsNullOrWhiteSpace(header))
         {
             throw new ArgumentException("A block header is required.", nameof(header));
         }
 
-        _writer.WriteLine(header);
+        writer.WriteLine(header);
 
-        return new BodyScope(_writer, _writer.Block());
+        return new BodyScope(writer, writer.Block());
+    }
+
+    /// <summary>Writes <c>if (condition)</c> and opens its braced body; chain <c>ElseIf</c>/<c>Else</c> on the result.</summary>
+    /// <exception cref="ArgumentException"><paramref name="condition"/> is null, empty or whitespace.</exception>
+    public readonly IfScope If(string condition)
+    {
+        return OpenIf(_writer, condition);
+    }
+
+    internal static IfScope OpenIf(SourceWriter writer, string condition)
+    {
+        if (string.IsNullOrWhiteSpace(condition))
+        {
+            throw new ArgumentException("A condition is required.", nameof(condition));
+        }
+
+        writer.WriteLine($"if ({condition})");
+
+        return new IfScope(writer, writer.Block());
+    }
+
+    /// <summary>
+    /// Writes <c>foreach (type identifier in collection)</c> and opens its braced body.
+    /// The identifier is written verbatim: it is neither validated nor escaped with <c>@</c>.
+    /// </summary>
+    /// <exception cref="ArgumentException">Any argument is null, empty or whitespace.</exception>
+    public readonly BodyScope ForEach(string type, string identifier, string collection)
+    {
+        return OpenForEach(_writer, type, identifier, collection);
+    }
+
+    internal static BodyScope OpenForEach(SourceWriter writer, string type, string identifier, string collection)
+    {
+        RequireText(type, nameof(type));
+        RequireText(identifier, nameof(identifier));
+        RequireText(collection, nameof(collection));
+
+        return OpenBlock(writer, $"foreach ({type} {identifier} in {collection})");
+    }
+
+    /// <summary>
+    /// Writes <c>for (initializer; condition; iterator)</c> and opens its braced body. Any part may be empty,
+    /// so all three empty renders <c>for (;;)</c>.
+    /// </summary>
+    public readonly BodyScope For(string initializer, string condition, string iterator)
+    {
+        return OpenFor(_writer, initializer, condition, iterator);
+    }
+
+    internal static BodyScope OpenFor(SourceWriter writer, string initializer, string condition, string iterator)
+    {
+        string header = $"for ({initializer.Trim()};{Padded(condition)};{Padded(iterator)})";
+
+        return OpenBlock(writer, header);
+    }
+
+    /// <summary>Writes <c>while (condition)</c> and opens its braced body.</summary>
+    /// <exception cref="ArgumentException"><paramref name="condition"/> is null, empty or whitespace.</exception>
+    public readonly BodyScope While(string condition)
+    {
+        return OpenWhile(_writer, condition);
+    }
+
+    internal static BodyScope OpenWhile(SourceWriter writer, string condition)
+    {
+        RequireText(condition, nameof(condition));
+
+        return OpenBlock(writer, $"while ({condition})");
+    }
+
+    /// <summary>Writes <c>using (resource)</c> and opens its braced body; a using declaration is a plain <see cref="Line"/>.</summary>
+    /// <exception cref="ArgumentException"><paramref name="resource"/> is null, empty or whitespace.</exception>
+    public readonly BodyScope Using(string resource)
+    {
+        return OpenUsing(_writer, resource);
+    }
+
+    internal static BodyScope OpenUsing(SourceWriter writer, string resource)
+    {
+        RequireText(resource, nameof(resource));
+
+        return OpenBlock(writer, $"using ({resource})");
+    }
+
+    /// <summary>
+    /// Writes <c>try</c> and opens its braced body; chain <c>Catch</c>/<c>Finally</c> on the result. A try with
+    /// neither is a caller error (CS1524) that <c>Dispose</c> does not detect.
+    /// </summary>
+    public readonly TryScope Try()
+    {
+        return OpenTry(_writer);
+    }
+
+    internal static TryScope OpenTry(SourceWriter writer)
+    {
+        writer.WriteLine("try");
+
+        return new TryScope(writer, writer.Block());
+    }
+
+    /// <summary>
+    /// Writes <c>switch (expression)</c> and opens its braced body; add sections with <c>Case</c>/<c>Default</c>.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="expression"/> is null, empty or whitespace.</exception>
+    public readonly SwitchScope Switch(string expression)
+    {
+        return OpenSwitch(_writer, expression);
+    }
+
+    internal static SwitchScope OpenSwitch(SourceWriter writer, string expression)
+    {
+        RequireText(expression, nameof(expression));
+        writer.WriteLine($"switch ({expression})");
+
+        return new SwitchScope(writer, writer.Block());
+    }
+
+    private static string Padded(string part)
+    {
+        return string.IsNullOrWhiteSpace(part) ? "" : " " + part.Trim();
+    }
+
+    private static void RequireText(string value, string name)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException("A value is required.", name);
+        }
     }
 
     /// <summary>Closes the body's brace.</summary>

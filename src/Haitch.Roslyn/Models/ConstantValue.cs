@@ -21,14 +21,20 @@ internal enum ConstantValueKind
 
 internal sealed record ConstantValue
 {
-    public static readonly ConstantValue Error = new(ConstantValueKind.Error, null, null, default);
+    public static readonly ConstantValue Error = new(ConstantValueKind.Error, null, null, default, null);
 
-    private ConstantValue(ConstantValueKind kind, object? value, TypeRef? type, EquatableArray<ConstantValue> elements)
+    private ConstantValue(
+        ConstantValueKind kind,
+        object? value,
+        TypeRef? type,
+        EquatableArray<ConstantValue> elements,
+        string? enumMemberName)
     {
         Kind = kind;
         Value = value;
         Type = type;
         Elements = elements;
+        EnumMemberName = enumMemberName;
     }
 
     public ConstantValueKind Kind { get; }
@@ -39,34 +45,40 @@ internal sealed record ConstantValue
 
     public EquatableArray<ConstantValue> Elements { get; }
 
+    /// <summary>
+    /// For an enum constant, the name of the single declared member with this value; <see langword="null"/>
+    /// for flag combinations, undefined values and aliased values.
+    /// </summary>
+    public string? EnumMemberName { get; }
+
     public static ConstantValue ForNull(TypeRef? type)
     {
-        return new ConstantValue(ConstantValueKind.Null, null, type, default);
+        return new ConstantValue(ConstantValueKind.Null, null, type, default, null);
     }
 
     public static ConstantValue ForPrimitive(object value)
     {
-        return new ConstantValue(ConstantValueKind.Primitive, value, null, default);
+        return new ConstantValue(ConstantValueKind.Primitive, value, null, default, null);
     }
 
     public static ConstantValue ForString(string value)
     {
-        return new ConstantValue(ConstantValueKind.String, value, null, default);
+        return new ConstantValue(ConstantValueKind.String, value, null, default, null);
     }
 
-    public static ConstantValue ForEnum(TypeRef type, object underlyingValue)
+    public static ConstantValue ForEnum(TypeRef type, object underlyingValue, string? memberName = null)
     {
-        return new ConstantValue(ConstantValueKind.Enum, underlyingValue, type, default);
+        return new ConstantValue(ConstantValueKind.Enum, underlyingValue, type, default, memberName);
     }
 
     public static ConstantValue ForType(TypeRef type)
     {
-        return new ConstantValue(ConstantValueKind.Type, null, type, default);
+        return new ConstantValue(ConstantValueKind.Type, null, type, default, null);
     }
 
     public static ConstantValue ForArray(TypeRef? type, EquatableArray<ConstantValue> elements)
     {
-        return new ConstantValue(ConstantValueKind.Array, null, type, elements);
+        return new ConstantValue(ConstantValueKind.Array, null, type, elements, null);
     }
 
     public static ConstantValue From(TypedConstant constant)
@@ -89,10 +101,38 @@ internal sealed record ConstantValue
         {
             TypedConstantKind.Primitive when constant.Value is string stringValue => ForString(stringValue),
             TypedConstantKind.Primitive => ForPrimitive(constant.Value!),
-            TypedConstantKind.Enum => ForEnum(type!, constant.Value!),
+            TypedConstantKind.Enum => ForEnum(type!, constant.Value!, FindEnumMemberName(constant)),
             TypedConstantKind.Type => ForType(TypeRef.From((ITypeSymbol)constant.Value!)),
             TypedConstantKind.Array => ForArray(type, constant.Values.Select(From).ToEquatableArray()),
             _ => throw new ArgumentOutOfRangeException(nameof(constant), constant.Kind, "Unsupported typed constant kind."),
         };
+    }
+
+    private static string? FindEnumMemberName(TypedConstant constant)
+    {
+        if (constant.Type is not INamedTypeSymbol enumType)
+        {
+            return null;
+        }
+
+        string? name = null;
+
+        foreach (ISymbol member in enumType.GetMembers())
+        {
+            if (member is not IFieldSymbol { IsConst: true, HasConstantValue: true } field
+                || !Equals(field.ConstantValue, constant.Value))
+            {
+                continue;
+            }
+
+            if (name is not null)
+            {
+                return null;
+            }
+
+            name = field.Name;
+        }
+
+        return name;
     }
 }

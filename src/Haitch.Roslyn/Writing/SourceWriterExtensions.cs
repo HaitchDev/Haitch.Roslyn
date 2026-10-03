@@ -90,6 +90,142 @@ internal static class SourceWriterExtensions
     }
 
     /// <summary>
+    /// Writes the header of a brand-new, non-partial type and opens its block. Throws
+    /// <see cref="ArgumentException"/> before writing anything for an illegal modifier combination.
+    /// </summary>
+    public static SourceWriter.BlockScope WriteNewTypeDeclaration(this SourceWriter writer, NewTypeModel type)
+    {
+        var header = RenderNewTypeHeader(type);
+
+        writer.WriteLine(header);
+
+        return writer.Block();
+    }
+
+    private static string RenderNewTypeHeader(NewTypeModel type)
+    {
+        ValidateNewType(type);
+
+        var builder = new StringBuilder();
+
+        if (type.Accessibility == Accessibility.NotApplicable)
+        {
+            if (type.IsFileLocal)
+            {
+                builder.Append("file ");
+            }
+        }
+        else
+        {
+            AppendAccessibility(builder, type.Accessibility);
+        }
+
+        if (type.IsStatic)
+        {
+            builder.Append("static ");
+        }
+        else if (type.IsAbstract)
+        {
+            builder.Append("abstract ");
+        }
+        else if (type.IsSealed)
+        {
+            builder.Append("sealed ");
+        }
+
+        if (type.IsReadOnly)
+        {
+            builder.Append("readonly ");
+        }
+
+        if (type.IsRefLikeType)
+        {
+            builder.Append("ref ");
+        }
+
+        if (type.IsPartial)
+        {
+            builder.Append("partial ");
+        }
+
+        builder.Append(KindKeyword(type.Kind)).Append(' ').Append(EscapeKeyword(type.Name));
+        AppendTypeParameterList(builder, type.TypeParameters);
+
+        for (var i = 0; i < type.BaseTypes.Count; i++)
+        {
+            builder.Append(i == 0 ? " : " : ", ").Append(type.BaseTypes[i].FullyQualifiedName);
+        }
+
+        AppendWhereClauses(builder, type.TypeParameters);
+
+        return builder.ToString();
+    }
+
+    internal static void ValidateNewType(NewTypeModel type)
+    {
+        var bareName = type.Name.StartsWith("@", StringComparison.Ordinal) ? type.Name.Substring(1) : type.Name;
+
+        if (!SyntaxFacts.IsValidIdentifier(bareName))
+        {
+            throw new ArgumentException($"'{type.Name}' is not a valid type name.", nameof(type));
+        }
+
+        if (type.IsFileLocal && type.Accessibility != Accessibility.NotApplicable)
+        {
+            throw new ArgumentException(
+                $"'{type.Name}' is file-local, which cannot be combined with an accessibility.",
+                nameof(type));
+        }
+
+        var isClassLike = type.Kind is TypeDeclarationKind.Class or TypeDeclarationKind.RecordClass;
+
+        if (type.IsStatic && (type.Kind != TypeDeclarationKind.Class || type.IsAbstract || type.IsSealed || type.BaseTypes.Count > 0))
+        {
+            throw new ArgumentException(
+                $"'{type.Name}' is static, which requires a plain class and excludes abstract, sealed and base types.",
+                nameof(type));
+        }
+
+        if (type.IsAbstract && type.IsSealed)
+        {
+            throw new ArgumentException($"'{type.Name}' cannot be both abstract and sealed.", nameof(type));
+        }
+
+        if (!isClassLike && (type.IsStatic || type.IsAbstract || type.IsSealed))
+        {
+            throw new ArgumentException(
+                $"'{type.Name}' is a {type.Kind}, which cannot be static, abstract or sealed.",
+                nameof(type));
+        }
+
+        var canBeReadOnlyOrRef = type.Kind is TypeDeclarationKind.Struct or TypeDeclarationKind.RecordStruct;
+
+        if (!canBeReadOnlyOrRef && (type.IsReadOnly || type.IsRefLikeType))
+        {
+            throw new ArgumentException(
+                $"'{type.Name}' is a {type.Kind}, which cannot be readonly or ref.",
+                nameof(type));
+        }
+
+        if (type.IsRefLikeType && type.Kind == TypeDeclarationKind.RecordStruct)
+        {
+            throw new ArgumentException($"'{type.Name}' is a record struct, which cannot be ref.", nameof(type));
+        }
+
+        for (var i = 0; i < type.BaseTypes.Count; i++)
+        {
+            var isInterface = type.BaseTypes[i].TypeKind == TypeKind.Interface;
+
+            if (!isInterface && (!isClassLike || i != 0))
+            {
+                throw new ArgumentException(
+                    $"'{type.BaseTypes[i].FullyQualifiedName}' is not an interface; only a class or record may have a base class, and it must be the only one and listed first.",
+                    nameof(type));
+            }
+        }
+    }
+
+    /// <summary>
     /// Writes a method signature from <paramref name="method"/>, terminated with <c>;</c>. Never
     /// writes a body: this is the shape a generator uses for the defining declaration of a partial
     /// method, an abstract member, or an interface member.
@@ -188,6 +324,78 @@ internal static class SourceWriterExtensions
         }
 
         return builder.ToString();
+    }
+
+    /// <summary>
+    /// Writes <paramref name="attribute"/> as one <c>[global::...(...)]</c> line. Throws
+    /// <see cref="ArgumentException"/> before writing anything when an argument is an error constant.
+    /// </summary>
+    public static SourceWriter WriteAttribute(this SourceWriter writer, AttributeModel attribute)
+    {
+        writer.WriteLine(RenderAttribute(attribute));
+
+        return writer;
+    }
+
+    /// <summary>
+    /// Writes one attribute line per entry of <paramref name="attributes"/>, in order, and nothing for an
+    /// empty array. Every attribute is rendered before the first line is written, so a failure leaves the
+    /// writer untouched.
+    /// </summary>
+    public static SourceWriter WriteAttributes(this SourceWriter writer, EquatableArray<AttributeModel> attributes)
+    {
+        var lines = new string[attributes.Count];
+
+        for (var i = 0; i < lines.Length; i++)
+        {
+            lines[i] = RenderAttribute(attributes[i]);
+        }
+
+        for (var i = 0; i < lines.Length; i++)
+        {
+            writer.WriteLine(lines[i]);
+        }
+
+        return writer;
+    }
+
+    // The attribute type is written fully qualified with its "Attribute" suffix, which always resolves.
+    internal static string RenderAttribute(AttributeModel attribute)
+    {
+        var builder = new StringBuilder("[").Append(attribute.AttributeType.FullyQualifiedName);
+
+        if (attribute.ConstructorArguments.Count > 0 || attribute.NamedArguments.Count > 0)
+        {
+            builder.Append('(');
+            var first = true;
+
+            for (var i = 0; i < attribute.ConstructorArguments.Count; i++)
+            {
+                if (!first)
+                {
+                    builder.Append(", ");
+                }
+
+                builder.Append(RenderConstant(attribute.ConstructorArguments[i], forAttribute: true));
+                first = false;
+            }
+
+            for (var i = 0; i < attribute.NamedArguments.Count; i++)
+            {
+                if (!first)
+                {
+                    builder.Append(", ");
+                }
+
+                NamedArgument named = attribute.NamedArguments[i];
+                builder.Append(EscapeKeyword(named.Name)).Append(" = ").Append(RenderConstant(named.Value, forAttribute: true));
+                first = false;
+            }
+
+            builder.Append(')');
+        }
+
+        return builder.Append(']').ToString();
     }
 
     // A const field is implicitly static and takes its value from the model, so `static` is never written
@@ -637,16 +845,40 @@ internal static class SourceWriterExtensions
         return parameter.IsDefaultLiteral ? "default" : RenderConstant(parameter.DefaultValue!);
     }
 
-    private static string RenderConstant(ConstantValue value)
+    // default(T) is the null constant that never trips nullable analysis: `(T)null` warns (CS8600) and
+    // `(T?)null` is an error (CS8669) where the consumer has nullable disabled.
+    private static string RenderTypedNull(TypeRef type)
+    {
+        var name = type.FullyQualifiedName;
+
+        if (name.EndsWith("?", StringComparison.Ordinal))
+        {
+            name = name[..^1];
+        }
+
+        return $"default({name})";
+    }
+
+    private static string EscapeKeyword(string identifier)
+    {
+        return SyntaxFacts.GetKeywordKind(identifier) == SyntaxKind.None ? identifier : "@" + identifier;
+    }
+
+    // The attribute path is stricter than field and parameter defaults: the argument's type is part of the
+    // attribute data and decides overload binding, so small integers, typed nulls and enum members are
+    // spelled out instead of relying on a literal's default type.
+    private static string RenderConstant(ConstantValue value, bool forAttribute = false)
     {
         return value.Kind switch
         {
-            ConstantValueKind.Null => "null",
+            ConstantValueKind.Null => forAttribute && value.Type is not null ? RenderTypedNull(value.Type) : "null",
             ConstantValueKind.String => SymbolDisplay.FormatLiteral((string)value.Value!, quote: true),
-            ConstantValueKind.Primitive => RenderPrimitive(value.Value!),
-            ConstantValueKind.Enum => RenderEnum(value),
+            ConstantValueKind.Primitive => forAttribute ? RenderAttributePrimitive(value.Value!) : RenderPrimitive(value.Value!),
+            ConstantValueKind.Enum => forAttribute && value.EnumMemberName is not null
+                ? $"{value.Type!.FullyQualifiedName}.{EscapeKeyword(value.EnumMemberName)}"
+                : RenderEnum(value),
             ConstantValueKind.Type => $"typeof({StripNullableAnnotationForTypeof(value.Type!)})",
-            ConstantValueKind.Array => RenderArray(value),
+            ConstantValueKind.Array => RenderArray(value, forAttribute),
             ConstantValueKind.Error => throw new ArgumentException(
                 "Cannot render a constant value of kind Error.",
                 nameof(value)),
@@ -730,10 +962,46 @@ internal static class SourceWriterExtensions
         return value.ToString("G17", CultureInfo.InvariantCulture) + "d";
     }
 
-    private static string RenderArray(ConstantValue value)
+    private static string RenderAttributePrimitive(object value)
+    {
+        var literal = RenderPrimitive(value);
+
+        return value switch
+        {
+            byte => $"(byte){literal}",
+            sbyte => $"(sbyte){literal}",
+            short => $"(short){literal}",
+            ushort => $"(ushort){literal}",
+            _ => literal,
+        };
+    }
+
+    // `new[] { }` does not compile, nor does `new[] { null }` or a mixed `new[] { 1, "a" }`, so the
+    // array type is written whenever the model knows it.
+    private static string RenderArray(ConstantValue value, bool forAttribute)
     {
         var builder = new StringBuilder();
-        builder.Append("new[] { ");
+
+        if (value.Type is null)
+        {
+            builder.Append("new[] { ");
+        }
+        else
+        {
+            var typeName = value.Type.FullyQualifiedName;
+
+            if (typeName.EndsWith("?", StringComparison.Ordinal))
+            {
+                typeName = typeName[..^1];
+            }
+
+            if (value.Elements.Count == 0)
+            {
+                return $"new {typeName} {{ }}";
+            }
+
+            builder.Append("new ").Append(typeName).Append(" { ");
+        }
 
         for (var i = 0; i < value.Elements.Count; i++)
         {
@@ -742,7 +1010,7 @@ internal static class SourceWriterExtensions
                 builder.Append(", ");
             }
 
-            builder.Append(RenderConstant(value.Elements[i]));
+            builder.Append(RenderConstant(value.Elements[i], forAttribute));
         }
 
         builder.Append(" }");

@@ -3,6 +3,7 @@
 
 using System;
 using Haitch.Roslyn.Models;
+using Microsoft.CodeAnalysis;
 
 namespace Haitch.Roslyn.Writing;
 
@@ -54,12 +55,7 @@ internal ref struct TypeScope
                 nameof(type));
         }
 
-        if (_state.NeedsBlankLine)
-        {
-            _writer.WriteLine();
-        }
-
-        _state.NeedsBlankLine = true;
+        BeginMember();
 
         SourceWriterExtensions.WriteTypeDeclarationLine(
             _writer,
@@ -70,6 +66,81 @@ internal ref struct TypeScope
             type.TypeParameters);
 
         return new TypeScope(_writer, type, new SourceWriterExtensions.TypeDeclarationScope([_writer.Block()]));
+    }
+
+    /// <summary>
+    /// Writes a brand-new, non-partial nested type and opens its block; the returned scope takes members
+    /// like any <see cref="TypeScope"/>. A blank line separates it from a preceding sibling.
+    /// </summary>
+    /// <remarks>
+    /// Instance members in a new static class are not rejected (CS0708 is the caller's error). Primary
+    /// constructors and records' positional parameters are not supported.
+    /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="type"/> is an illegal combination (see
+    /// <see cref="SourceWriterExtensions.WriteNewTypeDeclaration"/>), is file-local (CS9054), or is
+    /// protected in any form while this scope is a struct (CS0666) or a static class (CS1057).
+    /// </exception>
+    public TypeScope NewType(NewTypeModel type)
+    {
+        if (type.IsFileLocal)
+        {
+            throw new ArgumentException($"'{type.Name}' is file-local, which is illegal on a nested type.", nameof(type));
+        }
+
+        if (type.Accessibility is Accessibility.Protected or Accessibility.ProtectedOrInternal
+                or Accessibility.ProtectedAndInternal
+            && (_model.IsStatic || _model.Kind is TypeDeclarationKind.Struct or TypeDeclarationKind.RecordStruct))
+        {
+            throw new ArgumentException(
+                $"'{type.Name}' is {type.Accessibility}, which is illegal inside struct or static class '{_model.Name}'.",
+                nameof(type));
+        }
+
+        SourceWriterExtensions.ValidateNewType(type);
+        BeginMember();
+
+        return OpenNewType(_writer, type);
+    }
+
+    internal static void ThrowIfNestedOnlyAccessibility(NewTypeModel type)
+    {
+        if (type.Accessibility
+            is Accessibility.Private
+                or Accessibility.Protected
+                or Accessibility.ProtectedOrInternal
+                or Accessibility.ProtectedAndInternal)
+        {
+            throw new ArgumentException(
+                $"'{type.Name}' is {type.Accessibility}, which is illegal on a top-level type.",
+                nameof(type));
+        }
+    }
+
+    // TypeScope works from a TypeModel, so the new type is described as one with no containing types.
+    internal static TypeScope OpenNewType(SourceWriter writer, NewTypeModel type)
+    {
+        var model = new TypeModel(
+            null,
+            type.Name,
+            type.Kind,
+            type.Accessibility,
+            type.IsStatic,
+            type.IsAbstract,
+            type.IsSealed,
+            type.IsReadOnly,
+            type.IsRefLikeType,
+            type.IsFileLocal,
+            type.TypeParameters,
+            default,
+            default,
+            default,
+            default,
+            default);
+
+        var declaration = new SourceWriterExtensions.TypeDeclarationScope([writer.WriteNewTypeDeclaration(type)]);
+
+        return new TypeScope(writer, model, declaration);
     }
 
     /// <summary>
@@ -89,12 +160,7 @@ internal ref struct TypeScope
                 nameof(method));
         }
 
-        if (_state.NeedsBlankLine)
-        {
-            _writer.WriteLine();
-        }
-
-        _state.NeedsBlankLine = true;
+        BeginMember();
 
         SourceWriterExtensions.WriteMethodHeader(_writer, method);
 
@@ -178,12 +244,7 @@ internal ref struct TypeScope
             throw new ArgumentException($"'{property.Name}' has no accessors.", nameof(property));
         }
 
-        if (_state.NeedsBlankLine)
-        {
-            _writer.WriteLine();
-        }
-
-        _state.NeedsBlankLine = true;
+        BeginMember();
 
         _writer.WriteLine(SourceWriterExtensions.RenderPropertyHeader(property));
 
@@ -193,14 +254,45 @@ internal ref struct TypeScope
     // Renders before writing so a rejected model leaves the writer untouched.
     private void WriteMember(string line)
     {
-        if (_state.NeedsBlankLine)
+        BeginMember();
+
+        _writer.WriteLine(line);
+    }
+
+    // An attribute written just before already separated this member from its predecessor.
+    private readonly void BeginMember()
+    {
+        if (_state.NeedsBlankLine && !_state.AfterAttribute)
         {
             _writer.WriteLine();
         }
 
         _state.NeedsBlankLine = true;
+        _state.AfterAttribute = false;
+    }
 
+    /// <summary>
+    /// Writes <paramref name="attribute"/> on its own line directly above the next type or member this scope
+    /// writes, after a blank line when one is due; that member then adds no blank line of its own. Call it
+    /// again to stack attributes. Returns this scope for chaining. If the following member is rejected, the
+    /// attribute already written stays in the output.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// An argument of <paramref name="attribute"/> is an error constant; nothing is written.
+    /// </exception>
+    public TypeScope Attribute(AttributeModel attribute)
+    {
+        var line = SourceWriterExtensions.RenderAttribute(attribute);
+
+        if (_state.NeedsBlankLine && !_state.AfterAttribute)
+        {
+            _writer.WriteLine();
+        }
+
+        _state.AfterAttribute = true;
         _writer.WriteLine(line);
+
+        return this;
     }
 
     /// <summary>Closes the type's block, and those of its containing types when it opened them.</summary>
@@ -219,5 +311,6 @@ internal ref struct TypeScope
     private sealed class State
     {
         public bool NeedsBlankLine;
+        public bool AfterAttribute;
     }
 }

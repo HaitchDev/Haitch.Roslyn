@@ -1,38 +1,40 @@
 # Handoff
 
-## State (2026-10-02)
-- Every planned issue is implemented and reviewed, with high and medium findings fixed: 0.1–0.8, 1.1–1.2, 2.1–2.5, 3.1–3.5, 4.1–4.2, 5.1–5.2, 6.1–6.6, 7.1–7.2, 8.1–8.2, 9.1–9.5, 10.1–10.7.
-- 9.4/9.5: `.github/workflows/publish.yml` (tag `v*.*.*`, NuGet trusted publishing via `NUGET_USER`) and `ci.yml`. Validated by YAML parse and running their commands locally (`actionlint` not installed). They have never run on GitHub. The review found that the pack-based tests overwrote the shared `bin/Release` DLL with version 1.2.3; the tests now pack into an isolated `--artifacts-path`.
-- Added during this session:
-  - 0.7: the smoke consumer proves Polyfill types and records compile in a `netstandard2.0` consumer of the package.
-  - 0.8: Roslyn bumped to 4.12.0 (the human's decision), so consumers' generators need 4.12+.
-  - 6.6: the harness checks errors after generation.
-  - 10.6 and 10.7: partial method and partial property implementation.
-  - Slice 10, the typed scoped writer: `writer.File()` → `Using`/`Namespace` → `Type` → `Method`/`Field`/`AutoProperty`/`Property` → `BodyScope`/accessors.
-- Last green: 364/364. Nothing committed.
+## State (2026-10-03)
+- Published: `Haitch.Roslyn` and `Haitch.Roslyn.Testing` **0.1.1** on nuget.org (tag `v0.1.1`, commit `d44e287`). The docs are live in `haitch-web` (`d526410`).
+- Round 2 is done and reviewed, with high and medium findings fixed: issues 11.1–16.4. It is committed locally and not pushed or released. Last check: build has 0 warnings; `dotnet test` gives 592/592.
+  - 11: `ForTypesWithAttribute(..., includeMembers)`. The sample reports SAMPLE005 for a user's own `ToString`/`TypeName`.
+  - 12: attribute rendering (`WriteAttribute(s)`), `WellKnownAttributes`, and `Attribute()` on File/Namespace/Type scopes. Enums render as member names, arrays as typed, small ints with casts. Typed nulls render as `default(T)` because `(T)null` warns CS8600 under `#nullable enable`.
+  - 13: `NewTypeModel`, `WriteNewTypeDeclaration`, and `NewType()` on scopes. Illegal kind/modifier/base/accessibility combinations are rejected, and top-level and nested rules differ.
+  - 14: `EquatableArray<T>` is `IReadOnlyList<T>` and supports collection expressions via `[CollectionBuilder]` (from Polyfill). There is an identity `ToEquatableArray` overload.
+  - 15: `CacheabilityOptions`.
+    - `UnrelatedEditSourceIndex` appends `namespace HarnessUnrelatedEdit { }` to the given source.
+    - `RequireRecomputationAfterTriviaEdit`: every output of each named step must be Cached or Unchanged, and at least one must be Unchanged. Attributing outputs to sources by value was rejected after experiments.
+    - 6.5 and 7.2 tests are migrated.
+  - 16: statement scopes on BodyScope, IfScope and TryScope: `If`/`ElseIf`/`Else`, `ForEach`/`For`/`While`/`Using`, `Try`/`Catch`/`Finally`, `Switch`/`Case`/`Default`. They share `Open*` helpers.
 
-## Held for the human
-- First push (CI run) and first `v*` tag (publish): both are the human's call.
-- Scoped-writer limitations, accepted and documented:
-  - a parent scope can be written to while a child is open;
-  - copying a scope and disposing both closes the block twice;
-  - `Using` after `Namespace` emits invalid C#;
-  - opening an accessor while another accessor's body is open nests it.
-- Workers twice tried to write files via Bash (once blocked; once `sed -i` got through, and the edit was correct). Suggested: widen the repo hook to block in-place Bash writes.
+## Next
+- Decide: release **0.2.0** (round 2 adds a public API in Testing plus source-only features). That means push `main`, wait for CI, then tag `v0.2.0`.
+- Update the `haitch-web` docs for round 2 (attributes, NewType, statement scopes, `CacheabilityOptions`, collection expressions).
+- `.claude/settings.json` and `.claude/hooks/no-bash-writes.sh` are not committed. They block in-place writes in `Bash` and in `mcp__rider__execute_terminal_command`. Commit them if they should be shared.
+
+## Working rules learned
+- Run one implementer at a time (shared working tree). Read-only Opus reviewers can run alongside it but must not build.
+- Workers must show a *behavioural* red against a stub, not only a build error.
+- Compile-the-output tests count warnings as failures under `#nullable enable`.
+- Rider's reformat can strip `using Haitch.Roslyn.Types;` and restore stale buffers, so read the file back after `create_new_file`. The TUnit filter is `--treenode-filter`. Run `dotnet test` via `mcp__rider__execute_terminal_command` with `executeInShell: true`.
 
 ## Known limitations / follow-ups
-- `ForTypesWithAttribute` can't request members (`TypeModel.From(includeMembers: true)`), so the sample generator can't guard against a user's own `ToString`/`TypeName`.
-- Roslyn reports `IsSealed=false` for `sealed` interface members, so models built from symbols lose it.
-- `MethodModel.From` takes no `CancellationToken`.
-- `AssertCacheable` can't express "edit an unrelated second file" or require strictly `Unchanged`; 6.5 and 7.2 keep hand-rolled reruns for those.
-- The scoped writer's `Type(TypeModel)` renders partial declarations only; builders for new non-partial types would be a future issue. `AutoProperty` writes any model as an auto-property; ref/volatile are not modelled; explicit interface members are rejected.
-- `HintName.For`: Roslyn compares hint names case-insensitively, so types differing only in case collide (documented).
-- `AddEmbeddedAttributeDefinition` may raise CS0436 across InternalsVisibleTo assemblies (unverified on newer compilers).
-- `SourceWriterExtensions` does not render attribute lists. `EquatableArray<T>` does not implement `IEnumerable<T>`.
-- `CompilationHelper` pins C# 12 parse options; the partial-member tests use local C# 13 helpers.
-- Tooling: Rider's test explorer fails to start, but `dotnet test` via `mcp__rider__execute_terminal_command` (`executeInShell: true`) works. The TUnit filter is `--treenode-filter`. Rider's reformat may strip `using Haitch.Roslyn.Types;` from tests, and can restore a stale buffer after `create_new_file`, so read the file back before reformatting.
-- Remaining issue files predate the Working Agreement's **Constraints** heading (only 0.8, 6.6, 10.6 and 10.7 have it).
-
-## Open questions for the human
-- Commit now? (Recommended: yes. Nothing since `aa764ec` is committed.)
-- `.editorconfig` with 2-space XML indentation? (Recommended.)
+- Scoped writer (documented caller errors):
+  - a parent scope is writable while a child is open;
+  - copying a scope and disposing both closes twice;
+  - ElseIf/Else/Catch/Case with a nested block still open misnests;
+  - a try with no catch or finally;
+  - catch ordering (CS0160);
+  - switch fall-through (CS0163/CS8070);
+  - a dangling `Attribute()`; a rejected member after `Attribute()` leaves the attribute written.
+- `TypeParameterModel` has no variance. Primary constructors and positional records are not supported by `NewType`. `AutoProperty` writes any model as an auto-property; ref/volatile are not modelled; explicit interface members are rejected.
+- `MethodModel.From` takes no `CancellationToken`. Roslyn reports `IsSealed=false` for `sealed` interface members.
+- `HintName.For` is case-insensitive in Roslyn, so names that differ only in case collide (documented).
+- `AddEmbeddedAttributeDefinition` is shadowed by Roslyn 4.14+'s built-in instance method (documented in the web docs).
+- The remaining old issue files predate the **Constraints** heading.

@@ -95,11 +95,12 @@ public class SyntaxValueProviderExtensionsTests
     }
 
     [Test]
-    public async Task Should_report_the_value_step_as_cached_or_unchanged_after_an_unrelated_edit_in_another_file()
+    public void Should_report_the_value_step_as_cached_or_unchanged_after_an_unrelated_edit_in_another_file()
     {
         // The harness appends its trivia edit to the first source, so the marked type goes first.
-        // It also covers the unchanged-clone rerun and the caching-hazard check.
-        GeneratorHarnessResult harnessResult = GeneratorHarness.AssertCacheable(
+        // The unrelated edit goes to Source2.cs, not Source0.cs: SyntaxInfo carries a location that would
+        // shift (and so change the cached value) if the edit were made above Widget in the same file.
+        GeneratorHarness.AssertCacheable(
             new AttributeProviderTestGenerator(),
             [
                 """
@@ -109,45 +110,8 @@ public class SyntaxValueProviderExtensionsTests
                 MarkAttributeSource,
                 "public class Unrelated { }",
             ],
-            AttributeProviderTestGenerator.ValuesStepName);
-
-        GeneratorDriver driver = harnessResult.Driver;
-        Compilation compilation = harnessResult.InputCompilation;
-
-        // Unrelated edit lives in Source2.cs, not Source0.cs: SyntaxInfo carries a location that would
-        // shift (and so change the cached value) if the edit were made above Widget in the same file.
-        // The harness cannot edit a second file, so this rerun stays hand-rolled.
-        SyntaxTree treeB = compilation.SyntaxTrees.Single(tree => tree.FilePath == "Source2.cs");
-        SyntaxTree updatedTreeB = CSharpSyntaxTree.ParseText(
-            "public class Unrelated { public int Value; }", (CSharpParseOptions)treeB.Options, treeB.FilePath);
-        Compilation updatedCompilation = compilation.ReplaceSyntaxTree(treeB, updatedTreeB);
-
-        driver = driver.RunGenerators(updatedCompilation);
-
-        ImmutableArray<IncrementalStepRunReason> reasonsAfterUnrelatedEdit = GetValuesStepReasons(driver);
-
-        await Assert.That(reasonsAfterUnrelatedEdit).IsNotEmpty();
-        await Assert.That(reasonsAfterUnrelatedEdit.All(reason =>
-            reason == IncrementalStepRunReason.Cached || reason == IncrementalStepRunReason.Unchanged)).IsTrue();
-
-        // Trivia-only edit below the marked type, this time in Source0.cs itself: the identifier
-        // location SyntaxInfo captures does not move, so this exercises TypeModel/SyntaxInfo
-        // value equality directly. The tracked step sits behind the dedupe filter, which reports
-        // unchanged upstream values as Cached, so Cached is as strong as this can be asserted;
-        // Modified or New would still fail it.
-        SyntaxTree treeA = updatedCompilation.SyntaxTrees.Single(tree => tree.FilePath == "Source0.cs");
-        SyntaxTree updatedTreeA = CSharpSyntaxTree.ParseText(
-            treeA.GetText().ToString() + "// trailing comment, no semantic effect\n",
-            (CSharpParseOptions)treeA.Options, treeA.FilePath);
-        Compilation updatedCompilation2 = updatedCompilation.ReplaceSyntaxTree(treeA, updatedTreeA);
-
-        driver = driver.RunGenerators(updatedCompilation2);
-
-        ImmutableArray<IncrementalStepRunReason> reasonsAfterTriviaEdit = GetValuesStepReasons(driver);
-
-        await Assert.That(reasonsAfterTriviaEdit).IsNotEmpty();
-        await Assert.That(reasonsAfterTriviaEdit.All(reason =>
-            reason == IncrementalStepRunReason.Cached || reason == IncrementalStepRunReason.Unchanged)).IsTrue();
+            [AttributeProviderTestGenerator.ValuesStepName],
+            options: new CacheabilityOptions { UnrelatedEditSourceIndex = 2 });
     }
 
     [Test]
@@ -164,6 +128,76 @@ public class SyntaxValueProviderExtensionsTests
                 "[Sample.Mark] public partial class Widget { }",
             ],
             AttributeProviderTestGenerator.ValuesStepName);
+    }
+
+    [Test]
+    public async Task Should_modify_the_step_when_a_member_of_the_second_part_changes_but_not_for_trivia()
+    {
+        CSharpCompilation compilation = CreateCompilation(
+        [
+            CSharpSyntaxTree.ParseText(MarkAttributeSource, path: "Source0.cs"),
+            CSharpSyntaxTree.ParseText("[Sample.Mark] public partial class Widget { }", path: "Source1.cs"),
+            CSharpSyntaxTree.ParseText("public partial class Widget { public int First; }", path: "Source2.cs"),
+        ]);
+
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new AttributeProviderTestGenerator(includeMembers: true).AsSourceGenerator()],
+            driverOptions: new GeneratorDriverOptions(IncrementalGeneratorOutputKind.None,
+                trackIncrementalGeneratorSteps: true));
+        driver = driver.RunGenerators(compilation);
+
+        SyntaxTree tree2 = compilation.SyntaxTrees.Single(tree => tree.FilePath == "Source2.cs");
+        Compilation trivia = compilation.ReplaceSyntaxTree(
+            tree2,
+            CSharpSyntaxTree.ParseText("public partial class Widget { public int First; } // note",
+                path: "Source2.cs"));
+        driver = driver.RunGenerators(trivia);
+
+        await Assert.That(GetValuesStepReasons(driver)).IsNotEmpty();
+        await Assert.That(GetValuesStepReasons(driver).All(reason =>
+            reason == IncrementalStepRunReason.Cached || reason == IncrementalStepRunReason.Unchanged)).IsTrue();
+
+        SyntaxTree triviaTree2 = trivia.SyntaxTrees.Single(tree => tree.FilePath == "Source2.cs");
+        Compilation edited = trivia.ReplaceSyntaxTree(
+            triviaTree2,
+            CSharpSyntaxTree.ParseText("public partial class Widget { public int Renamed; }", path: "Source2.cs"));
+        driver = driver.RunGenerators(edited);
+
+        await Assert.That(GetValuesStepReasons(driver).Any(reason => reason == IncrementalStepRunReason.Modified))
+            .IsTrue();
+    }
+
+    [Test]
+    public async Task Should_skip_indexers_when_members_are_included()
+    {
+        var results = CollectResultsFromFiles(
+            MarkAttributeSource,
+            "Sample.MarkAttribute",
+            [
+                "[Sample.Mark] public partial class Widget { public int this[int i] => i; public int Count { get; set; } }"
+            ],
+            includeMembers: true);
+
+        await Assert.That(results.Length).IsEqualTo(1);
+        await Assert.That(results[0].Type.Properties.AsSpan().ToArray().Select(property => property.Name).ToArray())
+            .IsEquivalentTo(new[] { "Count" });
+    }
+
+    [Test]
+    public async Task Should_return_one_item_with_members_of_both_parts_when_both_are_marked()
+    {
+        var results = CollectResultsFromFiles(
+            MarkAttributeSource,
+            "Sample.MarkAttribute",
+            [
+                "[Sample.Mark] public partial class Widget { public int First; }",
+                "[Sample.Mark] public partial class Widget { public int Second; }",
+            ],
+            includeMembers: true);
+
+        await Assert.That(results.Length).IsEqualTo(1);
+        await Assert.That(results[0].Type.Fields.AsSpan().ToArray().Select(field => field.Name).Order().ToArray())
+            .IsEquivalentTo(new[] { "First", "Second" });
     }
 
     [Test]
@@ -250,14 +284,18 @@ public class SyntaxValueProviderExtensionsTests
     }
 
     private static ImmutableArray<(TypeModel Type, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes)>
-        CollectResultsFromFiles(string attributeSource, string metadataName, string[] sources)
+        CollectResultsFromFiles(
+            string attributeSource,
+            string metadataName,
+            string[] sources,
+            bool includeMembers = false)
     {
         CSharpCompilation compilation = CreateCompilation(
             new[] { CSharpSyntaxTree.ParseText(attributeSource, path: "Source0.cs") }
                 .Concat(sources.Select((source, index) =>
                     CSharpSyntaxTree.ParseText(source, path: $"Source{index + 1}.cs"))));
 
-        var generator = new CollectingAttributeProviderTestGenerator(metadataName);
+        var generator = new CollectingAttributeProviderTestGenerator(metadataName, includeMembers);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(generator.AsSourceGenerator());
         driver.RunGenerators(compilation);
 
@@ -314,10 +352,18 @@ public class SyntaxValueProviderExtensionsTests
     {
         public const string ValuesStepName = "AttributeProviderTestGenerator.Values";
 
+        private readonly bool _includeMembers;
+
+        public AttributeProviderTestGenerator(bool includeMembers = false)
+        {
+            _includeMembers = includeMembers;
+        }
+
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
             IncrementalValuesProvider<(TypeModel Type, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes)>
-                results = context.SyntaxProvider.ForTypesWithAttribute("Sample.MarkAttribute", ValuesStepName);
+                results = context.SyntaxProvider.ForTypesWithAttribute("Sample.MarkAttribute", ValuesStepName,
+                    _includeMembers);
 
             context.RegisterSourceOutput(results,
                 static (spc, value) =>
@@ -333,10 +379,14 @@ public class SyntaxValueProviderExtensionsTests
     private sealed class CollectingAttributeProviderTestGenerator : IIncrementalGenerator
     {
         private readonly string _metadataName;
+        private readonly bool _includeMembers;
 
-        public CollectingAttributeProviderTestGenerator(string metadataName = "Sample.MarkAttribute")
+        public CollectingAttributeProviderTestGenerator(
+            string metadataName = "Sample.MarkAttribute",
+            bool includeMembers = false)
         {
             _metadataName = metadataName;
+            _includeMembers = includeMembers;
         }
 
         public List<(TypeModel Type, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes)> Collected { get; } =
@@ -345,9 +395,59 @@ public class SyntaxValueProviderExtensionsTests
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
             IncrementalValuesProvider<(TypeModel Type, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes)>
-                results = context.SyntaxProvider.ForTypesWithAttribute(_metadataName, "Values");
+                results = context.SyntaxProvider.ForTypesWithAttribute(_metadataName, "Values", _includeMembers);
 
             context.RegisterSourceOutput(results, (_, value) => Collected.Add(value));
         }
+    }
+
+    [Test]
+    public async Task Should_include_members_of_every_part_when_requested()
+    {
+        var results = CollectResultsFromFiles(
+            MarkAttributeSource,
+            "Sample.MarkAttribute",
+            [
+                "[Sample.Mark] public partial class Widget { public int First; public string Name { get; set; } = \"\"; public void Run() { } }",
+                "public partial class Widget { public int Second; public int Count { get; set; } public void Stop() { } }",
+            ],
+            includeMembers: true);
+
+        await Assert.That(results.Length).IsEqualTo(1);
+        await Assert.That(results[0].Type.Fields.AsSpan().ToArray().Select(field => field.Name).Order().ToArray())
+            .IsEquivalentTo(new[] { "First", "Second" });
+        await Assert.That(results[0].Type.Properties.AsSpan().ToArray().Select(property => property.Name).Order()
+                .ToArray())
+            .IsEquivalentTo(new[] { "Count", "Name" });
+        await Assert.That(results[0].Type.Methods.AsSpan().ToArray().Select(method => method.Name).Order().ToArray())
+            .IsEquivalentTo(new[] { "Run", "Stop" });
+    }
+
+    [Test]
+    public async Task Should_leave_members_empty_by_default()
+    {
+        var results = CollectResultsFromFiles(
+            MarkAttributeSource,
+            "[Sample.Mark] public partial class Widget { public int First; public int Count { get; set; } public void Run() { } }");
+
+        await Assert.That(results.Length).IsEqualTo(1);
+        await Assert.That(results[0].Type.Fields.Count).IsEqualTo(0);
+        await Assert.That(results[0].Type.Properties.Count).IsEqualTo(0);
+        await Assert.That(results[0].Type.Methods.Count).IsEqualTo(0);
+    }
+
+    [Test]
+    public void Should_stay_cacheable_with_members_included()
+    {
+        GeneratorHarness.AssertCacheable(
+            new AttributeProviderTestGenerator(includeMembers: true),
+            [
+                """
+                [Sample.Mark]
+                public partial class Widget { public int Value; public void Run() { } }
+                """,
+                MarkAttributeSource,
+            ],
+            AttributeProviderTestGenerator.ValuesStepName);
     }
 }
