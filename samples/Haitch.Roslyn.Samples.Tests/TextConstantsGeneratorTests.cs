@@ -1,11 +1,5 @@
-using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
-using System.Threading;
 using Haitch.Roslyn.Testing;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Haitch.Roslyn.Samples.Tests;
 
@@ -14,45 +8,6 @@ public class TextConstantsGeneratorTests
     private const string Step = "TextConstantsGenerator.Files";
 
     private static readonly string[] Sources = ["class Input { }"];
-
-    private sealed class UnreadableText(string path) : AdditionalText
-    {
-        public override string Path => path;
-
-        public override SourceText? GetText(CancellationToken cancellationToken = default) => null;
-    }
-
-    // A new instance with equal contents is what the IDE supplies when it replaces the provider; the
-    // harness always reuses one instance, so it cannot exercise that rerun.
-    private sealed class MapOptionsProvider(
-        Dictionary<string, string> global,
-        Dictionary<string, IReadOnlyDictionary<string, string>> perFile
-    ) : AnalyzerConfigOptionsProvider
-    {
-        private sealed class Options(IReadOnlyDictionary<string, string> values)
-            : AnalyzerConfigOptions
-        {
-            public override bool TryGetValue(string key, [NotNullWhen(true)] out string? value) =>
-                values.TryGetValue(key, out value);
-        }
-
-        private static readonly Options Empty = new(new Dictionary<string, string>());
-
-        public override AnalyzerConfigOptions GlobalOptions { get; } = new Options(global);
-
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => Empty;
-
-        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) =>
-            perFile.TryGetValue(textFile.Path, out var values) ? new Options(values) : Empty;
-    }
-
-    private sealed class TextFile(string path, string content) : AdditionalText
-    {
-        public override string Path => path;
-
-        public override SourceText GetText(CancellationToken cancellationToken = default) =>
-            SourceText.From(content);
-    }
 
     private static GeneratorHarnessInput Input(
         IReadOnlyList<HarnessAdditionalText> texts,
@@ -168,22 +123,17 @@ public class TextConstantsGeneratorTests
     [Test]
     public async Task An_unreadable_file_reports_one_diagnostic()
     {
-        var compilation = CSharpCompilation.Create(
-            "Raw",
-            [CSharpSyntaxTree.ParseText("class Input { }")]
+        var result = GeneratorHarness.Run(
+            new TextConstantsGenerator(),
+            new GeneratorHarnessInput
+            {
+                Sources = Sources,
+                AdditionalTexts = [new UnreadableAdditionalText("broken.txt")],
+            }
         );
-        var driver = CSharpGeneratorDriver.Create(
-            generators: [new TextConstantsGenerator().AsSourceGenerator()],
-            additionalTexts: [new UnreadableText("broken.txt")]
-        );
-        driver = (CSharpGeneratorDriver)driver.RunGenerators(compilation);
 
-        ImmutableArray<Diagnostic> diagnostics = driver.GetRunResult().Diagnostics;
-
-        var diagnostic = await Assert.That(diagnostics).HasSingleItem();
-        await Assert.That(diagnostic!.Id).IsEqualTo("TEXTCONST001");
-        await Assert.That(diagnostic.GetMessage()).Contains("broken.txt");
-        await Assert.That(diagnostic.Location.GetLineSpan().Path).IsEqualTo("broken.txt");
+        await Assert.That(result.Diagnostics).HasSingleItem();
+        result.AssertDiagnostic("TEXTCONST001", messageContains: "broken.txt", file: "broken.txt");
     }
 
     [Test]
@@ -208,68 +158,21 @@ public class TextConstantsGeneratorTests
         await Assert.That(ConstantOf(result, "App.TextConstants", "B")).IsEqualTo("B");
     }
 
+    // Options are included so the rerun with a new, equal options provider is exercised for both
+    // global and per-file values.
     [Test]
-    public void Output_is_cacheable() =>
-        GeneratorHarness.AssertCacheable(
+    public async Task Output_is_cacheable()
+    {
+        var result = GeneratorHarness.AssertCacheable(
             new TextConstantsGenerator(),
-            Input([new("a.txt", "A"), new("b.txt", "B")]),
+            Input(
+                [new HarnessAdditionalText("a.txt", "A"), new HarnessAdditionalText("b.txt", "B")],
+                perFile: Names("a.txt", "Welcome")
+            ),
             [Step]
         );
 
-    [Test]
-    public async Task A_replaced_but_equal_options_provider_leaves_the_step_unmodified()
-    {
-        Dictionary<string, string> Global() => new() { ["build_property.RootNamespace"] = "App" };
-        Dictionary<string, IReadOnlyDictionary<string, string>> PerFile() =>
-            new()
-            {
-                ["a.txt"] = new Dictionary<string, string>
-                {
-                    ["build_metadata.AdditionalFiles.ConstantName"] = "Welcome",
-                },
-            };
-
-        var compilation = CSharpCompilation.Create(
-            "Rerun",
-            [CSharpSyntaxTree.ParseText("class Input { }")]
-        );
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new TextConstantsGenerator().AsSourceGenerator()],
-            additionalTexts: [new TextFile("a.txt", "A"), new TextFile("b.txt", "B")],
-            optionsProvider: new MapOptionsProvider(Global(), PerFile()),
-            driverOptions: new GeneratorDriverOptions(
-                IncrementalGeneratorOutputKind.None,
-                trackIncrementalGeneratorSteps: true
-            )
-        );
-
-        driver = driver.RunGenerators(compilation);
-        driver = driver.WithUpdatedAnalyzerConfigOptions(
-            new MapOptionsProvider(Global(), PerFile())
-        );
-        driver = driver.RunGenerators(compilation);
-
-        var outputs = driver
-            .GetRunResult()
-            .Results[0]
-            .TrackedSteps[Step]
-            .SelectMany(s => s.Outputs)
-            .ToList();
-
-        await Assert.That(outputs).IsNotEmpty();
-        await Assert
-            .That(
-                outputs
-                    .Where(o =>
-                        o.Reason
-                            is not (
-                                IncrementalStepRunReason.Unchanged
-                                or IncrementalStepRunReason.Cached
-                            )
-                    )
-                    .Select(o => o.Reason)
-            )
-            .IsEmpty();
+        await Assert.That(result.Sources["TextConstants.g.cs"]).Contains("Welcome");
     }
 
     [Test]

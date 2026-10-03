@@ -1,13 +1,9 @@
-using System.Collections.Immutable;
-using System.Threading;
 using Haitch.Roslyn.Diagnostics;
 using Haitch.Roslyn.Generators;
 using Haitch.Roslyn.Models;
 using Haitch.Roslyn.Testing;
 using Haitch.Roslyn.Types;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Haitch.Roslyn.Tests.Generators;
 
@@ -68,13 +64,6 @@ public class AdditionalFileTests
         }
     }
 
-    private sealed class UnreadableText(string path) : AdditionalText
-    {
-        public override string Path => path;
-
-        public override SourceText? GetText(CancellationToken cancellationToken = default) => null;
-    }
-
     private static readonly string[] Sources = ["class Input { }", "class Other { }"];
 
     private static GeneratorHarnessInput Input(
@@ -87,20 +76,6 @@ public class AdditionalFileTests
             AdditionalTexts = texts,
             PerFileOptions = perFile,
         };
-
-    private static ImmutableArray<Diagnostic> RunWithRawTexts(params AdditionalText[] texts)
-    {
-        var compilation = CSharpCompilation.Create(
-            "RawCompilation",
-            [CSharpSyntaxTree.ParseText("class Input { }")]
-        );
-        var driver = CSharpGeneratorDriver.Create(
-            generators: [new FileGenerator().AsSourceGenerator()],
-            additionalTexts: texts
-        );
-        driver = (CSharpGeneratorDriver)driver.RunGenerators(compilation);
-        return driver.GetRunResult().Diagnostics;
-    }
 
     [Test]
     public async Task Files_are_filtered_by_the_path_predicate()
@@ -197,20 +172,32 @@ public class AdditionalFileTests
     [Test]
     public async Task An_unreadable_text_fails_with_the_callers_descriptor_and_the_path()
     {
-        var diagnostics = RunWithRawTexts(new UnreadableText("broken.json"));
+        var result = GeneratorHarness.Run(
+            new FileGenerator(),
+            new GeneratorHarnessInput
+            {
+                Sources = Sources,
+                AdditionalTexts = [new UnreadableAdditionalText("broken.json")],
+            }
+        );
 
-        var diagnostic = await Assert.That(diagnostics).HasSingleItem();
-        await Assert.That(diagnostic!.Id).IsEqualTo("ADF001");
-        await Assert.That(diagnostic.GetMessage()).Contains("broken.json");
-        await Assert.That(diagnostic.Location.GetLineSpan().Path).IsEqualTo("broken.json");
+        await Assert.That(result.Diagnostics).HasSingleItem();
+        result.AssertDiagnostic("ADF001", messageContains: "broken.json", file: "broken.json");
     }
 
     [Test]
-    public async Task A_filtered_out_text_is_never_read()
+    public void A_filtered_out_text_is_never_read()
     {
-        var diagnostics = RunWithRawTexts(new UnreadableText("broken.txt"));
+        var result = GeneratorHarness.Run(
+            new FileGenerator(),
+            new GeneratorHarnessInput
+            {
+                Sources = Sources,
+                AdditionalTexts = [new UnreadableAdditionalText("broken.txt")],
+            }
+        );
 
-        await Assert.That(diagnostics).IsEmpty();
+        result.AssertNoDiagnostics();
     }
 
     [Test]
@@ -230,7 +217,7 @@ public class AdditionalFileTests
         var result = GeneratorHarness.AssertCacheable(
             new FileGenerator(),
             Input(
-                [new("a.json", "A"), new("b.txt", "B")],
+                [new("a.json", "A"), new("b.json", "B"), new("c.txt", "C")],
                 new()
                 {
                     ["a.json"] = new Dictionary<string, string>
@@ -244,27 +231,7 @@ public class AdditionalFileTests
         );
 
         await Assert.That(result.Sources["Files.g.cs"]).Contains("// a.json|A|kind=Config|");
-    }
-
-    [Test]
-    public async Task A_replaced_but_equal_options_provider_leaves_the_step_unmodified()
-    {
-        var (count, unstable) = DictionaryOptionsProvider.RerunWithEqualProvider(
-            new FileGenerator(),
-            new Dictionary<string, string>(),
-            new Dictionary<string, IReadOnlyDictionary<string, string>>
-            {
-                ["a.json"] = new Dictionary<string, string>
-                {
-                    ["build_metadata.AdditionalFiles.Kind"] = "Config",
-                },
-            },
-            [("a.json", "A"), ("b.json", "B")],
-            "Files"
-        );
-
-        await Assert.That(count).IsGreaterThan(0);
-        await Assert.That(unstable).IsEmpty();
+        await Assert.That(result.Sources["Files.g.cs"]).Contains("// b.json|B|kind=<null>|");
     }
 
     [Test]

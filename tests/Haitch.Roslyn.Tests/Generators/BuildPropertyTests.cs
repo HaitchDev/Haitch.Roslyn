@@ -128,22 +128,7 @@ public class BuildPropertyTests
         );
 
         await Assert.That(result.Sources["Props.g.cs"]).Contains("single=My.Root");
-    }
-
-    [Test]
-    public async Task A_replaced_but_equal_options_provider_leaves_the_steps_unmodified()
-    {
-        var (count, unstable) = DictionaryOptionsProvider.RerunWithEqualProvider(
-            new PropertyGenerator(),
-            new Dictionary<string, string> { ["build_property.RootNamespace"] = "My.Root" },
-            null,
-            [],
-            "Single",
-            "Many"
-        );
-
-        await Assert.That(count).IsGreaterThan(0);
-        await Assert.That(unstable).IsEmpty();
+        await Assert.That(result.Sources["Props.g.cs"]).Contains("root=My.Root");
     }
 
     [Test]
