@@ -93,13 +93,42 @@ internal static class SourceWriterExtensions
     /// Writes the header of a brand-new, non-partial type and opens its block. Throws
     /// <see cref="ArgumentException"/> before writing anything for an illegal modifier combination.
     /// </summary>
+    /// <remarks>
+    /// Always opens a <c>{ }</c> body, including for a record with
+    /// <see cref="NewTypeModel.PrimaryConstructorParameters"/>, which is written as
+    /// <c>record Person(string Name) { }</c>. Use <see cref="WriteBodylessNewTypeDeclaration"/> for the
+    /// <c>;</c> form.
+    /// </remarks>
     public static SourceWriter.BlockScope WriteNewTypeDeclaration(this SourceWriter writer, NewTypeModel type)
+    {
+        writer.WriteLine(RenderNewTypeHeader(type));
+
+        return writer.Block();
+    }
+
+    /// <summary>
+    /// Writes a complete bodyless positional record such as <c>record Person(string Name, int Age);</c>.
+    /// Throws <see cref="ArgumentException"/> before writing anything unless the kind is a record class or
+    /// record struct with non-null <see cref="NewTypeModel.PrimaryConstructorParameters"/>, or when the
+    /// model is otherwise illegal.
+    /// </summary>
+    /// <remarks>
+    /// Nothing is opened, so no members can be written inside the type afterwards; use
+    /// <see cref="WriteNewTypeDeclaration"/> when the type needs a body.
+    /// </remarks>
+    public static void WriteBodylessNewTypeDeclaration(this SourceWriter writer, NewTypeModel type)
     {
         var header = RenderNewTypeHeader(type);
 
-        writer.WriteLine(header);
+        if (type.Kind is not (TypeDeclarationKind.RecordClass or TypeDeclarationKind.RecordStruct)
+            || type.PrimaryConstructorParameters is null)
+        {
+            throw new ArgumentException(
+                $"'{type.Name}' cannot be written without a body: only a record class or record struct with primary constructor parameters can end in ';'.",
+                nameof(type));
+        }
 
-        return writer.Block();
+        writer.WriteLine(header + ";");
     }
 
     private static string RenderNewTypeHeader(NewTypeModel type)
@@ -156,6 +185,11 @@ internal static class SourceWriterExtensions
         builder.Append(KindKeyword(type.Kind)).Append(' ').Append(EscapeKeyword(type.Name));
         AppendTypeParameterList(builder, type.TypeParameters);
 
+        if (type.PrimaryConstructorParameters is { } primaryConstructorParameters)
+        {
+            AppendParameterList(builder, primaryConstructorParameters, isExtensionMethod: false);
+        }
+
         if (type.UnionCaseTypes.Count > 0)
         {
             builder.Append('(');
@@ -195,6 +229,14 @@ internal static class SourceWriterExtensions
         }
 
         var isClassLike = type.Kind is TypeDeclarationKind.Class or TypeDeclarationKind.RecordClass;
+
+        if (type.PrimaryConstructorParameters is not null
+            && (type.IsStatic || type.Kind is TypeDeclarationKind.Interface or TypeDeclarationKind.Union))
+        {
+            throw new ArgumentException(
+                $"'{type.Name}' is a {(type.IsStatic ? "static class" : type.Kind.ToString())}, which cannot have a primary constructor.",
+                nameof(type));
+        }
 
         if (type.IsStatic && (type.Kind != TypeDeclarationKind.Class || type.IsAbstract || type.IsSealed || type.BaseTypes.Count > 0))
         {
@@ -286,6 +328,20 @@ internal static class SourceWriterExtensions
                     nameof(type));
             }
         }
+
+        // Only interfaces (and delegates, which are not a NewType kind) can declare variant type parameters.
+        if (type.Kind != TypeDeclarationKind.Interface)
+        {
+            for (var i = 0; i < type.TypeParameters.Count; i++)
+            {
+                if (type.TypeParameters[i].Variance != VarianceKind.None)
+                {
+                    throw new ArgumentException(
+                        $"'{type.Name}' is a {type.Kind}, which cannot have a variant type parameter ('{type.TypeParameters[i].Name}').",
+                        nameof(type));
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -314,23 +370,36 @@ internal static class SourceWriterExtensions
         var builder = new StringBuilder();
         bool isExplicitInterfaceImplementation = method.ExplicitInterfaceMemberName is not null;
 
+        // Only interface and delegate type parameters can be variant; 'void M<in T>()' does not compile.
+        for (var i = 0; i < method.TypeParameters.Count; i++)
+        {
+            if (method.TypeParameters[i].Variance != VarianceKind.None)
+            {
+                throw new ArgumentException(
+                    $"Method '{method.Name}' cannot have a variant type parameter ('{method.TypeParameters[i].Name}').",
+                    nameof(method));
+            }
+        }
+
+        // An explicit implementation takes no accessibility and no inheritance modifier, but still
+        // carries static (static abstract members), extern, async and readonly.
+        if (!isExplicitInterfaceImplementation && method.HasExplicitAccessibility)
+        {
+            AppendAccessibility(builder, method.Accessibility);
+        }
+
+        if (method.IsStatic)
+        {
+            builder.Append("static ");
+        }
+
+        if (method.IsExtern)
+        {
+            builder.Append("extern ");
+        }
+
         if (!isExplicitInterfaceImplementation)
         {
-            if (method.HasExplicitAccessibility)
-            {
-                AppendAccessibility(builder, method.Accessibility);
-            }
-
-            if (method.IsStatic)
-            {
-                builder.Append("static ");
-            }
-
-            if (method.IsExtern)
-            {
-                builder.Append("extern ");
-            }
-
             if (method.IsAbstract)
             {
                 builder.Append("abstract ");
@@ -347,16 +416,16 @@ internal static class SourceWriterExtensions
             {
                 builder.Append("virtual ");
             }
+        }
 
-            if (method.IsAsync)
-            {
-                builder.Append("async ");
-            }
+        if (method.IsAsync)
+        {
+            builder.Append("async ");
+        }
 
-            if (method.IsReadOnly)
-            {
-                builder.Append("readonly ");
-            }
+        if (method.IsReadOnly)
+        {
+            builder.Append("readonly ");
         }
 
         if (method.IsPartialDefinition)
@@ -505,6 +574,11 @@ internal static class SourceWriterExtensions
             {
                 builder.Append("required ");
             }
+
+            if (field.IsVolatile)
+            {
+                builder.Append("volatile ");
+            }
         }
 
         builder.Append(field.Type.FullyQualifiedName).Append(' ').Append(field.Name);
@@ -568,6 +642,8 @@ internal static class SourceWriterExtensions
             builder.Append("partial ");
         }
 
+        AppendReturnRefKind(builder, property.ReturnRefKind);
+
         return builder.Append(property.Type.FullyQualifiedName).Append(' ').Append(property.Name).ToString();
     }
 
@@ -607,11 +683,10 @@ internal static class SourceWriterExtensions
                 nameof(property));
         }
 
-        // The model carries an explicit interface implementation's name as "IFoo.Member".
-        if (property.Name.IndexOf('.') >= 0)
+        if (property.ExplicitInterface is not null)
         {
             throw new ArgumentException(
-                $"'{property.Name}' is an explicit interface implementation, which cannot be written as an auto-property.",
+                $"'{property.Name}' is an explicit implementation of '{property.ExplicitInterface.FullyQualifiedName}', which cannot be written as an auto-property.",
                 nameof(property));
         }
 
@@ -619,6 +694,13 @@ internal static class SourceWriterExtensions
         {
             throw new ArgumentException(
                 $"'{property.Name}' has no get accessor; an auto-property requires one.",
+                nameof(property));
+        }
+
+        if (property.ReturnRefKind != ReturnRefKind.None)
+        {
+            throw new ArgumentException(
+                $"'{property.Name}' returns by ref, which cannot be written as an auto-property.",
                 nameof(property));
         }
 
@@ -816,6 +898,13 @@ internal static class SourceWriterExtensions
                 builder.Append(", ");
             }
 
+            builder.Append(
+                typeParameters[i].Variance switch
+                {
+                    VarianceKind.In => "in ",
+                    VarianceKind.Out => "out ",
+                    _ => string.Empty,
+                });
             builder.Append(typeParameters[i].Name);
         }
 

@@ -159,6 +159,232 @@ public class NewTypeDeclarationTests
     }
 
     [Test]
+    public async Task Should_write_variance_on_an_interface_type_parameters()
+    {
+        NewTypeModel model = new("IMap", TypeDeclarationKind.Interface, Accessibility.Public)
+        {
+            TypeParameters = new[]
+            {
+                Parameter("TIn", VarianceKind.In),
+                Parameter("TOut", VarianceKind.Out),
+                Parameter("TNone", VarianceKind.None),
+            }.ToEquatableArray(),
+        };
+
+        await AssertWrites(
+            model,
+            """
+            public interface IMap<in TIn, out TOut, TNone>
+            {
+            }
+
+            """);
+    }
+
+    [Test]
+    public async Task Should_write_variance_on_a_partial_variant_interface()
+    {
+        NewTypeModel model = new("IMap", TypeDeclarationKind.Interface, Accessibility.Public)
+        {
+            IsPartial = true,
+            TypeParameters = new[] { Parameter("T", VarianceKind.Out) }.ToEquatableArray(),
+        };
+
+        await AssertWrites(
+            model,
+            """
+            public partial interface IMap<out T>
+            {
+            }
+
+            """);
+    }
+
+    private static TypeParameterModel Parameter(string name, VarianceKind variance)
+    {
+        return new TypeParameterModel(
+            name,
+            default,
+            false,
+            NullableAnnotation.None,
+            false,
+            false,
+            false,
+            false)
+        {
+            Variance = variance,
+        };
+    }
+
+    private static readonly TypeRef StringRef = new("string", NullableAnnotation.NotAnnotated,
+        SpecialType.System_String, TypeKind.Class, false);
+    private static readonly TypeRef IntRef = new("int", NullableAnnotation.NotAnnotated, SpecialType.System_Int32,
+        TypeKind.Struct, true);
+    private static readonly TypeRef StringArrayRef = new("string[]", NullableAnnotation.NotAnnotated,
+        SpecialType.None, TypeKind.Array, false);
+
+    private static ParameterModel Positional(
+        string name,
+        TypeRef type,
+        ConstantValue? defaultValue = null,
+        bool isParams = false,
+        RefKind refKind = RefKind.None)
+    {
+        return new ParameterModel(name, type, refKind, ScopedKind.None, isParams, defaultValue, false, default);
+    }
+
+    [Test]
+    public async Task Should_end_a_positional_record_without_a_body_with_a_semicolon()
+    {
+        NewTypeModel model = new("Person", TypeDeclarationKind.RecordClass, Accessibility.Public)
+        {
+            PrimaryConstructorParameters = new[] { Positional("Name", StringRef), Positional("Age", IntRef) }
+                .ToEquatableArray(),
+        };
+
+        await AssertWritesBodyless(model, "public record Person(string Name, int Age);\n");
+    }
+
+    [Test]
+    public async Task Should_open_a_body_for_a_positional_record_written_with_the_block_method()
+    {
+        NewTypeModel model = new("Person", TypeDeclarationKind.RecordClass, Accessibility.Public)
+        {
+            PrimaryConstructorParameters = new[] { Positional("Name", StringRef), Positional("Age", IntRef) }
+                .ToEquatableArray(),
+        };
+
+        await AssertWrites(
+            model,
+            """
+            public record Person(string Name, int Age)
+            {
+            }
+
+            """);
+    }
+
+    [Test]
+    public async Task Should_reject_a_bodyless_declaration_for_a_non_record_and_leave_the_writer_empty()
+    {
+        NewTypeModel model = new("Widget", TypeDeclarationKind.Class, Accessibility.Public)
+        {
+            PrimaryConstructorParameters = new[] { Positional("id", IntRef) }.ToEquatableArray(),
+        };
+        SourceWriter writer = new();
+
+        await Assert.That(() => writer.WriteBodylessNewTypeDeclaration(model)).Throws<ArgumentException>();
+        await Assert.That(writer.ToString()).IsEqualTo(string.Empty);
+    }
+
+    [Test]
+    public async Task Should_reject_a_bodyless_declaration_without_a_primary_constructor_list()
+    {
+        NewTypeModel model = new("Person", TypeDeclarationKind.RecordClass, Accessibility.Public);
+        SourceWriter writer = new();
+
+        await Assert.That(() => writer.WriteBodylessNewTypeDeclaration(model)).Throws<ArgumentException>();
+        await Assert.That(writer.ToString()).IsEqualTo(string.Empty);
+    }
+
+    [Test]
+    public async Task Should_reject_an_illegal_bodyless_declaration_and_leave_the_writer_empty()
+    {
+        NewTypeModel model = new("Person", TypeDeclarationKind.RecordClass, Accessibility.Public)
+        {
+            IsStatic = true,
+            PrimaryConstructorParameters = new EquatableArray<ParameterModel>(),
+        };
+        SourceWriter writer = new();
+
+        await Assert.That(() => writer.WriteBodylessNewTypeDeclaration(model)).Throws<ArgumentException>();
+        await Assert.That(writer.ToString()).IsEqualTo(string.Empty);
+    }
+
+    [Test]
+    public async Task Should_write_an_empty_primary_constructor_list_for_an_empty_array()
+    {
+        NewTypeModel model = new("Unit", TypeDeclarationKind.RecordStruct, Accessibility.Public)
+        {
+            PrimaryConstructorParameters = new EquatableArray<ParameterModel>(),
+        };
+
+        await AssertWritesBodyless(model, "public record struct Unit();\n");
+    }
+
+    [Test]
+    public async Task Should_keep_the_body_for_a_non_record_with_primary_constructor_parameters()
+    {
+        NewTypeModel model = new("Widget", TypeDeclarationKind.Class, Accessibility.Public)
+        {
+            BaseTypes = new[] { Marker }.ToEquatableArray(),
+            PrimaryConstructorParameters = new[] { Positional("id", IntRef) }.ToEquatableArray(),
+        };
+
+        await AssertWrites(
+            model,
+            """
+            public class Widget(int id) : global::IMarker
+            {
+            }
+
+            """,
+            compileBody: "public int Copy = id; ");
+    }
+
+    [Test]
+    public async Task Should_write_parameter_defaults_params_and_ref_kinds()
+    {
+        NewTypeModel model = new("Buffer", TypeDeclarationKind.Struct, Accessibility.Public)
+        {
+            PrimaryConstructorParameters = new[]
+            {
+                Positional("count", IntRef, ConstantValue.ForPrimitive(5)),
+                Positional("names", StringArrayRef, isParams: true),
+            }.ToEquatableArray(),
+        };
+
+        await AssertWrites(
+            model,
+            """
+            public struct Buffer(int count = 5, params string[] names)
+            {
+            }
+
+            """,
+            compileBody: "public int Total = count + names.Length; ");
+    }
+
+    [Test]
+    public async Task Should_write_a_generic_positional_record_with_constraints_before_the_semicolon()
+    {
+        TypeParameterModel typeParameter = new(
+            "T",
+            default,
+            HasReferenceTypeConstraint: true,
+            NullableAnnotation.NotAnnotated,
+            HasValueTypeConstraint: false,
+            HasUnmanagedTypeConstraint: false,
+            HasNotNullConstraint: false,
+            HasConstructorConstraint: false);
+        TypeRef valueRef = new("T", NullableAnnotation.NotAnnotated, SpecialType.None, TypeKind.TypeParameter, false);
+        NewTypeModel model = new("Box", TypeDeclarationKind.RecordClass, Accessibility.Public)
+        {
+            TypeParameters = new[] { typeParameter }.ToEquatableArray(),
+            BaseTypes = new[] { Marker }.ToEquatableArray(),
+            PrimaryConstructorParameters = new[] { Positional("Value", valueRef) }.ToEquatableArray(),
+        };
+
+        await AssertWritesBodyless(
+            model,
+            """
+            public record Box<T>(T Value) : global::IMarker
+                where T : class;
+
+            """);
+    }
+
+    [Test]
     public async Task Should_write_a_file_sealed_class()
     {
         NewTypeModel model = new("Hidden", TypeDeclarationKind.Class, Accessibility.NotApplicable)
@@ -298,6 +524,37 @@ public class NewTypeDeclarationTests
         }
 
         await Assert.That(Create()).IsEqualTo(Create());
+
+        NewTypeModel RecordWith(EquatableArray<ParameterModel> parameters)
+        {
+            return new NewTypeModel("R", TypeDeclarationKind.RecordClass, Accessibility.Public)
+            {
+                PrimaryConstructorParameters = parameters,
+            };
+        }
+
+        NewTypeModel WithVariance(VarianceKind variance)
+        {
+            return new NewTypeModel("I", TypeDeclarationKind.Interface, Accessibility.Public)
+            {
+                TypeParameters = new[] { Parameter("T", variance) }.ToEquatableArray(),
+            };
+        }
+
+        EquatableArray<ParameterModel> One() => new[] { Positional("x", IntRef) }.ToEquatableArray();
+
+        await Assert.That(RecordWith(One())).IsEqualTo(RecordWith(One()));
+        await Assert.That(RecordWith(One())).IsNotEqualTo(
+            RecordWith(new[] { Positional("y", IntRef) }.ToEquatableArray()));
+        await Assert.That(RecordWith(new EquatableArray<ParameterModel>())).IsEqualTo(
+            RecordWith(new EquatableArray<ParameterModel>()));
+        await Assert.That(RecordWith(new EquatableArray<ParameterModel>())).IsNotEqualTo(RecordWith(One()));
+        await Assert.That(Model(TypeDeclarationKind.RecordClass) with { Name = "R" }).IsNotEqualTo(
+            RecordWith(new EquatableArray<ParameterModel>()));
+
+        await Assert.That(WithVariance(VarianceKind.Out)).IsEqualTo(WithVariance(VarianceKind.Out));
+        await Assert.That(WithVariance(VarianceKind.Out)).IsNotEqualTo(WithVariance(VarianceKind.In));
+        await Assert.That(WithVariance(VarianceKind.None)).IsNotEqualTo(WithVariance(VarianceKind.Out));
     }
 
     [Test]
@@ -351,7 +608,36 @@ public class NewTypeDeclarationTests
         }
 
         yield return () => Model(TypeDeclarationKind.RecordStruct) with { IsRefLikeType = true };
+
+        foreach (TypeDeclarationKind kind in new[]
+                     {
+                         TypeDeclarationKind.Class, TypeDeclarationKind.Struct, TypeDeclarationKind.RecordClass,
+                         TypeDeclarationKind.RecordStruct
+                     })
+        {
+            TypeDeclarationKind captured = kind;
+
+            yield return () => Model(captured) with
+            {
+                TypeParameters = new[] { Parameter("T", VarianceKind.Out) }.ToEquatableArray()
+            };
+        }
+
         yield return () => Model(TypeDeclarationKind.Class) with { Name = " " };
+
+        yield return () => Model(TypeDeclarationKind.Interface) with
+        {
+            PrimaryConstructorParameters = new EquatableArray<ParameterModel>()
+        };
+        yield return () => Model(TypeDeclarationKind.Class) with
+        {
+            IsStatic = true, PrimaryConstructorParameters = new EquatableArray<ParameterModel>()
+        };
+        yield return () => Model(TypeDeclarationKind.Union) with
+        {
+            UnionCaseTypes = new[] { "int" }.ToEquatableArray(),
+            PrimaryConstructorParameters = new[] { Positional("x", IntRef) }.ToEquatableArray(),
+        };
         yield return () => Model(TypeDeclarationKind.Class) with { Name = "" };
         yield return () => Model(TypeDeclarationKind.RecordClass) with { IsStatic = true };
         yield return () => Model(TypeDeclarationKind.Class) with { Name = "1abc" };
@@ -382,7 +668,17 @@ public class NewTypeDeclarationTests
         return new NewTypeModel("T0", kind, Accessibility.Public);
     }
 
-    private static async Task AssertWrites(NewTypeModel model, string expected)
+    private static async Task AssertWritesBodyless(NewTypeModel model, string expected)
+    {
+        SourceWriter writer = new();
+
+        writer.WriteBodylessNewTypeDeclaration(model);
+
+        await Assert.That(writer.ToString()).IsEqualTo(expected);
+        await AssertCompiles(writer.ToString());
+    }
+
+    private static async Task AssertWrites(NewTypeModel model, string expected, string? compileBody = null)
     {
         SourceWriter writer = new();
 
@@ -392,7 +688,8 @@ public class NewTypeDeclarationTests
 
         await Assert.That(output).IsEqualTo(expected);
 
-        await AssertCompiles(output);
+        // A primary constructor parameter that nothing reads is a warning, so the compile check gives it a reader.
+        await AssertCompiles(compileBody is null ? output : output.Replace("{\n}", "{ " + compileBody + "}"));
     }
 
     private static async Task AssertCompiles(string output)

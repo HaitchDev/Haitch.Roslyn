@@ -499,7 +499,87 @@ public class MemberModelTests
         MethodModel model = MethodModel.From(method);
 
         await Assert.That(model.ExplicitInterface!.FullyQualifiedName).IsEqualTo("global::IWorker");
+        await Assert.That(model.Name).IsEqualTo("DoWork");
         await Assert.That(model.ExplicitInterfaceMemberName).IsEqualTo("DoWork");
+    }
+
+    [Test]
+    public async Task Should_capture_an_explicit_interface_property_implementation_with_an_unqualified_name()
+    {
+        const string source =
+            """
+            public interface IFoo
+            {
+                int Bar { get; }
+            }
+
+            public class Foo : IFoo
+            {
+                int IFoo.Bar => 1;
+                public int Plain { get; set; }
+            }
+            """;
+
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "Foo");
+        IPropertySymbol explicitProperty = type.GetMembers()
+            .OfType<IPropertySymbol>()
+            .Single(p => p.ExplicitInterfaceImplementations.Length > 0);
+
+        PropertyModel model = PropertyModel.From(explicitProperty);
+        PropertyModel plain = PropertyModel.From(
+            type.GetMembers("Plain").OfType<IPropertySymbol>().Single());
+
+        await Assert.That(model.Name).IsEqualTo("Bar");
+        await Assert.That(model.ExplicitInterface!.FullyQualifiedName).IsEqualTo("global::IFoo");
+        await Assert.That(model.ExplicitInterfaceMemberName).IsEqualTo("Bar");
+        await Assert.That(plain.ExplicitInterface).IsNull();
+        await Assert.That(plain.ExplicitInterfaceMemberName).IsNull();
+    }
+
+    [Test]
+    public async Task Should_capture_volatile_fields()
+    {
+        const string source =
+            """
+            public class Host
+            {
+                public volatile int Flag;
+                public int Plain;
+            }
+            """;
+
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "Host");
+
+        FieldModel flag = FieldModel.From(type.GetMembers("Flag").OfType<IFieldSymbol>().Single());
+        FieldModel plain = FieldModel.From(type.GetMembers("Plain").OfType<IFieldSymbol>().Single());
+
+        await Assert.That(flag.IsVolatile).IsTrue();
+        await Assert.That(plain.IsVolatile).IsFalse();
+    }
+
+    [Test]
+    public async Task Should_capture_the_ref_kind_of_ref_returning_properties()
+    {
+        const string source =
+            """
+            public class Host
+            {
+                private int _slot;
+                public ref int Slot => ref _slot;
+                public ref readonly int View => ref _slot;
+                public int Plain { get; set; }
+            }
+            """;
+
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "Host");
+
+        PropertyModel slot = PropertyModel.From(type.GetMembers("Slot").OfType<IPropertySymbol>().Single());
+        PropertyModel view = PropertyModel.From(type.GetMembers("View").OfType<IPropertySymbol>().Single());
+        PropertyModel plain = PropertyModel.From(type.GetMembers("Plain").OfType<IPropertySymbol>().Single());
+
+        await Assert.That(slot.ReturnRefKind).IsEqualTo(ReturnRefKind.Ref);
+        await Assert.That(view.ReturnRefKind).IsEqualTo(ReturnRefKind.RefReadOnly);
+        await Assert.That(plain.ReturnRefKind).IsEqualTo(ReturnRefKind.None);
     }
 
     [Test]
@@ -647,6 +727,51 @@ public class MemberModelTests
         PropertyModel implicitModel = explicitModel with { HasExplicitAccessibility = false };
 
         await Assert.That(explicitModel).IsNotEqualTo(implicitModel);
+    }
+
+    [Test]
+    public async Task Should_not_treat_field_models_differing_only_in_IsVolatile_as_equal()
+    {
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol("public class VolHost { public volatile int F; }", "VolHost");
+        FieldModel volatileModel = FieldModel.From(type.GetMembers("F").OfType<IFieldSymbol>().Single());
+        FieldModel plainModel = volatileModel with { IsVolatile = false };
+
+        await Assert.That(volatileModel).IsNotEqualTo(plainModel);
+    }
+
+    [Test]
+    public async Task Should_not_treat_property_models_differing_only_in_ReturnRefKind_as_equal()
+    {
+        PropertyModel plainModel = GetProperty("public class RefEqHost { public int P { get; } }", "RefEqHost", "P");
+        PropertyModel refModel = plainModel with { ReturnRefKind = ReturnRefKind.Ref };
+
+        await Assert.That(plainModel).IsNotEqualTo(refModel);
+    }
+
+    [Test]
+    public async Task Should_not_treat_method_models_differing_only_in_ExplicitInterface_as_equal()
+    {
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(
+            "public interface IEq { void M(); } public class ExplEqHost : IEq { void IEq.M() { } }",
+            "ExplEqHost");
+        MethodModel explicitModel = MethodModel.From(
+            type.GetMembers().OfType<IMethodSymbol>().Single(m => m.ExplicitInterfaceImplementations.Length > 0));
+        MethodModel plainModel = explicitModel with { ExplicitInterface = null };
+
+        await Assert.That(explicitModel).IsNotEqualTo(plainModel);
+    }
+
+    [Test]
+    public async Task Should_not_treat_property_models_differing_only_in_ExplicitInterface_as_equal()
+    {
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(
+            "public interface IPEq { int P { get; } } public class ExplPEqHost : IPEq { int IPEq.P => 1; }",
+            "ExplPEqHost");
+        PropertyModel explicitModel = PropertyModel.From(
+            type.GetMembers().OfType<IPropertySymbol>().Single(p => p.ExplicitInterfaceImplementations.Length > 0));
+        PropertyModel plainModel = explicitModel with { ExplicitInterface = null };
+
+        await Assert.That(explicitModel).IsNotEqualTo(plainModel);
     }
 
     private static IMethodSymbol GetMethod(string source, string typeMetadataName, string methodName)

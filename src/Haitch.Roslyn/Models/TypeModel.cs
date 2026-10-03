@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using Haitch.Roslyn.Types;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -137,8 +138,16 @@ internal static class ClosedTypeDetector
 /// <param name="ContainingTypes">The enclosing types, outermost first.</param>
 /// <param name="Attributes">The attributes applied to the type.</param>
 /// <param name="Fields">The captured fields; empty unless members were included.</param>
-/// <param name="Properties">The captured properties; empty unless members were included.</param>
-/// <param name="Methods">The captured methods; empty unless members were included.</param>
+/// <param name="Properties">
+/// The captured properties; empty unless members were included. <c>Name</c> is not unique: an explicit
+/// interface implementation keeps the interface member's name, so it can repeat a property of the type or
+/// another interface's. Tell them apart by <see cref="PropertyModel.ExplicitInterface"/>.
+/// </param>
+/// <param name="Methods">
+/// The captured methods; empty unless members were included. <c>Name</c> is not unique: overloads and
+/// explicit interface implementations share names. Tell implementations apart by
+/// <see cref="MethodModel.ExplicitInterface"/>.
+/// </param>
 internal sealed record TypeModel(
     string? Namespace,
     string Name,
@@ -173,11 +182,18 @@ internal sealed record TypeModel(
     /// unless <paramref name="includeMembers"/> is true, since capturing every member ties the model's
     /// equality (and so incremental generator cache validity) to any edit of any member.
     /// </summary>
+    /// <param name="type">The type to capture.</param>
+    /// <param name="includeMembers">True to also capture fields, properties and methods.</param>
+    /// <param name="cancellationToken">
+    /// Checked per captured member; cancellation throws <see cref="OperationCanceledException"/>.
+    /// </param>
     /// <exception cref="ArgumentException">
     /// <paramref name="type"/> is an enum, delegate, or other kind <see cref="TypeModel"/> does not model.
     /// </exception>
-    public static TypeModel From(INamedTypeSymbol type, bool includeMembers = false)
+    public static TypeModel From(INamedTypeSymbol type, bool includeMembers = false, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var typeParameters = type.TypeParameters
             .Select(TypeParameterModel.From)
             .ToEquatableArray();
@@ -191,7 +207,11 @@ internal sealed record TypeModel(
             ? type.GetMembers()
                 .OfType<IFieldSymbol>()
                 .Where(field => !field.IsImplicitlyDeclared)
-                .Select(FieldModel.From)
+                .Select(field =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return FieldModel.From(field);
+                })
                 .ToEquatableArray()
             : default;
 
@@ -199,15 +219,21 @@ internal sealed record TypeModel(
             ? type.GetMembers()
                 .OfType<IPropertySymbol>()
                 .Where(property => !property.IsImplicitlyDeclared && !property.IsIndexer)
-                .Select(PropertyModel.From)
+                .Select(property =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return PropertyModel.From(property);
+                })
                 .ToEquatableArray()
             : default;
 
         var methods = includeMembers
             ? type.GetMembers()
                 .OfType<IMethodSymbol>()
-                .Where(method => method.MethodKind == MethodKind.Ordinary && !method.IsImplicitlyDeclared)
-                .Select(MethodModel.From)
+                .Where(method =>
+                    method.MethodKind is MethodKind.Ordinary or MethodKind.ExplicitInterfaceImplementation
+                    && !method.IsImplicitlyDeclared)
+                .Select(method => MethodModel.From(method, cancellationToken))
                 .ToEquatableArray()
             : default;
 

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Reflection;
 using Haitch.Roslyn.Generators;
 using Haitch.Roslyn.Models;
 using Haitch.Roslyn.Testing;
@@ -434,6 +435,47 @@ public class SyntaxValueProviderExtensionsTests
         await Assert.That(results[0].Type.Fields.Count).IsEqualTo(0);
         await Assert.That(results[0].Type.Properties.Count).IsEqualTo(0);
         await Assert.That(results[0].Type.Methods.Count).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task Should_pass_the_token_to_the_member_capture()
+    {
+        CSharpCompilation compilation = CreateCompilation(
+        [
+            CSharpSyntaxTree.ParseText(MarkAttributeSource),
+            CSharpSyntaxTree.ParseText("[Sample.Mark] public partial class Widget { public int Value; }"),
+        ]);
+        ContextCapturingTestGenerator generator = new();
+        CSharpGeneratorDriver.Create(generator.AsSourceGenerator()).RunGenerators(compilation);
+
+        // The driver itself throws on a cancelled token before the transform runs, so a driver-level test
+        // cannot tell whether the transform forwards the token; the transform is called directly instead.
+        MethodInfo transform = typeof(SyntaxValueProviderExtensions).GetMethod(
+            "Transform",
+            BindingFlags.NonPublic | BindingFlags.Static)!;
+        CancellationToken cancelled = new CancellationToken(canceled: true);
+
+        TargetInvocationException? thrown = await Assert
+            .That(() => transform.Invoke(null, [generator.Captured, true, cancelled]))
+            .Throws<TargetInvocationException>();
+
+        await Assert.That(thrown?.InnerException).IsTypeOf<OperationCanceledException>();
+    }
+
+    // Keeps the real context ForAttributeWithMetadataName hands a transform, since the type has no public constructor.
+    private sealed class ContextCapturingTestGenerator : IIncrementalGenerator
+    {
+        public GeneratorAttributeSyntaxContext Captured { get; private set; }
+
+        public void Initialize(IncrementalGeneratorInitializationContext context)
+        {
+            context.RegisterSourceOutput(
+                context.SyntaxProvider.ForAttributeWithMetadataName(
+                    "Sample.MarkAttribute",
+                    static (node, _) => node is TypeDeclarationSyntax,
+                    static (attributeContext, _) => attributeContext),
+                (_, attributeContext) => Captured = attributeContext);
+        }
     }
 
     [Test]

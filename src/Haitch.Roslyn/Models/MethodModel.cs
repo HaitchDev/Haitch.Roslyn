@@ -2,6 +2,7 @@
 #nullable enable
 
 using System.Linq;
+using System.Threading;
 using Haitch.Roslyn.Types;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -45,8 +46,18 @@ internal sealed record MethodModel(
     /// </summary>
     public bool HasExplicitAccessibility { get; init; } = true;
 
-    public static MethodModel From(IMethodSymbol method)
+    /// <summary>
+    /// Builds a <see cref="MethodModel"/> from <paramref name="method"/>.
+    /// </summary>
+    /// <param name="method">The method to capture.</param>
+    /// <param name="cancellationToken">
+    /// Checked per captured parameter and type parameter; cancellation throws
+    /// <see cref="System.OperationCanceledException"/>.
+    /// </param>
+    public static MethodModel From(IMethodSymbol method, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var returnRefKind = method.ReturnsByRefReadonly
             ? ReturnRefKind.RefReadOnly
             : method.ReturnsByRef
@@ -54,11 +65,19 @@ internal sealed record MethodModel(
                 : ReturnRefKind.None;
 
         var typeParameters = method.TypeParameters
-            .Select(TypeParameterModel.From)
+            .Select(typeParameter =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return TypeParameterModel.From(typeParameter);
+            })
             .ToEquatableArray();
 
         var parameters = method.Parameters
-            .Select(ParameterModel.From)
+            .Select(parameter =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return ParameterModel.From(parameter);
+            })
             .ToEquatableArray();
 
         var attributes = method.GetAttributes()
@@ -69,7 +88,9 @@ internal sealed record MethodModel(
         var explicitInterfaceMethod = method.ExplicitInterfaceImplementations.FirstOrDefault();
 
         return new MethodModel(
-            method.Name,
+            // Roslyn names an explicit implementation "System.IDisposable.Dispose"; the model carries the
+            // interface separately, as PropertyModel does.
+            explicitInterfaceMethod?.Name ?? method.Name,
             method.MethodKind,
             TypeRef.From(method.ReturnType),
             returnRefKind,

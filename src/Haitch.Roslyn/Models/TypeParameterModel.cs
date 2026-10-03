@@ -17,6 +17,8 @@ internal sealed record TypeParameterModel(
     bool HasNotNullConstraint,
     bool HasConstructorConstraint)
 {
+    public VarianceKind Variance { get; init; }
+
     public static TypeParameterModel From(ITypeParameterSymbol typeParameter)
     {
         var constraintTypes = typeParameter.ConstraintTypes
@@ -31,6 +33,9 @@ internal sealed record TypeParameterModel(
             typeParameter.HasValueTypeConstraint,
             typeParameter.HasUnmanagedTypeConstraint,
             typeParameter.HasNotNullConstraint,
-            typeParameter.HasConstructorConstraint);
+            typeParameter.HasConstructorConstraint)
+        {
+            Variance = typeParameter.Variance,
+        };
     }
 }

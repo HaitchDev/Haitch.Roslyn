@@ -18,6 +18,11 @@ internal sealed record FieldModel(
     ConstantValue? ConstantValue,
     EquatableArray<AttributeModel> Attributes)
 {
+    /// <summary>
+    /// Whether the field is declared <c>volatile</c>.
+    /// </summary>
+    public bool IsVolatile { get; init; }
+
     public static FieldModel From(IFieldSymbol field)
     {
         var attributes = field.GetAttributes()
@@ -34,7 +39,10 @@ internal sealed record FieldModel(
             field.IsConst,
             field.IsRequired,
             GetConstantValue(field),
-            attributes);
+            attributes)
+        {
+            IsVolatile = field.IsVolatile,
+        };
     }
 
     // Field constants are exposed as a raw CLR value (ConstantValue), not a TypedConstant,

@@ -49,6 +49,24 @@ internal sealed record PropertyModel(
     /// </summary>
     public bool HasExplicitAccessibility { get; init; } = true;
 
+    /// <summary>
+    /// The interface an explicit implementation (<c>int IFoo.Bar { get; }</c>) implements; null for every
+    /// other property. <see cref="Name"/> stays the unqualified member name either way.
+    /// </summary>
+    public TypeRef? ExplicitInterface { get; init; }
+
+    /// <summary>
+    /// The implemented interface member's name; null unless <see cref="ExplicitInterface"/> is set.
+    /// </summary>
+    public string? ExplicitInterfaceMemberName { get; init; }
+
+    /// <summary>
+    /// How the property returns its value: <see cref="Models.ReturnRefKind.Ref"/> for <c>ref</c>,
+    /// <see cref="Models.ReturnRefKind.RefReadOnly"/> for <c>ref readonly</c>, and
+    /// <see cref="Models.ReturnRefKind.None"/> otherwise; the same enum <see cref="MethodModel"/> uses.
+    /// </summary>
+    public ReturnRefKind ReturnRefKind { get; init; }
+
     public static PropertyModel From(IPropertySymbol property)
     {
         if (property.IsIndexer)
@@ -87,8 +105,11 @@ internal sealed record PropertyModel(
             .OfType<AttributeModel>()
             .ToEquatableArray();
 
+        var explicitInterfaceProperty = property.ExplicitInterfaceImplementations.FirstOrDefault();
+
         return new PropertyModel(
-            property.Name,
+            // Roslyn names an explicit implementation "IFoo.Bar"; the model carries the interface separately.
+            explicitInterfaceProperty?.Name ?? property.Name,
             TypeRef.From(property.Type),
             property.DeclaredAccessibility,
             property.IsStatic,
@@ -103,6 +124,15 @@ internal sealed record PropertyModel(
             attributes)
         {
             HasExplicitAccessibility = !isPartial || HasAccessModifier(syntaxProperty),
+            ReturnRefKind = property.ReturnsByRefReadonly
+                ? ReturnRefKind.RefReadOnly
+                : property.ReturnsByRef
+                    ? ReturnRefKind.Ref
+                    : ReturnRefKind.None,
+            ExplicitInterface = explicitInterfaceProperty is null
+                ? null
+                : TypeRef.From(explicitInterfaceProperty.ContainingType),
+            ExplicitInterfaceMemberName = explicitInterfaceProperty?.Name,
         };
     }
 

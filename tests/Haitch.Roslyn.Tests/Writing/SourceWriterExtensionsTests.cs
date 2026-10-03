@@ -773,6 +773,131 @@ public class SourceWriterExtensionsTests
     }
 
     [Test]
+    public async Task Should_keep_static_on_an_explicit_implementation_of_a_static_abstract_member()
+    {
+        const string source =
+            """
+            public interface IMaker
+            {
+                static abstract int Make();
+            }
+
+            public class Impl : IMaker
+            {
+                static int IMaker.Make() => 1;
+            }
+            """;
+
+        IMethodSymbol methodSymbol = CompilationHelper.GetNamedTypeSymbol(source, "Impl")
+            .GetMembers()
+            .OfType<IMethodSymbol>()
+            .Single(candidate => candidate.MethodKind == MethodKind.ExplicitInterfaceImplementation);
+
+        MethodModel method = MethodModel.From(methodSymbol);
+
+        SourceWriter writer = new();
+        writer.WriteMethodSignature(method);
+
+        string expected =
+            """
+            static int global::IMaker.Make();
+
+            """;
+
+        await Assert.That(writer.ToString()).IsEqualTo(expected);
+
+        const string originalSource =
+            """
+            public interface IMaker2
+            {
+                static abstract int Make();
+            }
+
+            public partial class Impl2 : IMaker2
+            {
+            }
+            """;
+
+        string signature = writer.ToString().TrimEnd();
+        string signatureWithBody = signature[..^1].Replace("IMaker.", "IMaker2.") + " => 1;";
+
+        string generatedSource =
+            $$"""
+              partial class Impl2
+              {
+                  {{signatureWithBody}}
+              }
+              """;
+
+        CompilationHelper.Compile(originalSource + "\n" + generatedSource);
+    }
+
+    [Test]
+    public async Task Should_keep_async_on_an_explicit_implementation()
+    {
+        const string source =
+            """
+            public interface IRunner
+            {
+                System.Threading.Tasks.Task<int> RunAsync();
+            }
+
+            public class Impl : IRunner
+            {
+                async System.Threading.Tasks.Task<int> IRunner.RunAsync()
+                {
+                    await System.Threading.Tasks.Task.Yield();
+                    return 1;
+                }
+            }
+            """;
+
+        IMethodSymbol methodSymbol = CompilationHelper.GetNamedTypeSymbol(source, "Impl")
+            .GetMembers()
+            .OfType<IMethodSymbol>()
+            .Single(candidate => candidate.MethodKind == MethodKind.ExplicitInterfaceImplementation);
+
+        MethodModel method = MethodModel.From(methodSymbol);
+
+        SourceWriter writer = new();
+        writer.WriteMethodSignature(method);
+
+        string expected =
+            """
+            async global::System.Threading.Tasks.Task<int> global::IRunner.RunAsync();
+
+            """;
+
+        await Assert.That(writer.ToString()).IsEqualTo(expected);
+
+        const string originalSource =
+            """
+            public interface IRunner2
+            {
+                System.Threading.Tasks.Task<int> RunAsync();
+            }
+
+            public partial class Impl2 : IRunner2
+            {
+            }
+            """;
+
+        string signature = writer.ToString().TrimEnd();
+        string signatureWithBody = signature[..^1].Replace("IRunner.", "IRunner2.")
+            + " { await global::System.Threading.Tasks.Task.Yield(); return 1; }";
+
+        string generatedSource =
+            $$"""
+              partial class Impl2
+              {
+                  {{signatureWithBody}}
+              }
+              """;
+
+        CompilationHelper.Compile(originalSource + "\n" + generatedSource);
+    }
+
+    [Test]
     public async Task Should_prefix_the_first_parameter_with_this_for_an_extension_method()
     {
         const string source =
@@ -904,6 +1029,46 @@ public class SourceWriterExtensionsTests
             """;
 
         CompilationHelper.Compile(originalSource + "\n" + writer.ToString());
+    }
+
+    [Test]
+    public async Task Should_write_a_partial_part_of_a_variant_interface_that_compiles_with_the_original()
+    {
+        const string originalSource = "public partial interface IFoo<out T> { }";
+
+        INamedTypeSymbol symbol = CompilationHelper.GetNamedTypeSymbol(originalSource, "IFoo`1");
+        TypeModel model = TypeModel.From(symbol);
+
+        SourceWriter writer = new();
+
+        using (writer.WriteTypeDeclaration(model)) { }
+
+        await Assert.That(writer.ToString()).Contains("partial interface IFoo<out T>");
+
+        // CS1067 (partial declarations must have the same variance) would surface as an error here.
+        CompilationHelper.Compile(originalSource + "\n" + writer.ToString());
+    }
+
+    [Test]
+    public async Task Should_reject_a_variant_method_type_parameter_and_leave_the_writer_empty()
+    {
+        const string source = "public interface ISample { void M<T>(); }";
+
+        IMethodSymbol methodSymbol = CompilationHelper.GetNamedTypeSymbol(source, "ISample")
+            .GetMembers("M")
+            .OfType<IMethodSymbol>()
+            .Single();
+        MethodModel model = MethodModel.From(methodSymbol);
+        MethodModel variant = model with
+        {
+            TypeParameters = model.TypeParameters
+                .Select(parameter => parameter with { Variance = VarianceKind.Out })
+                .ToEquatableArray(),
+        };
+        SourceWriter writer = new();
+
+        await Assert.That(() => writer.WriteMethodSignature(variant)).Throws<ArgumentException>();
+        await Assert.That(writer.ToString()).IsEqualTo(string.Empty);
     }
 
     [Test]

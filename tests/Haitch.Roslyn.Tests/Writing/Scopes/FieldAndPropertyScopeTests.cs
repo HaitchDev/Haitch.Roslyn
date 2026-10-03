@@ -29,6 +29,10 @@ public class FieldAndPropertyScopeTests
             public int Plain;
             public required int Id;
             protected internal readonly string? Note;
+            public volatile int Flag;
+            private int _slot;
+            public ref int Slot => ref _slot;
+            public ref readonly int View => ref _slot;
 
             public required string Name { get; set; }
             public int Count { get; private set; }
@@ -313,7 +317,12 @@ public class FieldAndPropertyScopeTests
     [Test]
     public async Task Should_reject_an_explicit_interface_implementation_property()
     {
-        PropertyModel property = PropertyFrom("Count") with { Name = "ISource.Member" };
+        PropertyModel property = PropertyFrom("Count") with
+        {
+            Name = "Member",
+            ExplicitInterface = new TypeRef("global::ISource", NullableAnnotation.NotAnnotated, SpecialType.None, TypeKind.Interface, false),
+            ExplicitInterfaceMemberName = "Member",
+        };
 
         await Assert.That(() =>
         {
@@ -409,6 +418,99 @@ public class FieldAndPropertyScopeTests
         await Assert
             .That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Id))
             .IsEmpty();
+    }
+
+    [Test]
+    public async Task Should_render_a_volatile_field()
+    {
+        string body = Render(type => type.Field(FieldFrom("Flag")));
+
+        await Assert.That(body).IsEqualTo("    public volatile int Flag;\n");
+    }
+
+    [Test]
+    public async Task Should_render_ref_and_ref_readonly_properties_through_a_property_scope()
+    {
+        string body = Render(type =>
+        {
+            using (var slot = type.Property(PropertyFrom("Slot")))
+            {
+                using var get = slot.Get();
+                get.Line("return ref _slot;");
+            }
+
+            using (var view = type.Property(PropertyFrom("View")))
+            {
+                using var get = view.Get();
+                get.Line("return ref _slot;");
+            }
+        });
+
+        await Assert
+            .That(body)
+            .IsEqualTo(
+                "    public ref int Slot\n    {\n        get\n        {\n            return ref _slot;\n        }\n    }\n\n"
+                + "    public ref readonly int View\n    {\n        get\n        {\n            return ref _slot;\n        }\n    }\n");
+    }
+
+    [Test]
+    public async Task Should_produce_a_type_that_compiles_with_a_volatile_field_and_ref_properties()
+    {
+        SourceWriter writer = new();
+
+        using (var file = writer.File())
+        {
+            using var type = file.Type(Sample());
+            type.Field(FieldFrom("Flag"));
+
+            using (var slot = type.Property(PropertyFrom("Slot")))
+            {
+                using var get = slot.Get();
+                get.Line("return ref _slot;");
+            }
+
+            using (var view = type.Property(PropertyFrom("View")))
+            {
+                using var get = view.Get();
+                get.Line("return ref _slot;");
+            }
+        }
+
+        string source = SampleSource + "\npublic partial class Sample { private int _slot; }\n" + writer;
+        CSharpCompilation compilation = CompilationHelper.Compile(source, allowErrors: true);
+
+        await Assert
+            .That(compilation.GetDiagnostics().Where(d => d.Severity != DiagnosticSeverity.Hidden).Select(d => d.Id))
+            .IsEmpty();
+    }
+
+    [Test]
+    public async Task Should_reject_an_auto_property_that_returns_by_ref_and_leave_the_writer_untouched()
+    {
+        SourceWriter writer = new();
+        string before = "";
+        string after = "";
+        ArgumentException? thrown = null;
+
+        using (var file = writer.File())
+        {
+            using var type = file.Type(Sample());
+            before = writer.ToString();
+
+            try
+            {
+                type.AutoProperty(PropertyFrom("Slot"));
+            }
+            catch (ArgumentException exception)
+            {
+                thrown = exception;
+            }
+
+            after = writer.ToString();
+        }
+
+        await Assert.That(thrown).IsNotNull();
+        await Assert.That(after).IsEqualTo(before);
     }
 
     [Test]

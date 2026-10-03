@@ -40,8 +40,8 @@ internal sealed record NewTypeModel(string Name, TypeDeclarationKind Kind, Acces
     public bool IsFileLocal { get; init; }
 
     /// <summary>
-    /// Gets the type parameters, with their constraints. Variance (<c>in</c>/<c>out</c>) is not
-    /// representable yet.
+    /// Gets the type parameters, with their constraints and variance (<c>in</c>/<c>out</c>,
+    /// interfaces only).
     /// </summary>
     public EquatableArray<TypeParameterModel> TypeParameters { get; init; }
 
@@ -56,4 +56,10 @@ internal sealed record NewTypeModel(string Name, TypeDeclarationKind Kind, Acces
     /// parenthesized list. May be empty only for a partial union part.
     /// </summary>
     public EquatableArray<string> UnionCaseTypes { get; init; }
+
+    /// <summary>
+    /// Gets the primary constructor parameter list written after the type parameters (classes, structs and
+    /// records). <see langword="null"/> writes no list; an empty array writes <c>()</c>.
+    /// </summary>
+    public EquatableArray<ParameterModel>? PrimaryConstructorParameters { get; init; }
 }

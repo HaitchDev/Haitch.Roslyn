@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Haitch.Roslyn.Models;
 using Haitch.Roslyn.Types;
 using Microsoft.CodeAnalysis;
@@ -44,7 +45,7 @@ internal static class SyntaxValueProviderExtensions
         return provider.ForAttributeWithMetadataName(
                 fullyQualifiedMetadataName,
                 predicate: static (node, _) => node is TypeDeclarationSyntax,
-                transform: (context, _) => Transform(context, includeMembers))
+                transform: (context, cancellationToken) => Transform(context, includeMembers, cancellationToken))
             .Where(static item => item is not null)
             .Select(static (item, _) => item!.Value)
             .WithTrackingName(trackingName);
@@ -100,7 +101,8 @@ internal static class SyntaxValueProviderExtensions
 
     private static (TypeModel Type, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes)? Transform(
         GeneratorAttributeSyntaxContext context,
-        bool includeMembers)
+        bool includeMembers,
+        CancellationToken cancellationToken)
     {
         var typeDeclaration = (TypeDeclarationSyntax)context.TargetNode;
         var typeSymbol = (INamedTypeSymbol)context.TargetSymbol;
@@ -123,7 +125,7 @@ internal static class SyntaxValueProviderExtensions
             .OfType<AttributeModel>()
             .ToEquatableArray();
 
-        var typeModel = TypeModel.From(typeSymbol, includeMembers);
+        var typeModel = TypeModel.From(typeSymbol, includeMembers, cancellationToken);
         var syntaxInfo = SyntaxInfo.From(typeDeclaration);
 
         return (typeModel, syntaxInfo, attributes);
