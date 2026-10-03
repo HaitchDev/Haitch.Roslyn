@@ -4,8 +4,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Haitch.Roslyn.Types;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Haitch.Roslyn.Models;
 
@@ -15,15 +17,24 @@ internal enum TypeDeclarationKind
     RecordClass,
     Struct,
     RecordStruct,
-    Interface
+    Interface,
+    Union
 }
 
 internal static class TypeDeclarationKindFactory
 {
     public static TypeDeclarationKind From(INamedTypeSymbol type)
     {
+        if (IsExtensionBlock(type))
+        {
+            throw new ArgumentException(
+                $"TypeModel does not support extension blocks ('{type.Name}'); model the containing static class instead.",
+                nameof(type));
+        }
+
         return type.TypeKind switch
         {
+            TypeKind.Struct when IsUnion(type) => TypeDeclarationKind.Union,
             TypeKind.Struct => type.IsRecord ? TypeDeclarationKind.RecordStruct : TypeDeclarationKind.Struct,
             TypeKind.Interface => TypeDeclarationKind.Interface,
             TypeKind.Class => type.IsRecord ? TypeDeclarationKind.RecordClass : TypeDeclarationKind.Class,
@@ -32,6 +43,72 @@ internal static class TypeDeclarationKindFactory
                     + "only classes, records, structs, record structs, and interfaces are modeled.",
                 nameof(type)),
         };
+    }
+
+    // Compared by name because Roslyn 4.12 has no TypeKind.Extension; unlike the declaring syntax, the
+    // kind is also reported for blocks loaded from metadata.
+    public static bool IsExtensionBlock(INamedTypeSymbol type)
+    {
+        return type.TypeKind.ToString() == "Extension";
+    }
+
+    // Roslyn 4.12 has no TypeKind or symbol API for unions, so source types are read from the declaring
+    // keyword and metadata types from UnionAttribute. IUnion is deliberately not used: hand-written structs
+    // may implement it and must keep being written as `partial struct`.
+    public static bool IsUnion(INamedTypeSymbol type)
+    {
+        if (type.TypeKind != TypeKind.Struct && type.TypeKind != TypeKind.Class)
+        {
+            return false;
+        }
+
+        if (type.DeclaringSyntaxReferences.Length > 0)
+        {
+            foreach (var reference in type.DeclaringSyntaxReferences)
+            {
+                if (
+                    reference.GetSyntax() is TypeDeclarationSyntax declaration
+                    && declaration.Keyword.ValueText == "union"
+                )
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return type.GetAttributes()
+            .Any(attribute =>
+                attribute.AttributeClass is { Name: "UnionAttribute" } attributeClass
+                && attributeClass.ContainingNamespace.ToDisplayString() == "System.Runtime.CompilerServices"
+            );
+    }
+}
+
+internal static class ClosedTypeDetector
+{
+    // Looked up on the interface because Roslyn's public symbol wrappers implement it explicitly.
+    private static readonly PropertyInfo? IsClosedProperty = typeof(ITypeSymbol).GetProperty(
+        "IsClosed",
+        BindingFlags.Public | BindingFlags.Instance);
+
+    // The compiler hides IsClosedTypeAttribute, and Roslyn 4.12 has no ITypeSymbol.IsClosed, so source
+    // types are read from syntax and metadata types from the host symbol's IsClosed property by reflection.
+    public static bool IsClosed(INamedTypeSymbol type)
+    {
+        foreach (var reference in type.DeclaringSyntaxReferences)
+        {
+            if (
+                reference.GetSyntax() is TypeDeclarationSyntax declaration
+                && declaration.Modifiers.Any(modifier => modifier.ValueText == "closed")
+            )
+            {
+                return true;
+            }
+        }
+
+        return IsClosedProperty?.PropertyType == typeof(bool) && IsClosedProperty.GetValue(type) is true;
     }
 }
 
@@ -81,6 +158,17 @@ internal sealed record TypeModel(
     EquatableArray<MethodModel> Methods)
 {
     /// <summary>
+    /// The case types of a union, in declaration order; empty for every other kind.
+    /// </summary>
+    public EquatableArray<TypeRef> UnionCaseTypes { get; init; }
+
+    /// <summary>
+    /// True for a <c>closed</c> class or record. <see cref="IsAbstract"/> is also true for such a type, and
+    /// a renderer emitting a partial declaration must echo neither modifier.
+    /// </summary>
+    public bool IsClosed { get; init; }
+
+    /// <summary>
     /// Builds a <see cref="TypeModel"/> from <paramref name="type"/>. Member arrays are left empty
     /// unless <paramref name="includeMembers"/> is true, since capturing every member ties the model's
     /// equality (and so incremental generator cache validity) to any edit of any member.
@@ -123,6 +211,16 @@ internal sealed record TypeModel(
                 .ToEquatableArray()
             : default;
 
+        var unionCaseTypes = TypeDeclarationKindFactory.IsUnion(type)
+            ? type.InstanceConstructors
+                .Where(constructor =>
+                    constructor.Parameters.Length == 1
+                    // Metadata symbols are never implicitly declared, so the filter only applies to source.
+                    && (constructor.IsImplicitlyDeclared || type.DeclaringSyntaxReferences.Length == 0))
+                .Select(constructor => TypeRef.From(constructor.Parameters[0].Type))
+                .ToEquatableArray()
+            : default;
+
         return new TypeModel(
             GetNamespace(type),
             type.Name,
@@ -139,7 +237,11 @@ internal sealed record TypeModel(
             attributes,
             fields,
             properties,
-            methods);
+            methods)
+        {
+            UnionCaseTypes = unionCaseTypes,
+            IsClosed = ClosedTypeDetector.IsClosed(type),
+        };
     }
 
     private static string? GetNamespace(INamedTypeSymbol type)

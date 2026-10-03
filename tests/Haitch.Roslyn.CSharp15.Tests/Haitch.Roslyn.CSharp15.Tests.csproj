@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <RootNamespace>Haitch.Roslyn.CSharp15.Tests</RootNamespace>
+        <AssemblyName>Haitch.Roslyn.CSharp15.Tests</AssemblyName>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="TUnit"/>
+        <!-- Roslyn 4.12 has no preview language version that parses unions or closed types. -->
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0"/>
+        <PackageReference Include="Polyfill" PrivateAssets="all"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\Haitch.Roslyn.Testing\Haitch.Roslyn.Testing.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="..\..\src\Haitch.Roslyn\**\*.cs" Exclude="..\..\src\Haitch.Roslyn\bin\**;..\..\src\Haitch.Roslyn\obj\**" Link="Src\%(RecursiveDir)%(Filename)%(Extension)"/>
+    </ItemGroup>
+
+</Project>

@@ -34,3 +34,25 @@ jobs:
 
       - name: Pack
         run: dotnet pack -c Release --no-build -o artifacts
+
+  dotnet11:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 10 runtime
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup .NET 11
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 11.0.x
+          dotnet-quality: preview
+
+      - name: Test on .NET 11
+        run: tools/test-dotnet11.sh

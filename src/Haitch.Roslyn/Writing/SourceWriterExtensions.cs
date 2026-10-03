@@ -133,6 +133,11 @@ internal static class SourceWriterExtensions
             builder.Append("sealed ");
         }
 
+        if (type.IsClosed)
+        {
+            builder.Append("closed ");
+        }
+
         if (type.IsReadOnly)
         {
             builder.Append("readonly ");
@@ -150,6 +155,18 @@ internal static class SourceWriterExtensions
 
         builder.Append(KindKeyword(type.Kind)).Append(' ').Append(EscapeKeyword(type.Name));
         AppendTypeParameterList(builder, type.TypeParameters);
+
+        if (type.UnionCaseTypes.Count > 0)
+        {
+            builder.Append('(');
+
+            for (var i = 0; i < type.UnionCaseTypes.Count; i++)
+            {
+                builder.Append(i == 0 ? "" : ", ").Append(type.UnionCaseTypes[i]);
+            }
+
+            builder.Append(')');
+        }
 
         for (var i = 0; i < type.BaseTypes.Count; i++)
         {
@@ -198,7 +215,53 @@ internal static class SourceWriterExtensions
                 nameof(type));
         }
 
-        var canBeReadOnlyOrRef = type.Kind is TypeDeclarationKind.Struct or TypeDeclarationKind.RecordStruct;
+        if (type.IsClosed && !isClassLike)
+        {
+            throw new ArgumentException(
+                $"'{type.Name}' is a {type.Kind}, which cannot be closed; only a class or record can.",
+                nameof(type));
+        }
+
+        if (type.IsClosed && (type.IsAbstract || type.IsSealed || type.IsStatic))
+        {
+            throw new ArgumentException(
+                $"'{type.Name}' is closed, which cannot be combined with abstract, sealed or static.",
+                nameof(type));
+        }
+
+        if (type.Kind == TypeDeclarationKind.Union)
+        {
+            if (type.UnionCaseTypes.Count == 0 && !type.IsPartial)
+            {
+                throw new ArgumentException(
+                    $"'{type.Name}' is a union without case types; only a partial union part may omit the case list.",
+                    nameof(type));
+            }
+
+            if (type.IsRefLikeType)
+            {
+                throw new ArgumentException($"'{type.Name}' is a union, which cannot be ref.", nameof(type));
+            }
+
+            for (var i = 0; i < type.UnionCaseTypes.Count; i++)
+            {
+                if (string.IsNullOrWhiteSpace(type.UnionCaseTypes[i]))
+                {
+                    throw new ArgumentException(
+                        $"'{type.Name}' has an empty union case type.",
+                        nameof(type));
+                }
+            }
+        }
+        else if (type.UnionCaseTypes.Count > 0)
+        {
+            throw new ArgumentException(
+                $"'{type.Name}' is a {type.Kind}, which cannot have union case types.",
+                nameof(type));
+        }
+
+        var canBeReadOnlyOrRef =
+            type.Kind is TypeDeclarationKind.Struct or TypeDeclarationKind.RecordStruct or TypeDeclarationKind.Union;
 
         if (!canBeReadOnlyOrRef && (type.IsReadOnly || type.IsRefLikeType))
         {
@@ -619,6 +682,7 @@ internal static class SourceWriterExtensions
             TypeDeclarationKind.Struct => "struct",
             TypeDeclarationKind.RecordStruct => "record struct",
             TypeDeclarationKind.Interface => "interface",
+            TypeDeclarationKind.Union => "union",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported type declaration kind."),
         };
     }

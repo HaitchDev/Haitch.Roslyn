@@ -47,4 +47,13 @@ internal sealed record NewTypeModel(string Name, TypeDeclarationKind Kind, Acces
 
     /// <summary>Gets the base class (first, if any) and interfaces, written in order.</summary>
     public EquatableArray<TypeRef> BaseTypes { get; init; }
+
+    /// <summary>Gets a value indicating whether <c>closed</c> is written (C# 15; classes and records only).</summary>
+    public bool IsClosed { get; init; }
+
+    /// <summary>
+    /// Gets the fully qualified case types of a <see cref="TypeDeclarationKind.Union"/>, written as its
+    /// parenthesized list. May be empty only for a partial union part.
+    /// </summary>
+    public EquatableArray<string> UnionCaseTypes { get; init; }
 }

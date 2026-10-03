@@ -6,5 +6,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Haitch.Roslyn.Tests/Haitch.Roslyn.Tests.csproj" />
+    <Project Path="tests/Haitch.Roslyn.CSharp15.Tests/Haitch.Roslyn.CSharp15.Tests.csproj" />
   </Folder>
 </Solution>
