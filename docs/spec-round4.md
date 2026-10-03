@@ -40,6 +40,14 @@ Each library slice is demonstrated by a small sample generator in `samples/`, te
 - 24.3 Optional `Func<SyntaxNode, CancellationToken, bool>` predicate on all four `For…WithAttribute` methods, applied after the built-in kind check.
 - 24.4 The `[Notify]` sample and its tests.
 
+**Slice 27: Generator gaps (runs before slice 25).** Demo: `NotifyGenerator` drops its workarounds with byte-identical output and is at least 150 lines shorter.
+- 27.1 `TypeModel.BaseType`, `Interfaces` and `AllInterfaces`.
+- 27.2 `EventModel` and `TypeModel.Events`.
+- 27.3 `TypeScope.Event` for field-like events.
+- 27.4 An optional base list on the innermost partial declaration written by `Type(TypeModel)`.
+- 27.5 `PartialTypeValidation.ValidateContainingTypes` for members.
+- 27.6 The `[Notify]` sample uses 27.1–27.5.
+
 **Slice 25: Typed attribute arguments.** Demo: `[Notify(Name = "Title", Raise = false)]` changes the output.
 - 25.1 `ConstantValue` typed accessors (`TryGetString`, `TryGetBoolean`, `TryGetInt32`/`Int64`/`Double`, `TryGetEnum<TEnum>`, `TryGetType`, `TryGetArray`, `TryGetStringArray`); false on mismatch, never throw.
 - 25.2 `AttributeModel.TryGetNamedArgument`/`TryGetConstructorArgument` and a `Find(fullyQualifiedMetadataName)` extension on `EquatableArray<AttributeModel>`.

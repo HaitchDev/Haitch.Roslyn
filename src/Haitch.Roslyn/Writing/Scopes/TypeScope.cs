@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using Haitch.Roslyn.Models;
+using Haitch.Roslyn.Types;
 using Microsoft.CodeAnalysis;
 
 namespace Haitch.Roslyn.Writing;
@@ -37,11 +38,16 @@ internal ref struct TypeScope
     /// <see cref="TypeModel.ContainingTypes"/> are ignored: this scope already wrote the enclosing types.
     /// A blank line separates it from a preceding sibling.
     /// </summary>
+    /// <param name="type">The type to declare.</param>
+    /// <param name="baseTypes">
+    /// Extra base types written on this declaration only, and not validated: the compiler reports
+    /// conflicts with the other declarations of the type.
+    /// </param>
     /// <exception cref="ArgumentException">
     /// <paramref name="type"/> is file-local, or has containing types whose last entry is not this scope's
     /// type. An empty containing-type chain is accepted.
     /// </exception>
-    public TypeScope Type(TypeModel type)
+    public TypeScope Type(TypeModel type, EquatableArray<TypeRef> baseTypes = default)
     {
         try
         {
@@ -62,7 +68,8 @@ internal ref struct TypeScope
                 type.IsRefLikeType,
                 type.Kind,
                 type.Name,
-                type.TypeParameters);
+                type.TypeParameters,
+                baseTypes);
 
             return new TypeScope(_writer, type, new SourceWriterExtensions.TypeDeclarationScope([_writer.Block()]));
         }
@@ -318,6 +325,30 @@ internal ref struct TypeScope
             _writer.WriteLine(header);
 
             return new PropertyScope(_writer, property, _writer.Block());
+        }
+        catch
+        {
+            _state.Pending.Clear();
+
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Writes one field-like event declaration line such as <c>public event global::System.EventHandler? Changed;</c>.
+    /// A blank line separates it from a preceding sibling.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="evt"/> is not field-like (it has written-out accessors) or is an explicit interface
+    /// implementation (<see cref="EventModel.ExplicitInterface"/> is set).
+    /// </exception>
+    public void Event(EventModel evt)
+    {
+        try
+        {
+            var line = SourceWriterExtensions.RenderEvent(evt);
+
+            WriteMember(line);
         }
         catch
         {

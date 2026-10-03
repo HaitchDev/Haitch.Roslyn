@@ -338,6 +338,71 @@ public class NotifyGeneratorTests
     }
 
     [Test]
+    public async Task Abstract_event_is_reported_because_the_setter_cannot_raise_it()
+    {
+        const string source = """
+            using System.ComponentModel;
+
+            namespace App;
+
+            public abstract partial class Document : INotifyPropertyChanged
+            {
+                public abstract event PropertyChangedEventHandler? PropertyChanged;
+
+                [Notify.Notify]
+                private string _name = "";
+            }
+            """;
+
+        var result = Run(source);
+
+        result.AssertDiagnostic("NOTIFY003", messageContains: "Document");
+        await Assert.That(result.Sources.Keys).DoesNotContain("App.Document.Notify.g.cs");
+    }
+
+    [Test]
+    public async Task Nested_type_with_the_property_name_is_reported()
+    {
+        const string source = """
+            namespace App;
+
+            public partial class Person
+            {
+                public class Title { }
+
+                [Notify.Notify]
+                private string _title = "";
+            }
+            """;
+
+        var result = Run(source);
+
+        result.AssertDiagnostic("NOTIFY005", messageContains: "_title");
+        await Assert.That(result.Sources.Keys).DoesNotContain("App.Person.Notify.g.cs");
+    }
+
+    [Test]
+    public async Task Nested_type_named_like_the_event_is_reported()
+    {
+        const string source = """
+            namespace App;
+
+            public partial class Document
+            {
+                public class PropertyChanged { }
+
+                [Notify.Notify]
+                private string _name = "";
+            }
+            """;
+
+        var result = Run(source);
+
+        result.AssertDiagnostic("NOTIFY003", messageContains: "Document");
+        await Assert.That(result.Sources.Keys).DoesNotContain("App.Document.Notify.g.cs");
+    }
+
+    [Test]
     public async Task Ref_struct_is_reported_because_it_cannot_implement_an_interface()
     {
         const string source = """

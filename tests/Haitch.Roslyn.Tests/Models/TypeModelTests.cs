@@ -573,6 +573,176 @@ public class TypeModelTests
             .IsEqualTo(MethodModel.From(method));
     }
 
+    [Test]
+    public async Task Should_capture_a_user_base_class()
+    {
+        const string source = """
+            namespace Example;
+
+            public class Base<T> { }
+
+            public class Sample : Base<int> { }
+            """;
+
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "Example.Sample");
+
+        TypeModel model = TypeModel.From(type);
+
+        await Assert.That(model.BaseType).IsNotNull();
+        await Assert
+            .That(model.BaseType!.FullyQualifiedName)
+            .IsEqualTo("global::Example.Base<int>");
+        await Assert.That(model.BaseType.TypeKind).IsEqualTo(TypeKind.Class);
+    }
+
+    [Test]
+    [Arguments("public class Sample { }")]
+    [Arguments("public struct Sample { }")]
+    [Arguments("public record Sample { }")]
+    [Arguments("public record struct Sample { }")]
+    [Arguments("public interface Sample { }")]
+    [Arguments("public interface Sample : System.IDisposable { }")]
+    public async Task Should_leave_the_base_type_null_when_there_is_no_explicit_base(
+        string declaration
+    )
+    {
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(
+            $"namespace Example; {declaration}",
+            "Example.Sample"
+        );
+
+        TypeModel model = TypeModel.From(type);
+
+        await Assert.That(model.BaseType).IsNull();
+    }
+
+    [Test]
+    public async Task Should_separate_direct_interfaces_from_inherited_ones()
+    {
+        const string source = """
+            namespace Example;
+
+            public interface IFoo { }
+
+            public class Base : System.IDisposable
+            {
+                public void Dispose() { }
+            }
+
+            public class Sample : Base, IFoo { }
+            """;
+
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "Example.Sample");
+
+        TypeModel model = TypeModel.From(type);
+
+        await Assert.That(model.Interfaces.Count).IsEqualTo(1);
+        await Assert.That(model.Interfaces[0].FullyQualifiedName).IsEqualTo("global::Example.IFoo");
+        await Assert.That(model.AllInterfaces.Count).IsEqualTo(2);
+        await Assert
+            .That(model.AllInterfaces.Select(i => i.FullyQualifiedName))
+            .Contains("global::System.IDisposable");
+        await Assert
+            .That(model.AllInterfaces.Select(i => i.FullyQualifiedName))
+            .Contains("global::Example.IFoo");
+    }
+
+    [Test]
+    public async Task Should_capture_generic_interfaces_with_their_type_arguments()
+    {
+        const string source = """
+            namespace Example;
+
+            public struct Sample : System.IEquatable<Sample> 
+            {
+                public bool Equals(Sample other) => true;
+            }
+            """;
+
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "Example.Sample");
+
+        TypeModel model = TypeModel.From(type);
+
+        await Assert.That(model.Interfaces.Count).IsEqualTo(1);
+        await Assert
+            .That(model.Interfaces[0].FullyQualifiedName)
+            .IsEqualTo("global::System.IEquatable<global::Example.Sample>");
+        await Assert.That(model.Interfaces[0].TypeKind).IsEqualTo(TypeKind.Interface);
+        await Assert.That(model.AllInterfaces).IsEquivalentTo(model.Interfaces);
+    }
+
+    [Test]
+    public async Task Should_capture_the_base_interfaces_of_an_interface()
+    {
+        const string source = """
+            namespace Example;
+
+            public interface IBase { }
+
+            public interface IMiddle : IBase { }
+
+            public interface ISample : IMiddle { }
+            """;
+
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "Example.ISample");
+
+        TypeModel model = TypeModel.From(type);
+
+        await Assert.That(model.Interfaces.Count).IsEqualTo(1);
+        await Assert.That(model.AllInterfaces.Count).IsEqualTo(2);
+    }
+
+    [Test]
+    public async Task Should_capture_base_types_and_interfaces_without_members()
+    {
+        const string source = """
+            namespace Example;
+
+            public class Base { }
+
+            public class Sample : Base, System.IDisposable
+            {
+                public void Dispose() { }
+            }
+            """;
+
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "Example.Sample");
+
+        TypeModel withoutMembers = TypeModel.From(type);
+        TypeModel withMembers = TypeModel.From(type, includeMembers: true);
+
+        await Assert.That(withoutMembers.BaseType).IsNotNull();
+        await Assert.That(withoutMembers.Interfaces.Count).IsEqualTo(1);
+        await Assert.That(withoutMembers.BaseType).IsEqualTo(withMembers.BaseType);
+        await Assert.That(withoutMembers.AllInterfaces).IsEquivalentTo(withMembers.AllInterfaces);
+    }
+
+    [Test]
+    public async Task Should_be_equal_for_two_models_of_the_same_symbol_with_base_types_and_interfaces()
+    {
+        const string source = """
+            namespace Example;
+
+            public class Base : System.IDisposable
+            {
+                public void Dispose() { }
+            }
+
+            public class Sample : Base, System.IEquatable<Sample>
+            {
+                public bool Equals(Sample? other) => true;
+            }
+            """;
+
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "Example.Sample");
+
+        TypeModel first = TypeModel.From(type);
+        TypeModel second = TypeModel.From(type);
+
+        await Assert.That(first).IsEqualTo(second);
+        await Assert.That(first.GetHashCode()).IsEqualTo(second.GetHashCode());
+    }
+
     // file-local types are mangled at the metadata level, so GetTypeByMetadataName can't find them;
     // resolve the declared symbol from the syntax tree instead.
     private static INamedTypeSymbol GetFileLocalType(string source, string typeName)

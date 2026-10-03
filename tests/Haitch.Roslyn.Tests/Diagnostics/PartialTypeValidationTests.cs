@@ -1,7 +1,11 @@
 using Haitch.Roslyn.Diagnostics;
+using Haitch.Roslyn.Generators;
 using Haitch.Roslyn.Models;
+using Haitch.Roslyn.Testing;
 using Haitch.Roslyn.Types;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Haitch.Roslyn.Tests.Diagnostics;
@@ -115,6 +119,137 @@ public class PartialTypeValidationTests
         {
             await Assert.That(diagnostic.Location).IsNull();
         }
+    }
+
+    [Test]
+    [Arguments("public int Value;")]
+    [Arguments("public void Run() { }")]
+    [Arguments("public int Value { get; set; }")]
+    public async Task ValidateContainingTypes_should_return_the_value_unchanged_for_a_member_of_a_partial_type(
+        string member
+    )
+    {
+        var syntax = MemberSyntax($"partial class Widget {{ {member} }}");
+
+        var result = PartialTypeValidation.ValidateContainingTypes(
+            "payload",
+            syntax,
+            Descriptors.ContainingTypeNotPartial,
+            "Widget"
+        );
+
+        await Assert.That(result.IsSuccess).IsTrue();
+        await Assert.That(result.Match(value => value, _ => null!)).IsEqualTo("payload");
+    }
+
+    [Test]
+    [Arguments("public int Value;")]
+    [Arguments("public void Run() { }")]
+    [Arguments("public int Value { get; set; }")]
+    public async Task ValidateContainingTypes_should_fail_at_the_member_for_a_member_of_a_non_partial_type(
+        string member
+    )
+    {
+        var syntax = MemberSyntax($"class Widget {{ {member} }}");
+
+        var result = PartialTypeValidation.ValidateContainingTypes(
+            "payload",
+            syntax,
+            Descriptors.ContainingTypeNotPartial,
+            "Widget"
+        );
+
+        await AssertSingleMember(result, syntax);
+    }
+
+    [Test]
+    public async Task ValidateContainingTypes_should_fail_for_a_partial_type_nested_in_a_non_partial_type()
+    {
+        var syntax = MemberSyntax("class Outer { partial class Widget { public int Value; } }");
+
+        var result = PartialTypeValidation.ValidateContainingTypes(
+            "payload",
+            syntax,
+            Descriptors.ContainingTypeNotPartial,
+            "Widget"
+        );
+
+        await AssertSingleMember(result, syntax);
+    }
+
+    [Test]
+    public async Task ValidateContainingTypes_should_report_through_the_result_pipeline_helpers()
+    {
+        var result = GeneratorHarness.Run(
+            new MemberGenerator(),
+            new GeneratorHarnessInput
+            {
+                Sources =
+                [
+                    """
+                    namespace Sample;
+
+                    [System.AttributeUsage(System.AttributeTargets.Method)]
+                    public class MarkAttribute : System.Attribute { }
+                    """,
+                    """
+                    public class Widget
+                    {
+                        [Sample.Mark]
+                        public void Run() { }
+                    }
+                    """,
+                ],
+            }
+        );
+
+        result.AssertDiagnostic("PT0002", line: 4, column: 17);
+    }
+
+    private sealed class MemberGenerator : IIncrementalGenerator
+    {
+        public void Initialize(IncrementalGeneratorInitializationContext context)
+        {
+            var results = context
+                .SyntaxProvider.ForMethodsWithAttribute("Sample.MarkAttribute", "Members")
+                .Select(
+                    static (item, _) =>
+                        PartialTypeValidation.ValidateContainingTypes(
+                            item.Method.Name,
+                            item.Syntax,
+                            Descriptors.ContainingTypeNotPartial,
+                            item.ContainingType.Name
+                        )
+                );
+
+            results.ReportDiagnostics(context, "Members.Validated");
+        }
+    }
+
+    private static SyntaxInfo MemberSyntax(string source)
+    {
+        var root = CSharpSyntaxTree.ParseText(source).GetRoot();
+        var member = root.DescendantNodes()
+            .First(node =>
+                node
+                    is MethodDeclarationSyntax
+                        or PropertyDeclarationSyntax
+                        or VariableDeclaratorSyntax
+            );
+
+        return SyntaxInfo.From(member);
+    }
+
+    private static async Task AssertSingleMember(Result<string> result, SyntaxInfo syntax)
+    {
+        await Assert.That(result.IsSuccess).IsFalse();
+        await Assert.That(result.Diagnostics.Count).IsEqualTo(1);
+
+        var diagnostic = result.Diagnostics[0];
+        await Assert.That(diagnostic.Descriptor.Id).IsEqualTo("PT0002");
+        await Assert.That(diagnostic.MessageArgs.Count).IsEqualTo(1);
+        await Assert.That(diagnostic.MessageArgs[0]).IsEqualTo("Widget");
+        await Assert.That(diagnostic.Location).IsEqualTo(syntax.Location);
     }
 
     private static async Task AssertSingle(Result<TypeModel> result, string id)

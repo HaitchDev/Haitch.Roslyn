@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using Haitch.Roslyn.Models;
+using Haitch.Roslyn.Types;
 
 namespace Haitch.Roslyn.Writing;
 
@@ -83,11 +84,16 @@ internal readonly ref struct FileScope
     /// <paramref name="type"/>'s <see cref="TypeModel.Namespace"/> is ignored: the enclosing
     /// scope is the source of truth for the namespace.
     /// </summary>
+    /// <param name="type">The type to declare.</param>
+    /// <param name="baseTypes">
+    /// Extra base types written on the innermost declaration only, never on its containing types, and
+    /// not validated: the compiler reports conflicts with the other declarations of the type.
+    /// </param>
     /// <exception cref="ArgumentException">
     /// <paramref name="type"/> is file-local, or has containing types while an <see cref="Attribute"/> is
     /// pending (it would land on the outermost containing type).
     /// </exception>
-    public TypeScope Type(TypeModel type)
+    public TypeScope Type(TypeModel type, EquatableArray<TypeRef> baseTypes = default)
     {
         try
         {
@@ -103,7 +109,7 @@ internal readonly ref struct FileScope
             TypeScope.ThrowIfFileLocal(type);
             BeginMember();
 
-            return new TypeScope(_writer, type, _writer.WriteTypeDeclaration(type));
+            return new TypeScope(_writer, type, _writer.WriteTypeDeclaration(type, baseTypes));
         }
         catch
         {

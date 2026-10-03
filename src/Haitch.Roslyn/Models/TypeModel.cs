@@ -178,12 +178,39 @@ internal sealed record TypeModel(
     public bool IsClosed { get; init; }
 
     /// <summary>
+    /// The base class, or null when the type has none beyond <c>object</c> or <c>System.ValueType</c>, and
+    /// for interfaces. The base type's own interface list is not captured here, but it feeds
+    /// <see cref="AllInterfaces"/>, so editing it changes this model and invalidates caches built on it.
+    /// </summary>
+    public TypeRef? BaseType { get; init; }
+
+    /// <summary>
+    /// The interfaces the type declares directly, in Roslyn's order; interfaces it only inherits from a base
+    /// class or a base interface are in <see cref="AllInterfaces"/> alone.
+    /// </summary>
+    public EquatableArray<TypeRef> Interfaces { get; init; }
+
+    /// <summary>
+    /// Every interface the type implements, including those inherited from its base class and base
+    /// interfaces, in Roslyn's order. Adding or removing an interface on a base type changes this list, so
+    /// it invalidates caches built on this model.
+    /// </summary>
+    public EquatableArray<TypeRef> AllInterfaces { get; init; }
+
+    /// <summary>
+    /// The captured events; empty unless members were included. <c>Name</c> is not unique: an explicit
+    /// interface implementation keeps the interface member's name, so tell them apart by
+    /// <see cref="EventModel.ExplicitInterface"/>.
+    /// </summary>
+    public EquatableArray<EventModel> Events { get; init; }
+
+    /// <summary>
     /// Builds a <see cref="TypeModel"/> from <paramref name="type"/>. Member arrays are left empty
     /// unless <paramref name="includeMembers"/> is true, since capturing every member ties the model's
     /// equality (and so incremental generator cache validity) to any edit of any member.
     /// </summary>
     /// <param name="type">The type to capture.</param>
-    /// <param name="includeMembers">True to also capture fields, properties and methods.</param>
+    /// <param name="includeMembers">True to also capture fields, properties, methods and events.</param>
     /// <param name="cancellationToken">
     /// Checked per captured member; cancellation throws <see cref="OperationCanceledException"/>.
     /// </param>
@@ -237,6 +264,14 @@ internal sealed record TypeModel(
                 .ToEquatableArray()
             : default;
 
+        var events = includeMembers
+            ? type.GetMembers()
+                .OfType<IEventSymbol>()
+                .Where(evt => !evt.IsImplicitlyDeclared)
+                .Select(evt => EventModel.From(evt, cancellationToken))
+                .ToEquatableArray()
+            : default;
+
         var unionCaseTypes = TypeDeclarationKindFactory.IsUnion(type)
             ? type.InstanceConstructors
                 .Where(constructor =>
@@ -267,7 +302,20 @@ internal sealed record TypeModel(
         {
             UnionCaseTypes = unionCaseTypes,
             IsClosed = ClosedTypeDetector.IsClosed(type),
+            BaseType = GetBaseType(type),
+            Events = events,
+            Interfaces = type.Interfaces.Select(TypeRef.From).ToEquatableArray(),
+            AllInterfaces = type.AllInterfaces.Select(TypeRef.From).ToEquatableArray(),
         };
+    }
+
+    // object, ValueType and Enum are implicit bases every class, struct and enum has; recording them would
+    // make "has a base class" indistinguishable from "has a user-written one".
+    private static TypeRef? GetBaseType(INamedTypeSymbol type)
+    {
+        return type.BaseType is { SpecialType: not (SpecialType.System_Object or SpecialType.System_ValueType or SpecialType.System_Enum) } baseType
+            ? TypeRef.From(baseType)
+            : null;
     }
 
     private static string? GetNamespace(INamedTypeSymbol type)

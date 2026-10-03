@@ -56,7 +56,17 @@ internal static class SourceWriterExtensions
     /// the type kind, the name, and type parameters (with constraints) are written; accessibility and
     /// <c>static</c>/<c>abstract</c>/<c>sealed</c> are never echoed back onto a partial declaration.
     /// </remarks>
-    public static TypeDeclarationScope WriteTypeDeclaration(this SourceWriter writer, TypeModel type)
+    /// <param name="writer">The writer to write to.</param>
+    /// <param name="type">The type to declare.</param>
+    /// <param name="baseTypes">
+    /// Extra base types written on the innermost declaration only, never on its containing types, and
+    /// not validated: the compiler reports conflicts with the other declarations of the type.
+    /// </param>
+    public static TypeDeclarationScope WriteTypeDeclaration(
+        this SourceWriter writer,
+        TypeModel type,
+        EquatableArray<TypeRef> baseTypes = default
+    )
     {
         if (type.IsFileLocal)
         {
@@ -83,7 +93,15 @@ internal static class SourceWriterExtensions
             scopes[i] = writer.Block();
         }
 
-        WriteTypeDeclarationLine(writer, type.IsReadOnly, type.IsRefLikeType, type.Kind, type.Name, type.TypeParameters);
+        WriteTypeDeclarationLine(
+            writer,
+            type.IsReadOnly,
+            type.IsRefLikeType,
+            type.Kind,
+            type.Name,
+            type.TypeParameters,
+            baseTypes
+        );
         scopes[type.ContainingTypes.Count] = writer.Block();
 
         return new TypeDeclarationScope(scopes);
@@ -202,11 +220,7 @@ internal static class SourceWriterExtensions
             builder.Append(')');
         }
 
-        for (var i = 0; i < type.BaseTypes.Count; i++)
-        {
-            builder.Append(i == 0 ? " : " : ", ").Append(type.BaseTypes[i].FullyQualifiedName);
-        }
-
+        AppendBaseList(builder, type.BaseTypes);
         AppendWhereClauses(builder, type.TypeParameters);
 
         return builder.ToString();
@@ -590,6 +604,60 @@ internal static class SourceWriterExtensions
         return builder.Append(';').ToString();
     }
 
+    // Only field-like events can be written as a single line: accessor bodies are not modelled, and an
+    // explicit implementation cannot carry accessibility or a plain name.
+    internal static string RenderEvent(EventModel evt)
+    {
+        if (!evt.IsFieldLike)
+        {
+            throw new ArgumentException(
+                $"'{evt.Name}' has custom accessors; only field-like events can be written.",
+                nameof(evt));
+        }
+
+        if (evt.ExplicitInterface is not null)
+        {
+            throw new ArgumentException(
+                $"'{evt.Name}' is an explicit interface implementation, which cannot be written as a field-like event.",
+                nameof(evt));
+        }
+
+        var builder = new StringBuilder();
+        AppendAccessibility(builder, evt.Accessibility);
+
+        if (evt.IsStatic)
+        {
+            builder.Append("static ");
+        }
+
+        if (evt.IsAbstract && evt.IsOverride)
+        {
+            builder.Append("abstract override ");
+        }
+        else if (evt.IsSealed && evt.IsOverride)
+        {
+            builder.Append("sealed override ");
+        }
+        else if (evt.IsOverride)
+        {
+            builder.Append("override ");
+        }
+        else if (evt.IsSealed)
+        {
+            builder.Append("sealed ");
+        }
+        else if (evt.IsAbstract)
+        {
+            builder.Append("abstract ");
+        }
+        else if (evt.IsVirtual)
+        {
+            builder.Append("virtual ");
+        }
+
+        return builder.Append("event ").Append(evt.Type.FullyQualifiedName).Append(' ').Append(evt.Name).Append(';').ToString();
+    }
+
     // Everything up to the accessor list, so accessor scopes (10.5) can share the header.
     internal static string RenderPropertyHeader(PropertyModel property)
     {
@@ -728,7 +796,8 @@ internal static class SourceWriterExtensions
         bool isRefLikeType,
         TypeDeclarationKind kind,
         string name,
-        EquatableArray<TypeParameterModel> typeParameters)
+        EquatableArray<TypeParameterModel> typeParameters,
+        EquatableArray<TypeRef> baseTypes = default)
     {
         var builder = new StringBuilder();
 
@@ -745,9 +814,18 @@ internal static class SourceWriterExtensions
         builder.Append("partial ").Append(KindKeyword(kind)).Append(' ').Append(name);
 
         AppendTypeParameterList(builder, typeParameters);
+        AppendBaseList(builder, baseTypes);
         AppendWhereClauses(builder, typeParameters);
 
         writer.WriteLine(builder.ToString());
+    }
+
+    private static void AppendBaseList(StringBuilder builder, EquatableArray<TypeRef> baseTypes)
+    {
+        for (var i = 0; i < baseTypes.Count; i++)
+        {
+            builder.Append(i == 0 ? " : " : ", ").Append(baseTypes[i].FullyQualifiedName);
+        }
     }
 
     private static string KindKeyword(TypeDeclarationKind kind)
