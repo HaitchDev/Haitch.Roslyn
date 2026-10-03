@@ -1,9 +1,7 @@
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Haitch.Roslyn.Testing;
 
@@ -72,13 +70,4 @@ internal sealed class HarnessAnalyzerConfigOptionsProvider : AnalyzerConfigOptio
 
     private AnalyzerConfigOptions ForPath(string path) =>
         _perFile.TryGetValue(path, out var options) ? options : HarnessAnalyzerConfigOptions.Empty;
-}
-
-internal sealed class HarnessAdditionalTextFile(HarnessAdditionalText source) : AdditionalText
-{
-    private readonly SourceText _text = SourceText.From(source.Text);
-
-    public override string Path => source.Path;
-
-    public override SourceText GetText(CancellationToken cancellationToken = default) => _text;
 }

@@ -28,6 +28,17 @@ public static class GeneratorHarness
     {
         ArgumentNullException.ThrowIfNull(input);
 
+        if (input.AdditionalTexts is { } texts)
+        {
+            for (var i = 0; i < texts.Count; i++)
+            {
+                if (texts[i] is null)
+                {
+                    throw new GeneratorTestException($"AdditionalTexts[{i}] is null.");
+                }
+            }
+        }
+
         var parseOptions =
             input.ParseOptions
             ?? CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Latest);
@@ -54,9 +65,7 @@ public static class GeneratorHarness
 
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [generator.AsSourceGenerator()],
-            additionalTexts: (input.AdditionalTexts ?? []).Select(t =>
-                (AdditionalText)new HarnessAdditionalTextFile(t)
-            ),
+            additionalTexts: input.AdditionalTexts ?? [],
             parseOptions: parseOptions,
             optionsProvider: NewOptionsProvider(input),
             driverOptions: new GeneratorDriverOptions(
