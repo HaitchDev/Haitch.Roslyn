@@ -320,6 +320,87 @@ public class SyntaxValueProviderExtensionsTests
         await Assert.That(generator.Collected[0].Attributes.Count).IsEqualTo(2);
     }
 
+    [Test]
+    public async Task Should_drop_types_the_predicate_rejects()
+    {
+        var generator = new PredicateTypeGenerator(
+            static (node, _) =>
+                node is TypeDeclarationSyntax type && type.Modifiers.Any(SyntaxKind.PartialKeyword)
+        );
+        GeneratorHarness.Run(
+            generator,
+            new GeneratorHarnessInput
+            {
+                Sources =
+                [
+                    MarkAttributeSource,
+                    """
+                    [Sample.Mark] public partial class Keep { }
+                    [Sample.Mark] public class Drop { }
+                    """,
+                ],
+            }
+        );
+
+        await Assert.That(generator.Names.ToArray()).IsEquivalentTo(new[] { "Keep" });
+    }
+
+    [Test]
+    public async Task Should_only_pass_type_declarations_to_the_predicate()
+    {
+        var generator = new PredicateTypeGenerator(static (_, _) => true);
+        GeneratorHarness.Run(
+            generator,
+            new GeneratorHarnessInput
+            {
+                Sources =
+                [
+                    MarkAttributeSource,
+                    """
+                    [Sample.Mark] public class Widget { }
+                    [Sample.Mark] public record Data;
+                    """,
+                ],
+            }
+        );
+
+        await Assert
+            .That(generator.Names.Order().ToArray())
+            .IsEquivalentTo(new[] { "Data", "Widget" });
+        await Assert
+            .That(generator.Seen.Distinct().ToArray())
+            .IsEquivalentTo(
+                new[] { nameof(ClassDeclarationSyntax), nameof(RecordDeclarationSyntax) }
+            );
+    }
+
+    private sealed class PredicateTypeGenerator(Func<SyntaxNode, CancellationToken, bool> predicate)
+        : IIncrementalGenerator
+    {
+        public List<string> Names { get; } = [];
+        public List<string> Seen { get; } = [];
+
+        public void Initialize(IncrementalGeneratorInitializationContext context)
+        {
+            context.RegisterSourceOutput(
+                context.SyntaxProvider.ForTypesWithAttribute(
+                    "Sample.MarkAttribute",
+                    "Types",
+                    predicate: (node, token) =>
+                    {
+                        lock (Seen)
+                        {
+                            Seen.Add(node.GetType().Name);
+                        }
+
+                        return predicate(node, token);
+                    }
+                ),
+                (_, value) => Names.Add(value.Type.Name)
+            );
+        }
+    }
+
     private static ImmutableArray<IncrementalStepRunReason> GetValuesStepReasons(
         GeneratorDriver driver
     )
