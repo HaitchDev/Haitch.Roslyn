@@ -1,3 +1,5 @@
+using System;
+
 namespace Haitch.Roslyn.Testing;
 
 /// <summary>The single exception type the testing package throws, so it works with any test framework.</summary>

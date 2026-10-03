@@ -3,7 +3,6 @@
         <TargetFramework>net10.0</TargetFramework>
         <RootNamespace>Haitch.Roslyn.Testing</RootNamespace>
         <AssemblyName>Haitch.Roslyn.Testing</AssemblyName>
-        <ImplicitUsings>enable</ImplicitUsings>
         <IsPackable>true</IsPackable>
         <PackageId>Haitch.Roslyn.Testing</PackageId>
         <Description>Test harness and cacheability checks for Roslyn incremental source generators.</Description>

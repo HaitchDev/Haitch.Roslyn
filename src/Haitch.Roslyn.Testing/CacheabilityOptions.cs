@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Haitch.Roslyn.Testing;
 
 /// <summary>Extra scenarios and strictness for <see cref="GeneratorHarness.AssertCacheable(Microsoft.CodeAnalysis.IIncrementalGenerator, GeneratorHarnessInput, IEnumerable{string}, CacheabilityOptions?)"/>.</summary>
