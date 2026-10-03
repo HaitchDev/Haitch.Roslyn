@@ -26,8 +26,14 @@ jobs:
       - name: Restore
         run: dotnet restore
 
+      - name: Restore tools
+        run: dotnet tool restore
+
       - name: Build
         run: dotnet build -c Release --no-restore
+
+      - name: Check formatting
+        run: dotnet csharpier check .
 
       - name: Test
         run: dotnet test -c Release --no-build
