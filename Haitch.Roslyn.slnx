@@ -1,11 +1,11 @@
 <Solution>
-  <Folder Name="/src/">
-    <Project Path="src/Haitch.Roslyn/Haitch.Roslyn.csproj" />
-    <File Path="src\Directory.Build.props" />
-    <Project Path="src/Haitch.Roslyn.Testing/Haitch.Roslyn.Testing.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/Haitch.Roslyn.Tests/Haitch.Roslyn.Tests.csproj" />
-    <Project Path="tests/Haitch.Roslyn.CSharp15.Tests/Haitch.Roslyn.CSharp15.Tests.csproj" />
-  </Folder>
+    <Folder Name="/src/">
+        <Project Path="src/Haitch.Roslyn/Haitch.Roslyn.csproj" />
+        <File Path="src\Directory.Build.props" />
+        <Project Path="src/Haitch.Roslyn.Testing/Haitch.Roslyn.Testing.csproj" />
+    </Folder>
+    <Folder Name="/tests/">
+        <Project Path="tests/Haitch.Roslyn.Tests/Haitch.Roslyn.Tests.csproj" />
+        <Project Path="tests/Haitch.Roslyn.CSharp15.Tests/Haitch.Roslyn.CSharp15.Tests.csproj" />
+    </Folder>
 </Solution>

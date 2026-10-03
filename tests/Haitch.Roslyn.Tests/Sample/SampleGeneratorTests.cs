@@ -7,28 +7,28 @@ namespace Haitch.Roslyn.Tests.Sample;
 public class SampleGeneratorTests
 {
     private const string TwoParts = """
-                                    using Sample;
+        using Sample;
 
-                                    namespace App;
+        namespace App;
 
-                                    [Sample]
-                                    public partial class Widget { }
-                                    """;
+        [Sample]
+        public partial class Widget { }
+        """;
 
     private const string SecondPart = """
-                                      namespace App;
+        namespace App;
 
-                                      public partial class Widget { public int Size; }
-                                      """;
+        public partial class Widget { public int Size; }
+        """;
 
     private const string NotPartial = """
-                                      using Sample;
+        using Sample;
 
-                                      namespace App;
+        namespace App;
 
-                                      [Sample]
-                                      public class Broken { }
-                                      """;
+        [Sample]
+        public class Broken { }
+        """;
 
     private static readonly TypeModel WidgetModel = new(
         "App",
@@ -46,7 +46,8 @@ public class SampleGeneratorTests
         default,
         default,
         default,
-        default);
+        default
+    );
 
     [Test]
     public async Task Should_generate_one_file_for_a_two_part_partial_type()
@@ -57,7 +58,9 @@ public class SampleGeneratorTests
 
         await Assert.That(result.Sources.Keys).Contains(hintName);
         await Assert.That(result.Sources.Keys.Count(key => key.Contains("Widget"))).IsEqualTo(1);
-        await Assert.That(result.Sources[hintName]).Contains("public const string TypeName = \"Widget\";");
+        await Assert
+            .That(result.Sources[hintName])
+            .Contains("public const string TypeName = \"Widget\";");
         await Assert.That(result.Sources[hintName]).Contains("public override string ToString()");
         await Assert.That(result.Diagnostics).IsEmpty();
     }
@@ -67,7 +70,10 @@ public class SampleGeneratorTests
     {
         var result = GeneratorHarness.Run(
             new SampleGenerator(),
-            ["[Sample.Sample] public partial class Widget { public override string ToString() => \"x\"; }"]);
+            [
+                "[Sample.Sample] public partial class Widget { public override string ToString() => \"x\"; }",
+            ]
+        );
 
         await Assert.That(result.Diagnostics.Select(d => d.Id)).IsEquivalentTo(["SAMPLE005"]);
         await Assert.That(result.Sources.Keys.Any(key => key.Contains("Widget"))).IsFalse();
@@ -78,7 +84,8 @@ public class SampleGeneratorTests
     {
         var result = GeneratorHarness.Run(
             new SampleGenerator(),
-            ["[Sample.Sample] public partial class Widget { public int TypeName; }"]);
+            ["[Sample.Sample] public partial class Widget { public int TypeName; }"]
+        );
 
         await Assert.That(result.Diagnostics.Select(d => d.Id)).IsEquivalentTo(["SAMPLE005"]);
         await Assert.That(result.Sources.Keys.Any(key => key.Contains("Widget"))).IsFalse();
@@ -92,7 +99,8 @@ public class SampleGeneratorTests
             [
                 "[Sample.Sample] public partial class Widget { }",
                 "public partial class Widget { public string TypeName => \"x\"; }",
-            ]);
+            ]
+        );
 
         await Assert.That(result.Diagnostics.Select(d => d.Id)).IsEquivalentTo(["SAMPLE005"]);
         await Assert.That(result.Sources.Keys.Any(key => key.Contains("Widget"))).IsFalse();
@@ -105,11 +113,18 @@ public class SampleGeneratorTests
 
         var result = GeneratorHarness.Run(
             new SampleGenerator(),
-            [prefix + "Widget { public override string ToString() => \"x\"; public int TypeName; }"]);
+            [prefix + "Widget { public override string ToString() => \"x\"; public int TypeName; }"]
+        );
 
-        await Assert.That(result.Diagnostics.Select(d => d.Id)).IsEquivalentTo(["SAMPLE005", "SAMPLE005"]);
-        await Assert.That(result.Diagnostics.Select(d => d.GetMessage()))
-            .IsEquivalentTo(["'Widget' already declares 'ToString'", "'Widget' already declares 'TypeName'"]);
+        await Assert
+            .That(result.Diagnostics.Select(d => d.Id))
+            .IsEquivalentTo(["SAMPLE005", "SAMPLE005"]);
+        await Assert
+            .That(result.Diagnostics.Select(d => d.GetMessage()))
+            .IsEquivalentTo([
+                "'Widget' already declares 'ToString'",
+                "'Widget' already declares 'TypeName'",
+            ]);
 
         foreach (var diagnostic in result.Diagnostics)
         {
@@ -124,25 +139,31 @@ public class SampleGeneratorTests
     {
         var result = GeneratorHarness.Run(
             new SampleGenerator(),
-            ["[Sample.Sample] public partial class Widget { public string ToString(string format) => format; }"]);
+            [
+                "[Sample.Sample] public partial class Widget { public string ToString(string format) => format; }",
+            ]
+        );
 
         await Assert.That(result.Diagnostics).IsEmpty();
-        await Assert.That(result.Sources["Widget.Sample.g.cs"]).IsEqualTo(
-            """
-            // <auto-generated/>
-            #nullable enable
+        await Assert
+            .That(result.Sources["Widget.Sample.g.cs"])
+            .IsEqualTo(
+                """
+                // <auto-generated/>
+                #nullable enable
 
-            partial class Widget
-            {
-                public const string TypeName = "Widget";
-
-                public override string ToString()
+                partial class Widget
                 {
-                    return TypeName;
-                }
-            }
+                    public const string TypeName = "Widget";
 
-            """);
+                    public override string ToString()
+                    {
+                        return TypeName;
+                    }
+                }
+
+                """
+            );
     }
 
     [Test]
@@ -150,7 +171,9 @@ public class SampleGeneratorTests
     {
         var result = GeneratorHarness.Run(new SampleGenerator(), [NotPartial]);
 
-        await Assert.That(result.Diagnostics.Select(d => d.Id)).IsEquivalentTo([SampleGenerator.NotPartial.Id]);
+        await Assert
+            .That(result.Diagnostics.Select(d => d.Id))
+            .IsEquivalentTo([SampleGenerator.NotPartial.Id]);
         await Assert.That(result.Sources.Keys.Any(key => key.Contains("Broken"))).IsFalse();
 
         var position = result.Diagnostics.Single().Location.GetLineSpan().StartLinePosition;
@@ -163,9 +186,12 @@ public class SampleGeneratorTests
     {
         var result = GeneratorHarness.Run(
             new SampleGenerator(),
-            ["[Sample.Sample] static partial class Helpers { }"]);
+            ["[Sample.Sample] static partial class Helpers { }"]
+        );
 
-        await Assert.That(result.Diagnostics.Select(d => d.Id)).IsEquivalentTo([SampleGenerator.StaticType.Id]);
+        await Assert
+            .That(result.Diagnostics.Select(d => d.Id))
+            .IsEquivalentTo([SampleGenerator.StaticType.Id]);
         await Assert.That(result.Sources.Keys.Any(key => key.Contains("Helpers"))).IsFalse();
     }
 
@@ -174,7 +200,8 @@ public class SampleGeneratorTests
     {
         var result = GeneratorHarness.Run(
             new SampleGenerator(),
-            ["partial class Outer { [Sample.Sample] public partial class Inner<T> { } }"]);
+            ["partial class Outer { [Sample.Sample] public partial class Inner<T> { } }"]
+        );
 
         await Assert.That(result.Sources.Keys).Contains("Outer+Inner`1.Sample.g.cs");
         await Assert.That(result.Sources.Keys.Count(key => key.Contains("Outer"))).IsEqualTo(1);
@@ -189,7 +216,8 @@ public class SampleGeneratorTests
             [NotPartial],
             SampleGenerator.ModelStepName,
             SampleGenerator.ValidatedStepName,
-            $"{SampleGenerator.ValidatedStepName}.Diagnostics");
+            $"{SampleGenerator.ValidatedStepName}.Diagnostics"
+        );
     }
 
     [Test]
@@ -199,6 +227,7 @@ public class SampleGeneratorTests
             new SampleGenerator(),
             [TwoParts, SecondPart],
             SampleGenerator.ModelStepName,
-            SampleGenerator.ValidatedStepName);
+            SampleGenerator.ValidatedStepName
+        );
     }
 }

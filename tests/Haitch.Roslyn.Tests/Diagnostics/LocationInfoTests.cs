@@ -32,7 +32,8 @@ public class LocationInfoTests
     {
         CSharpCompilation compilation = CSharpCompilation.Create(
             "TestAssembly",
-            references: [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)]);
+            references: [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)]
+        );
 
         INamedTypeSymbol objectSymbol = compilation.GetSpecialType(SpecialType.System_Object);
         Location location = objectSymbol.Locations[0];

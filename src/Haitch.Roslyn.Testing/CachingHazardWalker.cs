@@ -45,13 +45,16 @@ public static class CachingHazardWalker
         var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
         var found = Walk(value, "", 0, visited);
         return found is { } hazard
-            ? (hazard.Path.Length == 0
-                ? RootPath
-                : hazard.Path, hazard.Reason)
+            ? (hazard.Path.Length == 0 ? RootPath : hazard.Path, hazard.Reason)
             : null;
     }
 
-    private static (string Path, string Reason)? Walk(object? value, string path, int depth, HashSet<object> visited)
+    private static (string Path, string Reason)? Walk(
+        object? value,
+        string path,
+        int depth,
+        HashSet<object> visited
+    )
     {
         if (value is null)
         {
@@ -116,7 +119,9 @@ public static class CachingHazardWalker
         HashSet<object> visited
     )
     {
-        var backing = type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+        var backing = type.GetFields(
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            )
             .FirstOrDefault(f => f.FieldType.IsArray);
         if (backing?.GetValue(value) is not IList items)
         {
@@ -139,14 +144,13 @@ public static class CachingHazardWalker
         Type type,
         string path,
         int depth,
-        HashSet<object> visited)
+        HashSet<object> visited
+    )
     {
         foreach (var field in FieldCache.GetOrAdd(type, InstanceFields))
         {
             var name = MemberName(field);
-            var childPath = path.Length == 0
-                ? name
-                : $"{path}.{name}";
+            var childPath = path.Length == 0 ? name : $"{path}.{name}";
             if (Walk(field.GetValue(value), childPath, depth + 1, visited) is { } found)
             {
                 return found;
@@ -159,11 +163,18 @@ public static class CachingHazardWalker
     private static FieldInfo[] InstanceFields(Type type)
     {
         var fields = new List<FieldInfo>();
-        for (var current = type; current is not null && current != typeof(object); current = current.BaseType)
+        for (
+            var current = type;
+            current is not null && current != typeof(object);
+            current = current.BaseType
+        )
         {
             fields.AddRange(
                 current.GetFields(
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly
+                    BindingFlags.Instance
+                        | BindingFlags.Public
+                        | BindingFlags.NonPublic
+                        | BindingFlags.DeclaredOnly
                 )
             );
         }
@@ -172,7 +183,8 @@ public static class CachingHazardWalker
     }
 
     private static string MemberName(FieldInfo field) =>
-        field.Name.StartsWith('<') && field.Name.EndsWith(">k__BackingField", StringComparison.Ordinal)
+        field.Name.StartsWith('<')
+        && field.Name.EndsWith(">k__BackingField", StringComparison.Ordinal)
             ? field.Name[1..field.Name.IndexOf('>')]
             : field.Name;
 
@@ -186,10 +198,14 @@ public static class CachingHazardWalker
         || typeof(LocalizableString).IsAssignableFrom(type);
 
     private static bool HasValueEquality(Type type) =>
-        type.GetMethod("Equals", BindingFlags.Instance | BindingFlags.Public, null, [typeof(object)], null)
-            ?.DeclaringType != typeof(object);
+        type.GetMethod(
+            "Equals",
+            BindingFlags.Instance | BindingFlags.Public,
+            null,
+            [typeof(object)],
+            null
+        )?.DeclaringType != typeof(object);
 
-    private static string Article(string name) => name[0] is 'I' or 'A' or 'E' or 'O' or 'U'
-        ? "an"
-        : "a";
+    private static string Article(string name) =>
+        name[0] is 'I' or 'A' or 'E' or 'O' or 'U' ? "an" : "a";
 }

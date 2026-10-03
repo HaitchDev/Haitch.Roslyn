@@ -10,8 +10,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_parameter_ref_kinds_default_values_and_params()
     {
-        const string source =
-            """
+        const string source = """
             public static class RefSample
             {
                 public static ref readonly int GetRef(ref int a, out int b, in int c, int number = 5, params int[] rest)
@@ -31,15 +30,16 @@ public class MemberModelTests
         await Assert.That(model.Parameters[0].RefKind).IsEqualTo(RefKind.Ref);
         await Assert.That(model.Parameters[1].RefKind).IsEqualTo(RefKind.Out);
         await Assert.That(model.Parameters[2].RefKind).IsEqualTo(RefKind.In);
-        await Assert.That(model.Parameters[3].DefaultValue).IsEqualTo(ConstantValue.ForPrimitive(5));
+        await Assert
+            .That(model.Parameters[3].DefaultValue)
+            .IsEqualTo(ConstantValue.ForPrimitive(5));
         await Assert.That(model.Parameters[4].IsParams).IsTrue();
     }
 
     [Test]
     public async Task Should_capture_a_null_default_parameter_value()
     {
-        const string source =
-            """
+        const string source = """
             public static class NullDefaultSample
             {
                 public static void Method(string? text = null) { }
@@ -56,8 +56,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_property_accessors_and_init_required()
     {
-        const string source =
-            """
+        const string source = """
             public class SamplePropertyHost
             {
                 public required int Required { get; init; }
@@ -92,8 +91,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_method_return_type_generics_and_static_async_partial()
     {
-        const string source =
-            """
+        const string source = """
             using System.Threading.Tasks;
 
             public static class GenericSample
@@ -110,7 +108,9 @@ public class MemberModelTests
 
         MethodModel model = MethodModel.From(method);
 
-        await Assert.That(model.ReturnType.FullyQualifiedName).IsEqualTo("global::System.Threading.Tasks.Task<int>");
+        await Assert
+            .That(model.ReturnType.FullyQualifiedName)
+            .IsEqualTo("global::System.Threading.Tasks.Task<int>");
         await Assert.That(model.IsStatic).IsTrue();
         await Assert.That(model.IsAsync).IsTrue();
         await Assert.That(model.TypeParameters.Count).IsEqualTo(1);
@@ -118,15 +118,15 @@ public class MemberModelTests
         await Assert.That(model.TypeParameters[0].HasReferenceTypeConstraint).IsTrue();
         await Assert.That(model.TypeParameters[0].HasConstructorConstraint).IsTrue();
         await Assert.That(model.TypeParameters[0].ConstraintTypes.Count).IsEqualTo(1);
-        await Assert.That(model.TypeParameters[0].ConstraintTypes[0].FullyQualifiedName)
+        await Assert
+            .That(model.TypeParameters[0].ConstraintTypes[0].FullyQualifiedName)
             .IsEqualTo("global::System.IDisposable");
     }
 
     [Test]
     public async Task Should_capture_an_extension_method()
     {
-        const string source =
-            """
+        const string source = """
             public static class Extensions
             {
                 public static int GetLength(this string value) => value.Length;
@@ -143,8 +143,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_a_partial_method_definition()
     {
-        const string source =
-            """
+        const string source = """
             public partial class PartialHost
             {
                 private partial void OnChanged();
@@ -168,8 +167,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_field_readonly_and_const_modifiers()
     {
-        const string source =
-            """
+        const string source = """
             public class SampleFieldHost
             {
                 public readonly int ReadonlyField;
@@ -181,7 +179,9 @@ public class MemberModelTests
             """;
 
         INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "SampleFieldHost");
-        IFieldSymbol readonlyField = type.GetMembers("ReadonlyField").OfType<IFieldSymbol>().Single();
+        IFieldSymbol readonlyField = type.GetMembers("ReadonlyField")
+            .OfType<IFieldSymbol>()
+            .Single();
         IFieldSymbol constField = type.GetMembers("ConstField").OfType<IFieldSymbol>().Single();
         IFieldSymbol staticField = type.GetMembers("StaticField").OfType<IFieldSymbol>().Single();
 
@@ -198,8 +198,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_be_equal_across_two_compilations_of_the_same_source()
     {
-        const string source =
-            """
+        const string source = """
             using System.Threading.Tasks;
 
             public class SampleHost
@@ -219,15 +218,26 @@ public class MemberModelTests
         INamedTypeSymbol first = CompilationHelper.GetNamedTypeSymbol(source, "SampleHost");
         INamedTypeSymbol second = CompilationHelper.GetNamedTypeSymbol(source, "SampleHost");
 
-        PropertyModel firstProperty = PropertyModel.From(first.GetMembers("Value").OfType<IPropertySymbol>().Single());
-        PropertyModel secondProperty =
-            PropertyModel.From(second.GetMembers("Value").OfType<IPropertySymbol>().Single());
+        PropertyModel firstProperty = PropertyModel.From(
+            first.GetMembers("Value").OfType<IPropertySymbol>().Single()
+        );
+        PropertyModel secondProperty = PropertyModel.From(
+            second.GetMembers("Value").OfType<IPropertySymbol>().Single()
+        );
 
-        FieldModel firstField = FieldModel.From(first.GetMembers("Name").OfType<IFieldSymbol>().Single());
-        FieldModel secondField = FieldModel.From(second.GetMembers("Name").OfType<IFieldSymbol>().Single());
+        FieldModel firstField = FieldModel.From(
+            first.GetMembers("Name").OfType<IFieldSymbol>().Single()
+        );
+        FieldModel secondField = FieldModel.From(
+            second.GetMembers("Name").OfType<IFieldSymbol>().Single()
+        );
 
-        MethodModel firstMethod = MethodModel.From(first.GetMembers("ComputeAsync").OfType<IMethodSymbol>().Single());
-        MethodModel secondMethod = MethodModel.From(second.GetMembers("ComputeAsync").OfType<IMethodSymbol>().Single());
+        MethodModel firstMethod = MethodModel.From(
+            first.GetMembers("ComputeAsync").OfType<IMethodSymbol>().Single()
+        );
+        MethodModel secondMethod = MethodModel.From(
+            second.GetMembers("ComputeAsync").OfType<IMethodSymbol>().Single()
+        );
 
         ParameterModel firstParameter = firstMethod.Parameters[0];
         ParameterModel secondParameter = secondMethod.Parameters[0];
@@ -248,8 +258,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_an_enum_default_parameter_value()
     {
-        const string source =
-            """
+        const string source = """
             public enum Color
             {
                 Red,
@@ -275,8 +284,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_a_nullable_enum_default_parameter_value_as_an_enum_constant()
     {
-        const string source =
-            """
+        const string source = """
             public enum Color
             {
                 Red,
@@ -302,8 +310,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_a_struct_default_literal_parameter_value()
     {
-        const string source =
-            """
+        const string source = """
             public struct Point
             {
                 public int X;
@@ -328,8 +335,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_a_decimal_default_parameter_value()
     {
-        const string source =
-            """
+        const string source = """
             public static class DecimalDefaultSample
             {
                 public static void Method(decimal amount = 1.5m) { }
@@ -340,15 +346,16 @@ public class MemberModelTests
 
         MethodModel model = MethodModel.From(method);
 
-        await Assert.That(model.Parameters[0].DefaultValue).IsEqualTo(ConstantValue.ForPrimitive(1.5m));
+        await Assert
+            .That(model.Parameters[0].DefaultValue)
+            .IsEqualTo(ConstantValue.ForPrimitive(1.5m));
         await Assert.That(model.Parameters[0].IsDefaultLiteral).IsFalse();
     }
 
     [Test]
     public async Task Should_capture_a_ref_readonly_parameter()
     {
-        const string source =
-            """
+        const string source = """
             public static class RefReadonlyParamSample
             {
                 public static int Method(ref readonly int value) => value;
@@ -365,8 +372,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_scoped_parameter_kinds()
     {
-        const string source =
-            """
+        const string source = """
             public ref struct RefStruct { }
 
             public static class ScopedParamSample
@@ -386,8 +392,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_a_nullable_class_constraint()
     {
-        const string source =
-            """
+        const string source = """
             public static class NullableClassConstraintSample
             {
                 public static void Method<T>(T value) where T : class?
@@ -400,15 +405,15 @@ public class MemberModelTests
 
         MethodModel model = MethodModel.From(method);
 
-        await Assert.That(model.TypeParameters[0].ReferenceTypeConstraintNullableAnnotation)
+        await Assert
+            .That(model.TypeParameters[0].ReferenceTypeConstraintNullableAnnotation)
             .IsEqualTo(NullableAnnotation.Annotated);
     }
 
     [Test]
     public async Task Should_capture_unmanaged_and_notnull_constraints()
     {
-        const string source =
-            """
+        const string source = """
             public static class ConstraintSample
             {
                 public static void UnmanagedMethod<T>(T value) where T : unmanaged
@@ -434,8 +439,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_be_equal_across_two_compilations_for_type_parameter_constraint_types()
     {
-        const string source =
-            """
+        const string source = """
             public static class ConstraintEqualitySample
             {
                 public static void Method<T>(T value) where T : System.IDisposable
@@ -451,14 +455,15 @@ public class MemberModelTests
         TypeParameterModel secondTypeParameter = MethodModel.From(second).TypeParameters[0];
 
         await Assert.That(firstTypeParameter).IsEqualTo(secondTypeParameter);
-        await Assert.That(firstTypeParameter.GetHashCode()).IsEqualTo(secondTypeParameter.GetHashCode());
+        await Assert
+            .That(firstTypeParameter.GetHashCode())
+            .IsEqualTo(secondTypeParameter.GetHashCode());
     }
 
     [Test]
     public async Task Should_reject_indexers()
     {
-        const string source =
-            """
+        const string source = """
             public class IndexerHost
             {
                 public int this[int index]
@@ -470,7 +475,9 @@ public class MemberModelTests
             """;
 
         INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "IndexerHost");
-        IPropertySymbol indexer = type.GetMembers().OfType<IPropertySymbol>().Single(p => p.IsIndexer);
+        IPropertySymbol indexer = type.GetMembers()
+            .OfType<IPropertySymbol>()
+            .Single(p => p.IsIndexer);
 
         await Assert.That(() => PropertyModel.From(indexer)).Throws<ArgumentException>();
     }
@@ -478,8 +485,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_an_explicit_interface_implementation()
     {
-        const string source =
-            """
+        const string source = """
             public interface IWorker
             {
                 void DoWork();
@@ -506,8 +512,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_an_explicit_interface_property_implementation_with_an_unqualified_name()
     {
-        const string source =
-            """
+        const string source = """
             public interface IFoo
             {
                 int Bar { get; }
@@ -527,7 +532,8 @@ public class MemberModelTests
 
         PropertyModel model = PropertyModel.From(explicitProperty);
         PropertyModel plain = PropertyModel.From(
-            type.GetMembers("Plain").OfType<IPropertySymbol>().Single());
+            type.GetMembers("Plain").OfType<IPropertySymbol>().Single()
+        );
 
         await Assert.That(model.Name).IsEqualTo("Bar");
         await Assert.That(model.ExplicitInterface!.FullyQualifiedName).IsEqualTo("global::IFoo");
@@ -539,8 +545,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_volatile_fields()
     {
-        const string source =
-            """
+        const string source = """
             public class Host
             {
                 public volatile int Flag;
@@ -551,7 +556,9 @@ public class MemberModelTests
         INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "Host");
 
         FieldModel flag = FieldModel.From(type.GetMembers("Flag").OfType<IFieldSymbol>().Single());
-        FieldModel plain = FieldModel.From(type.GetMembers("Plain").OfType<IFieldSymbol>().Single());
+        FieldModel plain = FieldModel.From(
+            type.GetMembers("Plain").OfType<IFieldSymbol>().Single()
+        );
 
         await Assert.That(flag.IsVolatile).IsTrue();
         await Assert.That(plain.IsVolatile).IsFalse();
@@ -560,8 +567,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_the_ref_kind_of_ref_returning_properties()
     {
-        const string source =
-            """
+        const string source = """
             public class Host
             {
                 private int _slot;
@@ -573,9 +579,15 @@ public class MemberModelTests
 
         INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "Host");
 
-        PropertyModel slot = PropertyModel.From(type.GetMembers("Slot").OfType<IPropertySymbol>().Single());
-        PropertyModel view = PropertyModel.From(type.GetMembers("View").OfType<IPropertySymbol>().Single());
-        PropertyModel plain = PropertyModel.From(type.GetMembers("Plain").OfType<IPropertySymbol>().Single());
+        PropertyModel slot = PropertyModel.From(
+            type.GetMembers("Slot").OfType<IPropertySymbol>().Single()
+        );
+        PropertyModel view = PropertyModel.From(
+            type.GetMembers("View").OfType<IPropertySymbol>().Single()
+        );
+        PropertyModel plain = PropertyModel.From(
+            type.GetMembers("Plain").OfType<IPropertySymbol>().Single()
+        );
 
         await Assert.That(slot.ReturnRefKind).IsEqualTo(ReturnRefKind.Ref);
         await Assert.That(view.ReturnRefKind).IsEqualTo(ReturnRefKind.RefReadOnly);
@@ -585,8 +597,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_method_kind_and_readonly_modifier()
     {
-        const string source =
-            """
+        const string source = """
             public struct ReadOnlyMethodHost
             {
                 public readonly int Compute() => 1;
@@ -605,8 +616,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_whether_a_partial_method_declares_an_access_modifier()
     {
-        const string source =
-            """
+        const string source = """
             public partial class PartialHost
             {
                 partial void OnX();
@@ -615,21 +625,39 @@ public class MemberModelTests
             }
             """;
 
-        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "PartialHost", allowErrors: true);
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(
+            source,
+            "PartialHost",
+            allowErrors: true
+        );
 
-        await Assert.That(MethodModel.From(type.GetMembers("OnX").OfType<IMethodSymbol>().Single())
-            .HasExplicitAccessibility).IsFalse();
-        await Assert.That(MethodModel.From(type.GetMembers("M").OfType<IMethodSymbol>().Single())
-            .HasExplicitAccessibility).IsTrue();
-        await Assert.That(MethodModel.From(type.GetMembers("Plain").OfType<IMethodSymbol>().Single())
-            .HasExplicitAccessibility).IsTrue();
+        await Assert
+            .That(
+                MethodModel
+                    .From(type.GetMembers("OnX").OfType<IMethodSymbol>().Single())
+                    .HasExplicitAccessibility
+            )
+            .IsFalse();
+        await Assert
+            .That(
+                MethodModel
+                    .From(type.GetMembers("M").OfType<IMethodSymbol>().Single())
+                    .HasExplicitAccessibility
+            )
+            .IsTrue();
+        await Assert
+            .That(
+                MethodModel
+                    .From(type.GetMembers("Plain").OfType<IMethodSymbol>().Single())
+                    .HasExplicitAccessibility
+            )
+            .IsTrue();
     }
 
     [Test]
     public async Task Should_keep_explicit_accessibility_true_for_interface_members()
     {
-        const string source =
-            """
+        const string source = """
             public interface IHost
             {
                 void M();
@@ -647,7 +675,11 @@ public class MemberModelTests
     [Test]
     public async Task Should_not_treat_models_differing_only_in_HasExplicitAccessibility_as_equal()
     {
-        IMethodSymbol symbol = GetMethod("public class EqHost { public void M() { } }", "EqHost", "M");
+        IMethodSymbol symbol = GetMethod(
+            "public class EqHost { public void M() { } }",
+            "EqHost",
+            "M"
+        );
 
         MethodModel explicitModel = MethodModel.From(symbol);
         MethodModel implicitModel = explicitModel with { HasExplicitAccessibility = false };
@@ -655,9 +687,17 @@ public class MemberModelTests
         await Assert.That(explicitModel).IsNotEqualTo(implicitModel);
     }
 
-    private static PropertyModel GetProperty(string source, string typeMetadataName, string propertyName)
+    private static PropertyModel GetProperty(
+        string source,
+        string typeMetadataName,
+        string propertyName
+    )
     {
-        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, typeMetadataName, allowErrors: true);
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(
+            source,
+            typeMetadataName,
+            allowErrors: true
+        );
 
         return PropertyModel.From(type.GetMembers(propertyName).OfType<IPropertySymbol>().Single());
     }
@@ -665,8 +705,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_capture_partial_property_flag_and_whether_it_declares_an_access_modifier()
     {
-        const string source =
-            """
+        const string source = """
             public partial class PartialPropHost
             {
                 public partial int X { get; set; }
@@ -690,7 +729,11 @@ public class MemberModelTests
     [Test]
     public async Task Should_keep_explicit_accessibility_true_for_interface_properties()
     {
-        PropertyModel model = GetProperty("public interface IPropHost { int P { get; } }", "IPropHost", "P");
+        PropertyModel model = GetProperty(
+            "public interface IPropHost { int P { get; } }",
+            "IPropHost",
+            "P"
+        );
 
         await Assert.That(model.HasExplicitAccessibility).IsTrue();
         await Assert.That(model.Accessibility).IsEqualTo(Accessibility.Public);
@@ -699,8 +742,7 @@ public class MemberModelTests
     [Test]
     public async Task Should_derive_property_IsReadOnly_from_the_readonly_modifier_not_the_missing_setter()
     {
-        const string source =
-            """
+        const string source = """
             public struct MutableHost
             {
                 public int GetOnly { get; }
@@ -723,7 +765,11 @@ public class MemberModelTests
     [Test]
     public async Task Should_not_treat_property_models_differing_only_in_HasExplicitAccessibility_as_equal()
     {
-        PropertyModel explicitModel = GetProperty("public class PEqHost { public int P { get; } }", "PEqHost", "P");
+        PropertyModel explicitModel = GetProperty(
+            "public class PEqHost { public int P { get; } }",
+            "PEqHost",
+            "P"
+        );
         PropertyModel implicitModel = explicitModel with { HasExplicitAccessibility = false };
 
         await Assert.That(explicitModel).IsNotEqualTo(implicitModel);
@@ -732,8 +778,13 @@ public class MemberModelTests
     [Test]
     public async Task Should_not_treat_field_models_differing_only_in_IsVolatile_as_equal()
     {
-        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol("public class VolHost { public volatile int F; }", "VolHost");
-        FieldModel volatileModel = FieldModel.From(type.GetMembers("F").OfType<IFieldSymbol>().Single());
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(
+            "public class VolHost { public volatile int F; }",
+            "VolHost"
+        );
+        FieldModel volatileModel = FieldModel.From(
+            type.GetMembers("F").OfType<IFieldSymbol>().Single()
+        );
         FieldModel plainModel = volatileModel with { IsVolatile = false };
 
         await Assert.That(volatileModel).IsNotEqualTo(plainModel);
@@ -742,7 +793,11 @@ public class MemberModelTests
     [Test]
     public async Task Should_not_treat_property_models_differing_only_in_ReturnRefKind_as_equal()
     {
-        PropertyModel plainModel = GetProperty("public class RefEqHost { public int P { get; } }", "RefEqHost", "P");
+        PropertyModel plainModel = GetProperty(
+            "public class RefEqHost { public int P { get; } }",
+            "RefEqHost",
+            "P"
+        );
         PropertyModel refModel = plainModel with { ReturnRefKind = ReturnRefKind.Ref };
 
         await Assert.That(plainModel).IsNotEqualTo(refModel);
@@ -753,9 +808,13 @@ public class MemberModelTests
     {
         INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(
             "public interface IEq { void M(); } public class ExplEqHost : IEq { void IEq.M() { } }",
-            "ExplEqHost");
+            "ExplEqHost"
+        );
         MethodModel explicitModel = MethodModel.From(
-            type.GetMembers().OfType<IMethodSymbol>().Single(m => m.ExplicitInterfaceImplementations.Length > 0));
+            type.GetMembers()
+                .OfType<IMethodSymbol>()
+                .Single(m => m.ExplicitInterfaceImplementations.Length > 0)
+        );
         MethodModel plainModel = explicitModel with { ExplicitInterface = null };
 
         await Assert.That(explicitModel).IsNotEqualTo(plainModel);
@@ -766,15 +825,23 @@ public class MemberModelTests
     {
         INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(
             "public interface IPEq { int P { get; } } public class ExplPEqHost : IPEq { int IPEq.P => 1; }",
-            "ExplPEqHost");
+            "ExplPEqHost"
+        );
         PropertyModel explicitModel = PropertyModel.From(
-            type.GetMembers().OfType<IPropertySymbol>().Single(p => p.ExplicitInterfaceImplementations.Length > 0));
+            type.GetMembers()
+                .OfType<IPropertySymbol>()
+                .Single(p => p.ExplicitInterfaceImplementations.Length > 0)
+        );
         PropertyModel plainModel = explicitModel with { ExplicitInterface = null };
 
         await Assert.That(explicitModel).IsNotEqualTo(plainModel);
     }
 
-    private static IMethodSymbol GetMethod(string source, string typeMetadataName, string methodName)
+    private static IMethodSymbol GetMethod(
+        string source,
+        string typeMetadataName,
+        string methodName
+    )
     {
         INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, typeMetadataName);
 

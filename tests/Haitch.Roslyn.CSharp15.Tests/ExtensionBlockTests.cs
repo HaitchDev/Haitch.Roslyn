@@ -7,28 +7,28 @@ namespace Haitch.Roslyn.CSharp15.Tests;
 public class ExtensionBlockTests
 {
     private const string Source = """
-                                  #nullable enable
-                                  using System;
-                                  using System.Collections.Generic;
-                                  namespace App;
-                                  public static class StringExtensions
-                                  {
-                                      public static int Twice(int value) => value * 2;
+        #nullable enable
+        using System;
+        using System.Collections.Generic;
+        namespace App;
+        public static class StringExtensions
+        {
+            public static int Twice(int value) => value * 2;
 
-                                      extension(string text)
-                                      {
-                                          public int WordCount => text.Split(' ').Length;
-                                          public string Shout() => text.ToUpperInvariant();
-                                          public char this[Index index] => text[index];
-                                          public static string Empty2 => "";
-                                      }
+            extension(string text)
+            {
+                public int WordCount => text.Split(' ').Length;
+                public string Shout() => text.ToUpperInvariant();
+                public char this[Index index] => text[index];
+                public static string Empty2 => "";
+            }
 
-                                      extension<T>(List<T> list)
-                                      {
-                                          public bool IsSingle => list.Count == 1;
-                                      }
-                                  }
-                                  """;
+            extension<T>(List<T> list)
+            {
+                public bool IsSingle => list.Count == 1;
+            }
+        }
+        """;
 
     private static readonly MetadataReference[] References = CreateReferences();
 
@@ -36,7 +36,10 @@ public class ExtensionBlockTests
     public async Task From_ExtensionBlock_ThrowsArgumentExceptionNamingExtensionBlock()
     {
         var compilation = Compile(Source);
-        var block = compilation.GetTypeByMetadataName("App.StringExtensions")!.GetTypeMembers().First();
+        var block = compilation
+            .GetTypeByMetadataName("App.StringExtensions")!
+            .GetTypeMembers()
+            .First();
 
         var exception = Assert.Throws<ArgumentException>(() => TypeModel.From(block));
 
@@ -49,10 +52,15 @@ public class ExtensionBlockTests
     {
         var compilation = Compile(Source);
 
-        var model = TypeModel.From(compilation.GetTypeByMetadataName("App.StringExtensions")!, includeMembers: true);
+        var model = TypeModel.From(
+            compilation.GetTypeByMetadataName("App.StringExtensions")!,
+            includeMembers: true
+        );
 
         await Assert.That(model.IsStatic).IsTrue();
-        await Assert.That(model.Methods.Select(method => method.Name).ToArray()).IsEquivalentTo(["Twice"]);
+        await Assert
+            .That(model.Methods.Select(method => method.Name).ToArray())
+            .IsEquivalentTo(["Twice"]);
         await Assert.That(model.Properties.ToArray()).IsEmpty();
         await Assert.That(model.Fields.ToArray()).IsEmpty();
     }
@@ -76,14 +84,20 @@ public class ExtensionBlockTests
         await Assert.That(emitResult.Success).IsTrue();
         var reference = MetadataReference.CreateFromImage(stream.ToArray());
         var consumer = Compile("public class Consumer;", reference);
-        var block = consumer.GetTypeByMetadataName("App.StringExtensions")!.GetTypeMembers().First();
+        var block = consumer
+            .GetTypeByMetadataName("App.StringExtensions")!
+            .GetTypeMembers()
+            .First();
 
         var exception = Assert.Throws<ArgumentException>(() => TypeModel.From(block));
 
         await Assert.That(exception.Message).Contains("extension block");
     }
 
-    private static CSharpCompilation Compile(string source, params MetadataReference[] extraReferences)
+    private static CSharpCompilation Compile(
+        string source,
+        params MetadataReference[] extraReferences
+    )
     {
         return CSharpCompilation.Create(
             "ExtensionBlockTests" + Guid.NewGuid().ToString("N"),

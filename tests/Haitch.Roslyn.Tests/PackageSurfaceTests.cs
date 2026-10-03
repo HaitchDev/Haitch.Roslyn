@@ -10,7 +10,8 @@ public class PackageSurfaceTests
         // Source-only package: public types would collide with identically named types in consumers.
         Assembly assembly = typeof(PackageSurfaceTests).Assembly;
 
-        IEnumerable<Type> publicPackageTypes = assembly.GetTypes()
+        IEnumerable<Type> publicPackageTypes = assembly
+            .GetTypes()
             .Where(IsPackageType)
             .Where(type => type.IsVisible);
 
@@ -44,18 +45,22 @@ public class PackageSurfaceTests
             return !type.Name.StartsWith("<", StringComparison.Ordinal);
         }
 
-        bool isExcludedNamespace = GeneratedNamespaces.Contains(ns) ||
-                                   GeneratedNamespaces.Any(generated =>
-                                       ns.StartsWith(generated + ".", StringComparison.Ordinal));
+        bool isExcludedNamespace =
+            GeneratedNamespaces.Contains(ns)
+            || GeneratedNamespaces.Any(generated =>
+                ns.StartsWith(generated + ".", StringComparison.Ordinal)
+            );
 
         if (isExcludedNamespace)
         {
             return false;
         }
 
-        bool isHaitchRoslyn = ns == "Haitch.Roslyn" || ns.StartsWith("Haitch.Roslyn.", StringComparison.Ordinal);
-        bool isTestNamespace = ns == "Haitch.Roslyn.Tests" ||
-                               ns.StartsWith("Haitch.Roslyn.Tests.", StringComparison.Ordinal);
+        bool isHaitchRoslyn =
+            ns == "Haitch.Roslyn" || ns.StartsWith("Haitch.Roslyn.", StringComparison.Ordinal);
+        bool isTestNamespace =
+            ns == "Haitch.Roslyn.Tests"
+            || ns.StartsWith("Haitch.Roslyn.Tests.", StringComparison.Ordinal);
 
         return isHaitchRoslyn && !isTestNamespace;
     }

@@ -12,10 +12,20 @@ public class NewTypeDeclarationTests
 {
     private const string Support = "public class Base { }\npublic interface IMarker { }\n";
 
-    private static readonly TypeRef BaseClass = new("global::Base", NullableAnnotation.NotAnnotated, SpecialType.None,
-        TypeKind.Class, false);
-    private static readonly TypeRef Marker = new("global::IMarker", NullableAnnotation.NotAnnotated, SpecialType.None,
-        TypeKind.Interface, false);
+    private static readonly TypeRef BaseClass = new(
+        "global::Base",
+        NullableAnnotation.NotAnnotated,
+        SpecialType.None,
+        TypeKind.Class,
+        false
+    );
+    private static readonly TypeRef Marker = new(
+        "global::IMarker",
+        NullableAnnotation.NotAnnotated,
+        SpecialType.None,
+        TypeKind.Interface,
+        false
+    );
 
     [Test]
     public async Task Should_write_a_public_sealed_class_with_a_base_class_and_an_interface()
@@ -33,13 +43,17 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     [Test]
     public async Task Should_write_an_internal_static_class()
     {
-        NewTypeModel model = new("Helpers", TypeDeclarationKind.Class, Accessibility.Internal) { IsStatic = true };
+        NewTypeModel model = new("Helpers", TypeDeclarationKind.Class, Accessibility.Internal)
+        {
+            IsStatic = true,
+        };
 
         await AssertWrites(
             model,
@@ -48,13 +62,17 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     [Test]
     public async Task Should_write_a_public_abstract_class()
     {
-        NewTypeModel model = new("Shape", TypeDeclarationKind.Class, Accessibility.Public) { IsAbstract = true };
+        NewTypeModel model = new("Shape", TypeDeclarationKind.Class, Accessibility.Public)
+        {
+            IsAbstract = true,
+        };
 
         await AssertWrites(
             model,
@@ -63,13 +81,17 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     [Test]
     public async Task Should_write_a_public_readonly_struct()
     {
-        NewTypeModel model = new("Point", TypeDeclarationKind.Struct, Accessibility.Public) { IsReadOnly = true };
+        NewTypeModel model = new("Point", TypeDeclarationKind.Struct, Accessibility.Public)
+        {
+            IsReadOnly = true,
+        };
 
         await AssertWrites(
             model,
@@ -78,7 +100,8 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     [Test]
@@ -97,13 +120,17 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     [Test]
     public async Task Should_write_a_public_readonly_record_struct()
     {
-        NewTypeModel model = new("Pair", TypeDeclarationKind.RecordStruct, Accessibility.Public) { IsReadOnly = true };
+        NewTypeModel model = new("Pair", TypeDeclarationKind.RecordStruct, Accessibility.Public)
+        {
+            IsReadOnly = true,
+        };
 
         await AssertWrites(
             model,
@@ -112,13 +139,17 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     [Test]
     public async Task Should_write_a_public_sealed_record()
     {
-        NewTypeModel model = new("Person", TypeDeclarationKind.RecordClass, Accessibility.Public) { IsSealed = true };
+        NewTypeModel model = new("Person", TypeDeclarationKind.RecordClass, Accessibility.Public)
+        {
+            IsSealed = true,
+        };
 
         await AssertWrites(
             model,
@@ -127,7 +158,8 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     [Test]
@@ -141,7 +173,8 @@ public class NewTypeDeclarationTests
             HasValueTypeConstraint: false,
             HasUnmanagedTypeConstraint: false,
             HasNotNullConstraint: false,
-            HasConstructorConstraint: true);
+            HasConstructorConstraint: true
+        );
         NewTypeModel model = new("IBox", TypeDeclarationKind.Interface, Accessibility.Internal)
         {
             TypeParameters = new[] { typeParameter }.ToEquatableArray(),
@@ -155,7 +188,8 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     [Test]
@@ -178,7 +212,8 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     [Test]
@@ -197,7 +232,8 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     private static TypeParameterModel Parameter(string name, VarianceKind variance)
@@ -210,27 +246,53 @@ public class NewTypeDeclarationTests
             false,
             false,
             false,
-            false)
+            false
+        )
         {
             Variance = variance,
         };
     }
 
-    private static readonly TypeRef StringRef = new("string", NullableAnnotation.NotAnnotated,
-        SpecialType.System_String, TypeKind.Class, false);
-    private static readonly TypeRef IntRef = new("int", NullableAnnotation.NotAnnotated, SpecialType.System_Int32,
-        TypeKind.Struct, true);
-    private static readonly TypeRef StringArrayRef = new("string[]", NullableAnnotation.NotAnnotated,
-        SpecialType.None, TypeKind.Array, false);
+    private static readonly TypeRef StringRef = new(
+        "string",
+        NullableAnnotation.NotAnnotated,
+        SpecialType.System_String,
+        TypeKind.Class,
+        false
+    );
+    private static readonly TypeRef IntRef = new(
+        "int",
+        NullableAnnotation.NotAnnotated,
+        SpecialType.System_Int32,
+        TypeKind.Struct,
+        true
+    );
+    private static readonly TypeRef StringArrayRef = new(
+        "string[]",
+        NullableAnnotation.NotAnnotated,
+        SpecialType.None,
+        TypeKind.Array,
+        false
+    );
 
     private static ParameterModel Positional(
         string name,
         TypeRef type,
         ConstantValue? defaultValue = null,
         bool isParams = false,
-        RefKind refKind = RefKind.None)
+        RefKind refKind = RefKind.None
+    )
     {
-        return new ParameterModel(name, type, refKind, ScopedKind.None, isParams, defaultValue, false, default);
+        return new ParameterModel(
+            name,
+            type,
+            refKind,
+            ScopedKind.None,
+            isParams,
+            defaultValue,
+            false,
+            default
+        );
     }
 
     [Test]
@@ -238,8 +300,11 @@ public class NewTypeDeclarationTests
     {
         NewTypeModel model = new("Person", TypeDeclarationKind.RecordClass, Accessibility.Public)
         {
-            PrimaryConstructorParameters = new[] { Positional("Name", StringRef), Positional("Age", IntRef) }
-                .ToEquatableArray(),
+            PrimaryConstructorParameters = new[]
+            {
+                Positional("Name", StringRef),
+                Positional("Age", IntRef),
+            }.ToEquatableArray(),
         };
 
         await AssertWritesBodyless(model, "public record Person(string Name, int Age);\n");
@@ -250,8 +315,11 @@ public class NewTypeDeclarationTests
     {
         NewTypeModel model = new("Person", TypeDeclarationKind.RecordClass, Accessibility.Public)
         {
-            PrimaryConstructorParameters = new[] { Positional("Name", StringRef), Positional("Age", IntRef) }
-                .ToEquatableArray(),
+            PrimaryConstructorParameters = new[]
+            {
+                Positional("Name", StringRef),
+                Positional("Age", IntRef),
+            }.ToEquatableArray(),
         };
 
         await AssertWrites(
@@ -261,7 +329,8 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     [Test]
@@ -273,7 +342,9 @@ public class NewTypeDeclarationTests
         };
         SourceWriter writer = new();
 
-        await Assert.That(() => writer.WriteBodylessNewTypeDeclaration(model)).Throws<ArgumentException>();
+        await Assert
+            .That(() => writer.WriteBodylessNewTypeDeclaration(model))
+            .Throws<ArgumentException>();
         await Assert.That(writer.ToString()).IsEqualTo(string.Empty);
     }
 
@@ -283,7 +354,9 @@ public class NewTypeDeclarationTests
         NewTypeModel model = new("Person", TypeDeclarationKind.RecordClass, Accessibility.Public);
         SourceWriter writer = new();
 
-        await Assert.That(() => writer.WriteBodylessNewTypeDeclaration(model)).Throws<ArgumentException>();
+        await Assert
+            .That(() => writer.WriteBodylessNewTypeDeclaration(model))
+            .Throws<ArgumentException>();
         await Assert.That(writer.ToString()).IsEqualTo(string.Empty);
     }
 
@@ -297,7 +370,9 @@ public class NewTypeDeclarationTests
         };
         SourceWriter writer = new();
 
-        await Assert.That(() => writer.WriteBodylessNewTypeDeclaration(model)).Throws<ArgumentException>();
+        await Assert
+            .That(() => writer.WriteBodylessNewTypeDeclaration(model))
+            .Throws<ArgumentException>();
         await Assert.That(writer.ToString()).IsEqualTo(string.Empty);
     }
 
@@ -329,7 +404,8 @@ public class NewTypeDeclarationTests
             }
 
             """,
-            compileBody: "public int Copy = id; ");
+            compileBody: "public int Copy = id; "
+        );
     }
 
     [Test]
@@ -352,7 +428,8 @@ public class NewTypeDeclarationTests
             }
 
             """,
-            compileBody: "public int Total = count + names.Length; ");
+            compileBody: "public int Total = count + names.Length; "
+        );
     }
 
     [Test]
@@ -366,13 +443,23 @@ public class NewTypeDeclarationTests
             HasValueTypeConstraint: false,
             HasUnmanagedTypeConstraint: false,
             HasNotNullConstraint: false,
-            HasConstructorConstraint: false);
-        TypeRef valueRef = new("T", NullableAnnotation.NotAnnotated, SpecialType.None, TypeKind.TypeParameter, false);
+            HasConstructorConstraint: false
+        );
+        TypeRef valueRef = new(
+            "T",
+            NullableAnnotation.NotAnnotated,
+            SpecialType.None,
+            TypeKind.TypeParameter,
+            false
+        );
         NewTypeModel model = new("Box", TypeDeclarationKind.RecordClass, Accessibility.Public)
         {
             TypeParameters = new[] { typeParameter }.ToEquatableArray(),
             BaseTypes = new[] { Marker }.ToEquatableArray(),
-            PrimaryConstructorParameters = new[] { Positional("Value", valueRef) }.ToEquatableArray(),
+            PrimaryConstructorParameters = new[]
+            {
+                Positional("Value", valueRef),
+            }.ToEquatableArray(),
         };
 
         await AssertWritesBodyless(
@@ -381,7 +468,8 @@ public class NewTypeDeclarationTests
             public record Box<T>(T Value) : global::IMarker
                 where T : class;
 
-            """);
+            """
+        );
     }
 
     [Test]
@@ -400,7 +488,8 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     [Test]
@@ -415,13 +504,17 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     [Test]
     public async Task Should_write_a_public_partial_class_when_opted_in()
     {
-        NewTypeModel model = new("Split", TypeDeclarationKind.Class, Accessibility.Public) { IsPartial = true };
+        NewTypeModel model = new("Split", TypeDeclarationKind.Class, Accessibility.Public)
+        {
+            IsPartial = true,
+        };
 
         await AssertWrites(
             model,
@@ -430,7 +523,8 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     [Test]
@@ -450,14 +544,21 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     [Test]
     public async Task Should_not_be_equal_when_only_base_types_differ()
     {
-        NewTypeModel a = Model(TypeDeclarationKind.Class) with { BaseTypes = new[] { BaseClass }.ToEquatableArray() };
-        NewTypeModel b = Model(TypeDeclarationKind.Class) with { BaseTypes = new[] { Marker }.ToEquatableArray() };
+        NewTypeModel a = Model(TypeDeclarationKind.Class) with
+        {
+            BaseTypes = new[] { BaseClass }.ToEquatableArray(),
+        };
+        NewTypeModel b = Model(TypeDeclarationKind.Class) with
+        {
+            BaseTypes = new[] { Marker }.ToEquatableArray(),
+        };
 
         await Assert.That(a).IsNotEqualTo(b);
     }
@@ -474,7 +575,8 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     [Test]
@@ -489,20 +591,27 @@ public class NewTypeDeclarationTests
             {
             }
 
-            """);
+            """
+        );
     }
 
     [Test]
     public async Task Should_write_interface_base_types_on_structs_interfaces_and_records()
     {
-        foreach (TypeDeclarationKind kind in new[]
-                 {
-                     TypeDeclarationKind.Struct, TypeDeclarationKind.Interface, TypeDeclarationKind.RecordClass,
-                     TypeDeclarationKind.RecordStruct
-                 })
+        foreach (
+            TypeDeclarationKind kind in new[]
+            {
+                TypeDeclarationKind.Struct,
+                TypeDeclarationKind.Interface,
+                TypeDeclarationKind.RecordClass,
+                TypeDeclarationKind.RecordStruct,
+            }
+        )
         {
             NewTypeModel model = new("Impl", kind, Accessibility.Public)
-                { BaseTypes = new[] { Marker }.ToEquatableArray() };
+            {
+                BaseTypes = new[] { Marker }.ToEquatableArray(),
+            };
             SourceWriter writer = new();
 
             using (writer.WriteNewTypeDeclaration(model)) { }
@@ -541,20 +650,30 @@ public class NewTypeDeclarationTests
             };
         }
 
-        EquatableArray<ParameterModel> One() => new[] { Positional("x", IntRef) }.ToEquatableArray();
+        EquatableArray<ParameterModel> One() =>
+            new[] { Positional("x", IntRef) }.ToEquatableArray();
 
         await Assert.That(RecordWith(One())).IsEqualTo(RecordWith(One()));
-        await Assert.That(RecordWith(One())).IsNotEqualTo(
-            RecordWith(new[] { Positional("y", IntRef) }.ToEquatableArray()));
-        await Assert.That(RecordWith(new EquatableArray<ParameterModel>())).IsEqualTo(
-            RecordWith(new EquatableArray<ParameterModel>()));
-        await Assert.That(RecordWith(new EquatableArray<ParameterModel>())).IsNotEqualTo(RecordWith(One()));
-        await Assert.That(Model(TypeDeclarationKind.RecordClass) with { Name = "R" }).IsNotEqualTo(
-            RecordWith(new EquatableArray<ParameterModel>()));
+        await Assert
+            .That(RecordWith(One()))
+            .IsNotEqualTo(RecordWith(new[] { Positional("y", IntRef) }.ToEquatableArray()));
+        await Assert
+            .That(RecordWith(new EquatableArray<ParameterModel>()))
+            .IsEqualTo(RecordWith(new EquatableArray<ParameterModel>()));
+        await Assert
+            .That(RecordWith(new EquatableArray<ParameterModel>()))
+            .IsNotEqualTo(RecordWith(One()));
+        await Assert
+            .That(Model(TypeDeclarationKind.RecordClass) with { Name = "R" })
+            .IsNotEqualTo(RecordWith(new EquatableArray<ParameterModel>()));
 
         await Assert.That(WithVariance(VarianceKind.Out)).IsEqualTo(WithVariance(VarianceKind.Out));
-        await Assert.That(WithVariance(VarianceKind.Out)).IsNotEqualTo(WithVariance(VarianceKind.In));
-        await Assert.That(WithVariance(VarianceKind.None)).IsNotEqualTo(WithVariance(VarianceKind.Out));
+        await Assert
+            .That(WithVariance(VarianceKind.Out))
+            .IsNotEqualTo(WithVariance(VarianceKind.In));
+        await Assert
+            .That(WithVariance(VarianceKind.None))
+            .IsNotEqualTo(WithVariance(VarianceKind.Out));
     }
 
     [Test]
@@ -580,16 +699,39 @@ public class NewTypeDeclarationTests
 
     private static IEnumerable<Func<NewTypeModel>> IllegalCaseIterator()
     {
-        yield return () => Model(TypeDeclarationKind.Class) with { IsStatic = true, IsAbstract = true };
-        yield return () => Model(TypeDeclarationKind.Class) with { IsStatic = true, IsSealed = true };
-        yield return () => Model(TypeDeclarationKind.Class) with
-        {
-            IsStatic = true, BaseTypes = new[] { Marker }.ToEquatableArray()
-        };
-        yield return () => Model(TypeDeclarationKind.Class) with { IsAbstract = true, IsSealed = true };
+        yield return () =>
+            Model(TypeDeclarationKind.Class) with
+            {
+                IsStatic = true,
+                IsAbstract = true,
+            };
+        yield return () =>
+            Model(TypeDeclarationKind.Class) with
+            {
+                IsStatic = true,
+                IsSealed = true,
+            };
+        yield return () =>
+            Model(TypeDeclarationKind.Class) with
+            {
+                IsStatic = true,
+                BaseTypes = new[] { Marker }.ToEquatableArray(),
+            };
+        yield return () =>
+            Model(TypeDeclarationKind.Class) with
+            {
+                IsAbstract = true,
+                IsSealed = true,
+            };
 
-        foreach (TypeDeclarationKind kind in new[]
-                     { TypeDeclarationKind.Struct, TypeDeclarationKind.RecordStruct, TypeDeclarationKind.Interface })
+        foreach (
+            TypeDeclarationKind kind in new[]
+            {
+                TypeDeclarationKind.Struct,
+                TypeDeclarationKind.RecordStruct,
+                TypeDeclarationKind.Interface,
+            }
+        )
         {
             TypeDeclarationKind captured = kind;
 
@@ -598,8 +740,14 @@ public class NewTypeDeclarationTests
             yield return () => Model(captured) with { IsSealed = true };
         }
 
-        foreach (TypeDeclarationKind kind in new[]
-                     { TypeDeclarationKind.Class, TypeDeclarationKind.RecordClass, TypeDeclarationKind.Interface })
+        foreach (
+            TypeDeclarationKind kind in new[]
+            {
+                TypeDeclarationKind.Class,
+                TypeDeclarationKind.RecordClass,
+                TypeDeclarationKind.Interface,
+            }
+        )
         {
             TypeDeclarationKind captured = kind;
 
@@ -609,58 +757,74 @@ public class NewTypeDeclarationTests
 
         yield return () => Model(TypeDeclarationKind.RecordStruct) with { IsRefLikeType = true };
 
-        foreach (TypeDeclarationKind kind in new[]
-                     {
-                         TypeDeclarationKind.Class, TypeDeclarationKind.Struct, TypeDeclarationKind.RecordClass,
-                         TypeDeclarationKind.RecordStruct
-                     })
+        foreach (
+            TypeDeclarationKind kind in new[]
+            {
+                TypeDeclarationKind.Class,
+                TypeDeclarationKind.Struct,
+                TypeDeclarationKind.RecordClass,
+                TypeDeclarationKind.RecordStruct,
+            }
+        )
         {
             TypeDeclarationKind captured = kind;
 
-            yield return () => Model(captured) with
-            {
-                TypeParameters = new[] { Parameter("T", VarianceKind.Out) }.ToEquatableArray()
-            };
+            yield return () =>
+                Model(captured) with
+                {
+                    TypeParameters = new[] { Parameter("T", VarianceKind.Out) }.ToEquatableArray(),
+                };
         }
 
         yield return () => Model(TypeDeclarationKind.Class) with { Name = " " };
 
-        yield return () => Model(TypeDeclarationKind.Interface) with
-        {
-            PrimaryConstructorParameters = new EquatableArray<ParameterModel>()
-        };
-        yield return () => Model(TypeDeclarationKind.Class) with
-        {
-            IsStatic = true, PrimaryConstructorParameters = new EquatableArray<ParameterModel>()
-        };
-        yield return () => Model(TypeDeclarationKind.Union) with
-        {
-            UnionCaseTypes = new[] { "int" }.ToEquatableArray(),
-            PrimaryConstructorParameters = new[] { Positional("x", IntRef) }.ToEquatableArray(),
-        };
+        yield return () =>
+            Model(TypeDeclarationKind.Interface) with
+            {
+                PrimaryConstructorParameters = new EquatableArray<ParameterModel>(),
+            };
+        yield return () =>
+            Model(TypeDeclarationKind.Class) with
+            {
+                IsStatic = true,
+                PrimaryConstructorParameters = new EquatableArray<ParameterModel>(),
+            };
+        yield return () =>
+            Model(TypeDeclarationKind.Union) with
+            {
+                UnionCaseTypes = new[] { "int" }.ToEquatableArray(),
+                PrimaryConstructorParameters = new[] { Positional("x", IntRef) }.ToEquatableArray(),
+            };
         yield return () => Model(TypeDeclarationKind.Class) with { Name = "" };
         yield return () => Model(TypeDeclarationKind.RecordClass) with { IsStatic = true };
         yield return () => Model(TypeDeclarationKind.Class) with { Name = "1abc" };
         yield return () => Model(TypeDeclarationKind.Class) with { Name = "a b" };
         yield return () => Model(TypeDeclarationKind.Class) with { IsFileLocal = true };
         yield return () =>
-            Model(TypeDeclarationKind.Struct) with { BaseTypes = new[] { BaseClass }.ToEquatableArray() };
-        yield return () => Model(TypeDeclarationKind.RecordStruct) with
-        {
-            BaseTypes = new[] { BaseClass }.ToEquatableArray()
-        };
-        yield return () => Model(TypeDeclarationKind.Interface) with
-        {
-            BaseTypes = new[] { BaseClass }.ToEquatableArray()
-        };
-        yield return () => Model(TypeDeclarationKind.Class) with
-        {
-            BaseTypes = new[] { BaseClass, BaseClass }.ToEquatableArray()
-        };
-        yield return () => Model(TypeDeclarationKind.Class) with
-        {
-            BaseTypes = new[] { Marker, BaseClass }.ToEquatableArray()
-        };
+            Model(TypeDeclarationKind.Struct) with
+            {
+                BaseTypes = new[] { BaseClass }.ToEquatableArray(),
+            };
+        yield return () =>
+            Model(TypeDeclarationKind.RecordStruct) with
+            {
+                BaseTypes = new[] { BaseClass }.ToEquatableArray(),
+            };
+        yield return () =>
+            Model(TypeDeclarationKind.Interface) with
+            {
+                BaseTypes = new[] { BaseClass }.ToEquatableArray(),
+            };
+        yield return () =>
+            Model(TypeDeclarationKind.Class) with
+            {
+                BaseTypes = new[] { BaseClass, BaseClass }.ToEquatableArray(),
+            };
+        yield return () =>
+            Model(TypeDeclarationKind.Class) with
+            {
+                BaseTypes = new[] { Marker, BaseClass }.ToEquatableArray(),
+            };
     }
 
     private static NewTypeModel Model(TypeDeclarationKind kind)
@@ -678,7 +842,11 @@ public class NewTypeDeclarationTests
         await AssertCompiles(writer.ToString());
     }
 
-    private static async Task AssertWrites(NewTypeModel model, string expected, string? compileBody = null)
+    private static async Task AssertWrites(
+        NewTypeModel model,
+        string expected,
+        string? compileBody = null
+    )
     {
         SourceWriter writer = new();
 
@@ -689,16 +857,22 @@ public class NewTypeDeclarationTests
         await Assert.That(output).IsEqualTo(expected);
 
         // A primary constructor parameter that nothing reads is a warning, so the compile check gives it a reader.
-        await AssertCompiles(compileBody is null ? output : output.Replace("{\n}", "{ " + compileBody + "}"));
+        await AssertCompiles(
+            compileBody is null ? output : output.Replace("{\n}", "{ " + compileBody + "}")
+        );
     }
 
     private static async Task AssertCompiles(string output)
     {
-        CSharpCompilation compilation =
-            CompilationHelper.Compile($"#nullable enable\n{Support}{output}", allowErrors: true);
+        CSharpCompilation compilation = CompilationHelper.Compile(
+            $"#nullable enable\n{Support}{output}",
+            allowErrors: true
+        );
         string[] problems = compilation
             .GetDiagnostics()
-            .Where(diagnostic => diagnostic.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning)
+            .Where(diagnostic =>
+                diagnostic.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning
+            )
             .Select(diagnostic => diagnostic.ToString())
             .ToArray();
 

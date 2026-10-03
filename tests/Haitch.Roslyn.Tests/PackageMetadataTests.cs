@@ -15,27 +15,44 @@ public class PackageMetadataTests
     [NotInParallel("pack")]
     public async Task Should_pack_both_projects_with_shared_metadata_and_testing_symbols_only()
     {
-        string outputDirectory = Path.Combine(Path.GetTempPath(), $"haitch-roslyn-metadata-{Guid.NewGuid():N}");
+        string outputDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"haitch-roslyn-metadata-{Guid.NewGuid():N}"
+        );
         Directory.CreateDirectory(outputDirectory);
 
         try
         {
             foreach (string project in new[] { "Haitch.Roslyn", "Haitch.Roslyn.Testing" })
             {
-                string projectPath = Path.Combine(RepoPaths.Root, "src", project, $"{project}.csproj");
+                string projectPath = Path.Combine(
+                    RepoPaths.Root,
+                    "src",
+                    project,
+                    $"{project}.csproj"
+                );
                 var result = await RunDotNetAsync(
                     RepoPaths.Root,
                     [
-                        "pack", projectPath, "-c", "Release", "-o", outputDirectory,
+                        "pack",
+                        projectPath,
+                        "-c",
+                        "Release",
+                        "-o",
+                        outputDirectory,
                         // Isolated bin/obj: a stamped Version must never overwrite the repo's Release build output.
-                        "--artifacts-path", Path.Combine(outputDirectory, "artifacts"),
-                        $"-p:Version={Version}", "-nodeReuse:false"
-                    ]);
+                        "--artifacts-path",
+                        Path.Combine(outputDirectory, "artifacts"),
+                        $"-p:Version={Version}",
+                        "-nodeReuse:false",
+                    ]
+                );
 
                 if (result.ExitCode != 0)
                 {
                     throw new InvalidOperationException(
-                        $"pack of {project} failed with exit code {result.ExitCode}:\n{result.Output}");
+                        $"pack of {project} failed with exit code {result.ExitCode}:\n{result.Output}"
+                    );
                 }
             }
 
@@ -46,9 +63,15 @@ public class PackageMetadataTests
 
             AssertSourceOnly(Path.Combine(outputDirectory, $"Haitch.Roslyn.{Version}.nupkg"));
 
-            await Assert.That(File.Exists(Path.Combine(outputDirectory, $"Haitch.Roslyn.Testing.{Version}.snupkg")))
+            await Assert
+                .That(
+                    File.Exists(
+                        Path.Combine(outputDirectory, $"Haitch.Roslyn.Testing.{Version}.snupkg")
+                    )
+                )
                 .IsTrue();
-            await Assert.That(File.Exists(Path.Combine(outputDirectory, $"Haitch.Roslyn.{Version}.snupkg")))
+            await Assert
+                .That(File.Exists(Path.Combine(outputDirectory, $"Haitch.Roslyn.{Version}.snupkg")))
                 .IsFalse();
         }
         finally
@@ -65,22 +88,37 @@ public class PackageMetadataTests
         Require(entries.Contains("icon.png"), $"{packagePath} is missing icon.png");
         Require(entries.Contains("README.md"), $"{packagePath} is missing README.md");
 
-        ZipArchiveEntry nuspecEntry = archive.Entries.Single(entry => entry.FullName.EndsWith(".nuspec"));
+        ZipArchiveEntry nuspecEntry = archive.Entries.Single(entry =>
+            entry.FullName.EndsWith(".nuspec")
+        );
         using StreamReader reader = new(nuspecEntry.Open());
-        XElement metadata = XDocument.Parse(reader.ReadToEnd()).Root!.Elements().Single(e => e.Name.LocalName == "metadata");
+        XElement metadata = XDocument
+            .Parse(reader.ReadToEnd())
+            .Root!.Elements()
+            .Single(e => e.Name.LocalName == "metadata");
 
         string Value(string name) =>
-            metadata.Elements().FirstOrDefault(e => e.Name.LocalName == name)?.Value ?? string.Empty;
+            metadata.Elements().FirstOrDefault(e => e.Name.LocalName == name)?.Value
+            ?? string.Empty;
 
-        Require(Value("authors") == "Hayden Quinn", $"{packagePath}: authors was '{Value("authors")}'");
+        Require(
+            Value("authors") == "Hayden Quinn",
+            $"{packagePath}: authors was '{Value("authors")}'"
+        );
         Require(Value("version") == Version, $"{packagePath}: version was '{Value("version")}'");
         Require(Value("license") == "MIT", $"{packagePath}: license was '{Value("license")}'");
 
-        XElement? repository = metadata.Elements().FirstOrDefault(e => e.Name.LocalName == "repository");
-        Require(repository?.Attribute("url")?.Value == RepositoryUrl, $"{packagePath}: repository url was wrong");
+        XElement? repository = metadata
+            .Elements()
+            .FirstOrDefault(e => e.Name.LocalName == "repository");
+        Require(
+            repository?.Attribute("url")?.Value == RepositoryUrl,
+            $"{packagePath}: repository url was wrong"
+        );
         Require(
             !string.IsNullOrEmpty(repository?.Attribute("commit")?.Value),
-            $"{packagePath}: repository commit was missing");
+            $"{packagePath}: repository commit was missing"
+        );
     }
 
     private static void AssertSourceOnly(string packagePath)
@@ -89,10 +127,15 @@ public class PackageMetadataTests
 
         foreach (string entry in archive.Entries.Select(e => e.FullName))
         {
-            Require(!entry.StartsWith("lib/"), $"{packagePath} must not contain build output but has {entry}");
             Require(
-                !entry.EndsWith(".dll") && (!entry.EndsWith(".xml") || entry == "[Content_Types].xml"),
-                $"{packagePath} must not contain binaries or XML docs but has {entry}");
+                !entry.StartsWith("lib/"),
+                $"{packagePath} must not contain build output but has {entry}"
+            );
+            Require(
+                !entry.EndsWith(".dll")
+                    && (!entry.EndsWith(".xml") || entry == "[Content_Types].xml"),
+                $"{packagePath} must not contain binaries or XML docs but has {entry}"
+            );
         }
     }
 
@@ -104,7 +147,10 @@ public class PackageMetadataTests
         }
     }
 
-    private static async Task<(int ExitCode, string Output)> RunDotNetAsync(string workingDirectory, string[] arguments)
+    private static async Task<(int ExitCode, string Output)> RunDotNetAsync(
+        string workingDirectory,
+        string[] arguments
+    )
     {
         string dotnetPath = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet";
 
@@ -155,11 +201,11 @@ public class PackageMetadataTests
             {
                 process.Kill(entireProcessTree: true);
             }
-            catch (InvalidOperationException)
-            {
-            }
+            catch (InvalidOperationException) { }
 
-            throw new TimeoutException($"'dotnet {string.Join(' ', arguments)}' timed out after {ProcessTimeout}.");
+            throw new TimeoutException(
+                $"'dotnet {string.Join(' ', arguments)}' timed out after {ProcessTimeout}."
+            );
         }
 
         lock (outputLock)
@@ -177,11 +223,7 @@ public class PackageMetadataTests
                 Directory.Delete(path, recursive: true);
             }
         }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 }

@@ -20,19 +20,27 @@ internal sealed class TestGenerator : IIncrementalGenerator
         "Class '{0}' must not start with 'Bad'",
         "Test",
         DiagnosticSeverity.Error,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true
+    );
 #pragma warning restore RS2008
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        IncrementalValuesProvider<Result<string>> results = context.SyntaxProvider.CreateSyntaxProvider(
-            static (node, _) => node is ClassDeclarationSyntax,
-            static (ctx, _) => Transform((ClassDeclarationSyntax)ctx.Node));
+        IncrementalValuesProvider<Result<string>> results =
+            context.SyntaxProvider.CreateSyntaxProvider(
+                static (node, _) => node is ClassDeclarationSyntax,
+                static (ctx, _) => Transform((ClassDeclarationSyntax)ctx.Node)
+            );
 
-        IncrementalValuesProvider<string> values = results.ReportDiagnostics(context, ValuesStepName);
+        IncrementalValuesProvider<string> values = results.ReportDiagnostics(
+            context,
+            ValuesStepName
+        );
 
-        context.RegisterSourceOutput(values,
-            static (spc, value) => spc.AddSource($"{value}.g.cs", $"// generated for {value}\n"));
+        context.RegisterSourceOutput(
+            values,
+            static (spc, value) => spc.AddSource($"{value}.g.cs", $"// generated for {value}\n")
+        );
     }
 
     private static Result<string> Transform(ClassDeclarationSyntax classDeclaration)
@@ -40,7 +48,9 @@ internal sealed class TestGenerator : IIncrementalGenerator
         string name = classDeclaration.Identifier.Text;
 
         return name.StartsWith("Bad", StringComparison.Ordinal)
-            ? Result<string>.Failure(DiagnosticInfo.Create(BadNameDescriptor, classDeclaration.GetLocation(), name))
+            ? Result<string>.Failure(
+                DiagnosticInfo.Create(BadNameDescriptor, classDeclaration.GetLocation(), name)
+            )
             : Result<string>.Success(name);
     }
 }

@@ -8,10 +8,10 @@ namespace Haitch.Roslyn.CSharp15.Tests;
 public class ClosedModelTests
 {
     private const string ShapeSource = """
-                                       #nullable enable
-                                       namespace App;
-                                       public closed record Shape;
-                                       """;
+        #nullable enable
+        namespace App;
+        public closed record Shape;
+        """;
 
     private static readonly MetadataReference[] References = CreateReferences();
 
@@ -101,10 +101,10 @@ public class ClosedModelTests
     public async Task WriteTypeDeclaration_PartOfClosedClass_DoesNotEchoModifiersAndCompiles()
     {
         const string source = """
-                              #nullable enable
-                              namespace App;
-                              public closed partial class Shape;
-                              """;
+            #nullable enable
+            namespace App;
+            public closed partial class Shape;
+            """;
         var compilation = Compile(source);
         var model = TypeModel.From(compilation.GetTypeByMetadataName("App.Shape")!);
 
@@ -158,7 +158,9 @@ public class ClosedModelTests
         var result = compilation.Emit(stream);
         if (!result.Success)
         {
-            throw new InvalidOperationException(string.Join(Environment.NewLine, result.Diagnostics));
+            throw new InvalidOperationException(
+                string.Join(Environment.NewLine, result.Diagnostics)
+            );
         }
 
         return MetadataReference.CreateFromImage(stream.ToArray());

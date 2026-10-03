@@ -15,7 +15,8 @@ public class DiagnosticInfoTests
         "Test message '{0}'",
         "Test",
         DiagnosticSeverity.Warning,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true
+    );
 
     private static readonly DiagnosticDescriptor OtherDescriptor = new(
         "HR0002",
@@ -23,7 +24,8 @@ public class DiagnosticInfoTests
         "Other message '{0}'",
         "Test",
         DiagnosticSeverity.Error,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true
+    );
 #pragma warning restore RS2008
 
     [Test]

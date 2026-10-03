@@ -27,7 +27,9 @@ public static class GeneratorHarness
         parseOptions ??= CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Latest);
 
         var trees = sources
-            .Select((text, i) => CSharpSyntaxTree.ParseText(text, parseOptions, path: $"Source{i}.cs"))
+            .Select(
+                (text, i) => CSharpSyntaxTree.ParseText(text, parseOptions, path: $"Source{i}.cs")
+            )
             .ToList();
 
         var references = PlatformReferences.Value.Concat(additionalReferences ?? []).ToList();
@@ -36,8 +38,10 @@ public static class GeneratorHarness
             "HarnessCompilation",
             trees,
             references,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions: NullableContextOptions.Enable)
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable
+            )
         );
 
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
@@ -45,8 +49,10 @@ public static class GeneratorHarness
             additionalTexts: null,
             parseOptions: parseOptions,
             optionsProvider: null,
-            driverOptions: new GeneratorDriverOptions(IncrementalGeneratorOutputKind.None,
-                trackIncrementalGeneratorSteps: true)
+            driverOptions: new GeneratorDriverOptions(
+                IncrementalGeneratorOutputKind.None,
+                trackIncrementalGeneratorSteps: true
+            )
         );
 
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out _);
@@ -56,7 +62,8 @@ public static class GeneratorHarness
         if (failures.Count > 0)
         {
             throw new GeneratorTestException(
-                "Generator threw:" + string.Concat(failures.Select(f => Environment.NewLine + f.Exception))
+                "Generator threw:"
+                    + string.Concat(failures.Select(f => Environment.NewLine + f.Exception))
             );
         }
 
@@ -64,7 +71,8 @@ public static class GeneratorHarness
         // markers) resolves; errors are grouped by whether their tree was part of the input.
         var inputTrees = compilation.SyntaxTrees.ToHashSet();
         var allErrors = Errors(output);
-        var inputErrors = allErrors.Where(e => e.Location.SourceTree is not { } tree || inputTrees.Contains(tree))
+        var inputErrors = allErrors
+            .Where(e => e.Location.SourceTree is not { } tree || inputTrees.Contains(tree))
             .ToList();
         var outputErrors = allErrors.Where(e => !inputErrors.Contains(e)).ToList();
         if (inputErrors.Count > 0 || outputErrors.Count > 0)
@@ -84,7 +92,14 @@ public static class GeneratorHarness
             }
         }
 
-        return new GeneratorHarnessResult(generated, runResult.Diagnostics, output, driver, compilation, runResult);
+        return new GeneratorHarnessResult(
+            generated,
+            runResult.Diagnostics,
+            output,
+            driver,
+            compilation,
+            runResult
+        );
     }
 
     /// <inheritdoc cref="AssertCacheable(IIncrementalGenerator, IEnumerable{string}, IEnumerable{string}, IEnumerable{MetadataReference}?, CSharpParseOptions?)"/>
@@ -118,8 +133,15 @@ public static class GeneratorHarness
         IEnumerable<string> trackedStepNames,
         IEnumerable<MetadataReference>? additionalReferences = null,
         CSharpParseOptions? parseOptions = null
-    ) => AssertCacheable(generator, sources, trackedStepNames, new CacheabilityOptions(), additionalReferences,
-        parseOptions);
+    ) =>
+        AssertCacheable(
+            generator,
+            sources,
+            trackedStepNames,
+            new CacheabilityOptions(),
+            additionalReferences,
+            parseOptions
+        );
 
     /// <summary>
     /// As the other overloads, with the extra scenarios and strictness of <paramref name="options"/>.
@@ -157,14 +179,18 @@ public static class GeneratorHarness
         var names = trackedStepNames.ToList();
         if (names.Count == 0)
         {
-            throw new GeneratorTestException("AssertCacheable needs at least one tracked step name");
+            throw new GeneratorTestException(
+                "AssertCacheable needs at least one tracked step name"
+            );
         }
 
         if (options.UnrelatedEditSourceIndex is { } index)
         {
             if (sourceList.Count < 2)
             {
-                throw new GeneratorTestException("UnrelatedEditSourceIndex needs at least two sources");
+                throw new GeneratorTestException(
+                    "UnrelatedEditSourceIndex needs at least two sources"
+                );
             }
 
             if (index < 1 || index >= sourceList.Count)
@@ -183,7 +209,7 @@ public static class GeneratorHarness
         {
             throw new GeneratorTestException(
                 $"Tracked step(s) not found: {string.Join(", ", unknown)}. "
-                + $"Steps that exist: {string.Join(", ", known.Keys.OrderBy(k => k, StringComparer.Ordinal))}."
+                    + $"Steps that exist: {string.Join(", ", known.Keys.OrderBy(k => k, StringComparer.Ordinal))}."
             );
         }
 
@@ -258,14 +284,17 @@ public static class GeneratorHarness
         if (result.Exception is not null)
         {
             throw new GeneratorTestException(
-                $"Generator threw in run {run} after {scenario}:{Environment.NewLine}{result.Exception}");
+                $"Generator threw in run {run} after {scenario}:{Environment.NewLine}{result.Exception}"
+            );
         }
 
         foreach (var name in stepNames)
         {
             if (!result.TrackedSteps.TryGetValue(name, out var steps))
             {
-                throw new GeneratorTestException($"Step '{name}' did not run in run {run} after {scenario}.");
+                throw new GeneratorTestException(
+                    $"Step '{name}' did not run in run {run} after {scenario}."
+                );
             }
 
             var unchanged = 0;
@@ -274,9 +303,16 @@ public static class GeneratorHarness
                 for (var i = 0; i < step.Outputs.Length; i++)
                 {
                     var reason = step.Outputs[i].Reason;
-                    if (reason is not (IncrementalStepRunReason.Cached or IncrementalStepRunReason.Unchanged))
+                    if (
+                        reason
+                        is not (
+                            IncrementalStepRunReason.Cached
+                            or IncrementalStepRunReason.Unchanged
+                        )
+                    )
                     {
-                        var hazard = CachingHazardWalker.FindHazard(step.Outputs[i].Value) is { } found
+                        var hazard = CachingHazardWalker.FindHazard(step.Outputs[i].Value)
+                            is { } found
                             ? $" The output holds a caching hazard at {found.Path}: {found.Reason}."
                             : "";
                         throw new GeneratorTestException(
@@ -295,8 +331,8 @@ public static class GeneratorHarness
             {
                 throw new GeneratorTestException(
                     $"Step '{name}' run {run} had no Unchanged output after {scenario}, so it did not re-run for the edited source; "
-                    + "RequireRecomputationAfterTriviaEdit needs the per-item model step named "
-                    + "(an aggregate such as Collect over unchanged items reports Cached)."
+                        + "RequireRecomputationAfterTriviaEdit needs the per-item model step named "
+                        + "(an aggregate such as Collect over unchanged items reports Cached)."
                 );
             }
         }
@@ -315,7 +351,11 @@ public static class GeneratorHarness
     private static List<Diagnostic> Errors(Compilation compilation) =>
         compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
 
-    private static void AppendErrors(System.Text.StringBuilder message, string heading, List<Diagnostic> errors)
+    private static void AppendErrors(
+        System.Text.StringBuilder message,
+        string heading,
+        List<Diagnostic> errors
+    )
     {
         if (errors.Count == 0)
         {
@@ -332,9 +372,7 @@ public static class GeneratorHarness
     private static string Format(Diagnostic diagnostic)
     {
         var span = diagnostic.Location.GetLineSpan();
-        var file = span.Path.Length == 0
-            ? "<no file>"
-            : span.Path;
+        var file = span.Path.Length == 0 ? "<no file>" : span.Path;
         return $"{file}:{span.StartLinePosition.Line + 1}: {diagnostic.Id}: {diagnostic.GetMessage()}";
     }
 }

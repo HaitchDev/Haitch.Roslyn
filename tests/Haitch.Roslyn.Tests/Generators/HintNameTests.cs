@@ -10,20 +10,21 @@ namespace Haitch.Roslyn.Tests.Generators;
 public class HintNameTests
 {
     private const string Shapes = """
-                                  namespace My.App
-                                  {
-                                      public class Foo { }
-                                      public class Foo<T> { }
-                                      public class Outer<T> { public class Inner<U> { } public class Plain { } }
-                                  }
-                                  namespace A { public class B { public class X { } } }
-                                  public class Global { }
-                                  public class Global<T, U> { }
-                                  """;
+        namespace My.App
+        {
+            public class Foo { }
+            public class Foo<T> { }
+            public class Outer<T> { public class Inner<U> { } public class Plain { } }
+        }
+        namespace A { public class B { public class X { } } }
+        public class Global { }
+        public class Global<T, U> { }
+        """;
 
     private const string NamespacedSource = "namespace A.B { public class X { } }";
 
-    private const string CaseSource = "namespace My.App { public class Foo { } public class foo { } }";
+    private const string CaseSource =
+        "namespace My.App { public class Foo { } public class foo { } }";
 
     private const string GlobalSource = "public class Foo { }";
 
@@ -34,7 +35,10 @@ public class HintNameTests
     [Arguments("My.App.Outer`1+Plain", "My.App.Outer`1+Plain.Equality.g.cs")]
     [Arguments("Global", "Global.Equality.g.cs")]
     [Arguments("Global`2", "Global`2.Equality.g.cs")]
-    public async Task Should_format_the_hint_name_for_each_type_shape(string metadataName, string expected)
+    public async Task Should_format_the_hint_name_for_each_type_shape(
+        string metadataName,
+        string expected
+    )
     {
         TypeModel model = ModelFor(metadataName);
 
@@ -46,7 +50,8 @@ public class HintNameTests
     {
         string namespaced = HintName.For(
             TypeModel.From(CompilationHelper.GetNamedTypeSymbol(NamespacedSource, "A.B.X")),
-            "Equality");
+            "Equality"
+        );
         string nested = HintName.For(ModelFor("A.B+X"), "Equality");
 
         await Assert.That(namespaced).IsNotEqualTo(nested);
@@ -99,9 +104,11 @@ public class HintNameTests
     [Arguments("My.App.foo", "My.App.foo.49529bac.Equality.g.cs")]
     public async Task Should_place_a_pinned_hash_before_the_suffix_when_disambiguating(
         string metadataName,
-        string expected)
+        string expected
+    )
     {
-        await Assert.That(HintName.For(CaseModel(metadataName), "Equality", disambiguateCase: true))
+        await Assert
+            .That(HintName.For(CaseModel(metadataName), "Equality", disambiguateCase: true))
             .IsEqualTo(expected);
     }
 
@@ -110,7 +117,8 @@ public class HintNameTests
     {
         TypeModel model = TypeModel.From(CompilationHelper.GetNamedTypeSymbol(GlobalSource, "Foo"));
 
-        await Assert.That(HintName.For(model, "Equality", disambiguateCase: true))
+        await Assert
+            .That(HintName.For(model, "Equality", disambiguateCase: true))
             .IsEqualTo("Foo.0c7e1677.Equality.g.cs");
     }
 
@@ -119,9 +127,11 @@ public class HintNameTests
     {
         TypeModel model = CaseModel("My.App.Foo");
 
-        await Assert.That(HintName.For(model, "Equality", disambiguateCase: true))
+        await Assert
+            .That(HintName.For(model, "Equality", disambiguateCase: true))
             .IsEqualTo("My.App.Foo.abdd334c.Equality.g.cs");
-        await Assert.That(HintName.For(model, "Json", disambiguateCase: true))
+        await Assert
+            .That(HintName.For(model, "Json", disambiguateCase: true))
             .IsEqualTo("My.App.Foo.abdd334c.Json.g.cs");
     }
 
@@ -130,14 +140,18 @@ public class HintNameTests
     {
         TypeModel model = ModelFor("My.App.Outer`1+Inner`1");
 
-        await Assert.That(HintName.For(model, "Equality", disambiguateCase: true))
+        await Assert
+            .That(HintName.For(model, "Equality", disambiguateCase: true))
             .IsEqualTo("My.App.Outer`1+Inner`1.2074b1e4.Equality.g.cs");
     }
 
     [Test]
     public async Task Should_produce_two_files_when_a_generator_adds_case_only_variants_with_disambiguation()
     {
-        GeneratorHarnessResult result = GeneratorHarness.Run(new CaseVariantGenerator(true), [CaseSource]);
+        GeneratorHarnessResult result = GeneratorHarness.Run(
+            new CaseVariantGenerator(true),
+            [CaseSource]
+        );
 
         await Assert.That(result.RunResult.GeneratedTrees.Length).IsEqualTo(2);
     }
@@ -145,7 +159,8 @@ public class HintNameTests
     [Test]
     public async Task Should_make_AddSource_reject_case_only_variants_without_disambiguation()
     {
-        await Assert.That(() => GeneratorHarness.Run(new CaseVariantGenerator(false), [CaseSource]))
+        await Assert
+            .That(() => GeneratorHarness.Run(new CaseVariantGenerator(false), [CaseSource]))
             .Throws<GeneratorTestException>();
     }
 
@@ -177,14 +192,20 @@ public class HintNameTests
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            context.RegisterSourceOutput(context.CompilationProvider, (ctx, compilation) =>
-            {
-                foreach (string name in new[] { "My.App.Foo", "My.App.foo" })
+            context.RegisterSourceOutput(
+                context.CompilationProvider,
+                (ctx, compilation) =>
                 {
-                    TypeModel model = TypeModel.From(compilation.GetTypeByMetadataName(name)!);
-                    ctx.AddSource(HintName.For(model, "Equality", disambiguateCase), "// generated");
+                    foreach (string name in new[] { "My.App.Foo", "My.App.foo" })
+                    {
+                        TypeModel model = TypeModel.From(compilation.GetTypeByMetadataName(name)!);
+                        ctx.AddSource(
+                            HintName.For(model, "Equality", disambiguateCase),
+                            "// generated"
+                        );
+                    }
                 }
-            });
+            );
         }
     }
 
@@ -192,13 +213,19 @@ public class HintNameTests
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            context.RegisterSourceOutput(context.CompilationProvider, (ctx, compilation) =>
-            {
-                foreach (INamedTypeSymbol type in Walk(compilation.Assembly.GlobalNamespace))
+            context.RegisterSourceOutput(
+                context.CompilationProvider,
+                (ctx, compilation) =>
                 {
-                    ctx.AddSource(HintName.For(TypeModel.From(type), "Equality"), "// generated");
+                    foreach (INamedTypeSymbol type in Walk(compilation.Assembly.GlobalNamespace))
+                    {
+                        ctx.AddSource(
+                            HintName.For(TypeModel.From(type), "Equality"),
+                            "// generated"
+                        );
+                    }
                 }
-            });
+            );
         }
 
         private static IEnumerable<INamedTypeSymbol> Walk(INamespaceOrTypeSymbol container)

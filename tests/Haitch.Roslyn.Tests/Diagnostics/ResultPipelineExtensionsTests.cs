@@ -37,7 +37,8 @@ public class ResultPipelineExtensionsTests
             new TestGenerator(),
             ["class Widget { }", "class OtherWidget { }"],
             [TestGenerator.ValuesStepName],
-            options: new CacheabilityOptions { RequireRecomputationAfterTriviaEdit = true });
+            options: new CacheabilityOptions { RequireRecomputationAfterTriviaEdit = true }
+        );
     }
 
     private static GeneratorDriverRunResult RunGenerator(string source)
@@ -55,6 +56,7 @@ public class ResultPipelineExtensionsTests
             "Tests",
             trees,
             [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+        );
     }
 }

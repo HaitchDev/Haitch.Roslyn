@@ -86,8 +86,7 @@ public class TypeModelTests
     [Test]
     public async Task Should_capture_the_containing_type_chain_for_a_nested_type()
     {
-        const string source =
-            """
+        const string source = """
             namespace Example;
 
             public class Outer<T>
@@ -99,7 +98,10 @@ public class TypeModelTests
             }
             """;
 
-        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "Example.Outer`1+Inner+Innermost");
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(
+            source,
+            "Example.Outer`1+Inner+Innermost"
+        );
 
         TypeModel model = TypeModel.From(type);
 
@@ -116,8 +118,7 @@ public class TypeModelTests
     [Test]
     public async Task Should_capture_generic_constraints_on_the_types_own_type_parameters()
     {
-        const string source =
-            """
+        const string source = """
             namespace Example;
 
             public class Sample<T> where T : class, new()
@@ -152,8 +153,7 @@ public class TypeModelTests
     [Test]
     public async Task Should_capture_static_abstract_and_sealed_modifiers()
     {
-        const string source =
-            """
+        const string source = """
             namespace Example;
 
             public static class StaticSample { }
@@ -163,9 +163,18 @@ public class TypeModelTests
             public sealed class SealedSample { }
             """;
 
-        INamedTypeSymbol staticType = CompilationHelper.GetNamedTypeSymbol(source, "Example.StaticSample");
-        INamedTypeSymbol abstractType = CompilationHelper.GetNamedTypeSymbol(source, "Example.AbstractSample");
-        INamedTypeSymbol sealedType = CompilationHelper.GetNamedTypeSymbol(source, "Example.SealedSample");
+        INamedTypeSymbol staticType = CompilationHelper.GetNamedTypeSymbol(
+            source,
+            "Example.StaticSample"
+        );
+        INamedTypeSymbol abstractType = CompilationHelper.GetNamedTypeSymbol(
+            source,
+            "Example.AbstractSample"
+        );
+        INamedTypeSymbol sealedType = CompilationHelper.GetNamedTypeSymbol(
+            source,
+            "Example.SealedSample"
+        );
 
         TypeModel staticModel = TypeModel.From(staticType);
         TypeModel abstractModel = TypeModel.From(abstractType);
@@ -229,8 +238,7 @@ public class TypeModelTests
     [Test]
     public async Task Should_capture_is_read_only_and_is_ref_like_type_on_containing_types()
     {
-        const string readOnlySource =
-            """
+        const string readOnlySource = """
             namespace Example;
 
             public readonly struct Outer
@@ -239,8 +247,7 @@ public class TypeModelTests
             }
             """;
 
-        const string refStructSource =
-            """
+        const string refStructSource = """
             namespace Example;
 
             public ref struct RefOuter
@@ -249,9 +256,14 @@ public class TypeModelTests
             }
             """;
 
-        INamedTypeSymbol readOnlyInner = CompilationHelper.GetNamedTypeSymbol(readOnlySource, "Example.Outer+Inner");
-        INamedTypeSymbol refStructInner =
-            CompilationHelper.GetNamedTypeSymbol(refStructSource, "Example.RefOuter+Inner");
+        INamedTypeSymbol readOnlyInner = CompilationHelper.GetNamedTypeSymbol(
+            readOnlySource,
+            "Example.Outer+Inner"
+        );
+        INamedTypeSymbol refStructInner = CompilationHelper.GetNamedTypeSymbol(
+            refStructSource,
+            "Example.RefOuter+Inner"
+        );
 
         TypeModel readOnlyModel = TypeModel.From(readOnlyInner);
         TypeModel refStructModel = TypeModel.From(refStructInner);
@@ -263,8 +275,7 @@ public class TypeModelTests
     [Test]
     public async Task Should_capture_field_property_and_method_members_when_included()
     {
-        const string source =
-            """
+        const string source = """
             namespace Example;
 
             public class Sample
@@ -292,8 +303,7 @@ public class TypeModelTests
     [Test]
     public async Task Should_include_explicit_interface_implementations_when_members_are_included()
     {
-        const string source =
-            """
+        const string source = """
             namespace Example;
 
             public interface IFoo
@@ -322,19 +332,26 @@ public class TypeModelTests
 
         await Assert.That(model.Methods.Count).IsEqualTo(2);
         await Assert.That(model.Properties.Count).IsEqualTo(2);
-        await Assert.That(dispose.ExplicitInterface!.FullyQualifiedName).IsEqualTo("global::System.IDisposable");
+        await Assert
+            .That(dispose.ExplicitInterface!.FullyQualifiedName)
+            .IsEqualTo("global::System.IDisposable");
         await Assert.That(dispose.ExplicitInterfaceMemberName).IsEqualTo("Dispose");
-        await Assert.That(bar.ExplicitInterface!.FullyQualifiedName).IsEqualTo("global::Example.IFoo");
+        await Assert
+            .That(bar.ExplicitInterface!.FullyQualifiedName)
+            .IsEqualTo("global::Example.IFoo");
         await Assert.That(bar.ExplicitInterfaceMemberName).IsEqualTo("Bar");
-        await Assert.That(model.Methods.Single(m => m.Name == "Ordinary").ExplicitInterface).IsNull();
-        await Assert.That(model.Properties.Single(p => p.Name == "Plain").ExplicitInterface).IsNull();
+        await Assert
+            .That(model.Methods.Single(m => m.Name == "Ordinary").ExplicitInterface)
+            .IsNull();
+        await Assert
+            .That(model.Properties.Single(p => p.Name == "Plain").ExplicitInterface)
+            .IsNull();
     }
 
     [Test]
     public async Task Should_leave_member_arrays_empty_when_include_members_is_false()
     {
-        const string source =
-            """
+        const string source = """
             namespace Example;
 
             public class Sample
@@ -361,8 +378,7 @@ public class TypeModelTests
     [Test]
     public async Task Should_exclude_implicitly_declared_members_for_a_record()
     {
-        const string source =
-            """
+        const string source = """
             namespace Example;
 
             public record Sample(string Name)
@@ -384,8 +400,7 @@ public class TypeModelTests
     [Test]
     public async Task Should_skip_indexers_when_members_are_included()
     {
-        const string source =
-            """
+        const string source = """
             namespace Example;
 
             public class Sample
@@ -427,8 +442,7 @@ public class TypeModelTests
     [Test]
     public async Task Should_be_equal_across_two_compilations_of_the_same_source()
     {
-        const string source =
-            """
+        const string source = """
             namespace Example;
 
             [System.Obsolete]
@@ -455,22 +469,28 @@ public class TypeModelTests
     [Test]
     public async Task Should_throw_when_the_token_is_cancelled_while_capturing_members()
     {
-        const string source = "namespace Example; public class Sample { public int F; public int P { get; set; } public void M(int x) { } }";
+        const string source =
+            "namespace Example; public class Sample { public int F; public int P { get; set; } public void M(int x) { } }";
         INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "Example.Sample");
         CancellationToken cancelled = new CancellationToken(canceled: true);
 
-        await Assert.That(() => TypeModel.From(type, includeMembers: true, cancelled)).Throws<OperationCanceledException>();
+        await Assert
+            .That(() => TypeModel.From(type, includeMembers: true, cancelled))
+            .Throws<OperationCanceledException>();
     }
 
     [Test]
     public async Task Should_throw_when_the_token_is_cancelled_while_capturing_a_method()
     {
-        const string source = "namespace Example; public class Sample { public void M<T>(int x, T y) { } }";
+        const string source =
+            "namespace Example; public class Sample { public void M<T>(int x, T y) { } }";
         INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "Example.Sample");
         IMethodSymbol method = type.GetMembers("M").OfType<IMethodSymbol>().Single();
         CancellationToken cancelled = new CancellationToken(canceled: true);
 
-        await Assert.That(() => MethodModel.From(method, cancelled)).Throws<OperationCanceledException>();
+        await Assert
+            .That(() => MethodModel.From(method, cancelled))
+            .Throws<OperationCanceledException>();
     }
 
     [Test]
@@ -481,11 +501,17 @@ public class TypeModelTests
     {
         INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(
             $"namespace Example; public class Sample {{ {member} }}",
-            "Example.Sample");
+            "Example.Sample"
+        );
         using CancellationTokenSource cancelWhenMembersAreRead = new CancellationTokenSource();
-        INamedTypeSymbol proxy = CancellingSymbolProxy.Create(type, nameof(INamespaceOrTypeSymbol.GetMembers), cancelWhenMembersAreRead);
+        INamedTypeSymbol proxy = CancellingSymbolProxy.Create(
+            type,
+            nameof(INamespaceOrTypeSymbol.GetMembers),
+            cancelWhenMembersAreRead
+        );
 
-        await Assert.That(() => TypeModel.From(proxy, includeMembers: true, cancelWhenMembersAreRead.Token))
+        await Assert
+            .That(() => TypeModel.From(proxy, includeMembers: true, cancelWhenMembersAreRead.Token))
             .Throws<OperationCanceledException>();
     }
 
@@ -494,12 +520,18 @@ public class TypeModelTests
     {
         INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(
             "namespace Example; public class Sample { public void M(int x) { } }",
-            "Example.Sample");
+            "Example.Sample"
+        );
         IMethodSymbol method = type.GetMembers("M").OfType<IMethodSymbol>().Single();
         using CancellationTokenSource cancelWhenParametersAreRead = new CancellationTokenSource();
-        IMethodSymbol proxy = CancellingSymbolProxy.Create(method, "get_Parameters", cancelWhenParametersAreRead);
+        IMethodSymbol proxy = CancellingSymbolProxy.Create(
+            method,
+            "get_Parameters",
+            cancelWhenParametersAreRead
+        );
 
-        await Assert.That(() => MethodModel.From(proxy, cancelWhenParametersAreRead.Token))
+        await Assert
+            .That(() => MethodModel.From(proxy, cancelWhenParametersAreRead.Token))
             .Throws<OperationCanceledException>();
     }
 
@@ -508,26 +540,37 @@ public class TypeModelTests
     {
         INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(
             "namespace Example; public class Sample { public void M<T>() { } }",
-            "Example.Sample");
+            "Example.Sample"
+        );
         IMethodSymbol method = type.GetMembers("M").OfType<IMethodSymbol>().Single();
-        using CancellationTokenSource cancelWhenTypeParametersAreRead = new CancellationTokenSource();
-        IMethodSymbol proxy = CancellingSymbolProxy.Create(method, "get_TypeParameters", cancelWhenTypeParametersAreRead);
+        using CancellationTokenSource cancelWhenTypeParametersAreRead =
+            new CancellationTokenSource();
+        IMethodSymbol proxy = CancellingSymbolProxy.Create(
+            method,
+            "get_TypeParameters",
+            cancelWhenTypeParametersAreRead
+        );
 
-        await Assert.That(() => MethodModel.From(proxy, cancelWhenTypeParametersAreRead.Token))
+        await Assert
+            .That(() => MethodModel.From(proxy, cancelWhenTypeParametersAreRead.Token))
             .Throws<OperationCanceledException>();
     }
 
     [Test]
     public async Task Should_produce_an_equal_model_when_the_token_is_not_cancelled()
     {
-        const string source = "namespace Example; public class Sample { public int F; public int P { get; set; } public void M<T>(int x, T y) { } }";
+        const string source =
+            "namespace Example; public class Sample { public int F; public int P { get; set; } public void M<T>(int x, T y) { } }";
         INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, "Example.Sample");
         IMethodSymbol method = type.GetMembers("M").OfType<IMethodSymbol>().Single();
         using CancellationTokenSource source1 = new CancellationTokenSource();
 
-        await Assert.That(TypeModel.From(type, includeMembers: true, source1.Token))
+        await Assert
+            .That(TypeModel.From(type, includeMembers: true, source1.Token))
             .IsEqualTo(TypeModel.From(type, includeMembers: true));
-        await Assert.That(MethodModel.From(method, source1.Token)).IsEqualTo(MethodModel.From(method));
+        await Assert
+            .That(MethodModel.From(method, source1.Token))
+            .IsEqualTo(MethodModel.From(method));
     }
 
     // file-local types are mangled at the metadata level, so GetTypeByMetadataName can't find them;
@@ -538,7 +581,8 @@ public class TypeModelTests
         SyntaxTree syntaxTree = compilation.SyntaxTrees.Single();
         SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree);
 
-        ClassDeclarationSyntax declaration = syntaxTree.GetRoot()
+        ClassDeclarationSyntax declaration = syntaxTree
+            .GetRoot()
             .DescendantNodes()
             .OfType<ClassDeclarationSyntax>()
             .Single(node => node.Identifier.Text == typeName);

@@ -17,7 +17,8 @@ public class GeneratorHarnessTests
     );
 #pragma warning restore RS2008
 
-    private sealed class FixtureGenerator(string hintName, string source, bool report = false) : IIncrementalGenerator
+    private sealed class FixtureGenerator(string hintName, string source, bool report = false)
+        : IIncrementalGenerator
     {
         public void Initialize(IncrementalGeneratorInitializationContext context) =>
             context.RegisterSourceOutput(
@@ -54,7 +55,10 @@ public class GeneratorHarnessTests
     [Test]
     public async Task Should_return_generator_reported_diagnostics_without_throwing()
     {
-        var result = GeneratorHarness.Run(new FixtureGenerator("Hello.g.cs", "class Hello { }", report: true), []);
+        var result = GeneratorHarness.Run(
+            new FixtureGenerator("Hello.g.cs", "class Hello { }", report: true),
+            []
+        );
 
         await Assert.That(result.Diagnostics.Length).IsEqualTo(1);
         await Assert.That(result.Diagnostics[0].Id).IsEqualTo("HR9001");
@@ -63,7 +67,10 @@ public class GeneratorHarnessTests
     [Test]
     public async Task Should_expose_the_driver_and_run_result()
     {
-        var result = GeneratorHarness.Run(new FixtureGenerator("Hello.g.cs", "class Hello { }"), []);
+        var result = GeneratorHarness.Run(
+            new FixtureGenerator("Hello.g.cs", "class Hello { }"),
+            []
+        );
 
         await Assert.That(result.Driver).IsNotNull();
         await Assert.That(result.RunResult.GeneratedTrees.Length).IsEqualTo(1);
@@ -111,7 +118,10 @@ public class GeneratorHarnessTests
     {
         var generator = new DelegateGenerator(context =>
             context.RegisterPostInitializationOutput(ctx =>
-                ctx.AddSource("Marker.g.cs", "internal sealed class MarkerAttribute : System.Attribute { }")
+                ctx.AddSource(
+                    "Marker.g.cs",
+                    "internal sealed class MarkerAttribute : System.Attribute { }"
+                )
             )
         );
 
@@ -125,7 +135,10 @@ public class GeneratorHarnessTests
     {
         var generator = new DelegateGenerator(context =>
             context.RegisterPostInitializationOutput(ctx =>
-                ctx.AddSource("Marker.g.cs", "internal sealed class MarkerAttribute : System.Attribute { }")
+                ctx.AddSource(
+                    "Marker.g.cs",
+                    "internal sealed class MarkerAttribute : System.Attribute { }"
+                )
             )
         );
 
@@ -156,7 +169,10 @@ public class GeneratorHarnessTests
     [Test]
     public async Task Should_expose_the_input_compilation_without_generated_trees()
     {
-        var result = GeneratorHarness.Run(new FixtureGenerator("Hello.g.cs", "class Hello { }"), ["class Input { }"]);
+        var result = GeneratorHarness.Run(
+            new FixtureGenerator("Hello.g.cs", "class Hello { }"),
+            ["class Input { }"]
+        );
 
         await Assert.That(result.InputCompilation.SyntaxTrees.Count()).IsEqualTo(1);
         await Assert.That(result.Compilation.SyntaxTrees.Count()).IsEqualTo(2);
@@ -187,8 +203,13 @@ public class GeneratorHarnessTests
     {
         var generator = new DelegateGenerator(context =>
         {
-            var named = context.CompilationProvider.Select((c, _) => c.AssemblyName).WithTrackingName("x");
-            context.RegisterSourceOutput(named, (ctx, _) => ctx.AddSource("Hello.g.cs", "class Hello { }"));
+            var named = context
+                .CompilationProvider.Select((c, _) => c.AssemblyName)
+                .WithTrackingName("x");
+            context.RegisterSourceOutput(
+                named,
+                (ctx, _) => ctx.AddSource("Hello.g.cs", "class Hello { }")
+            );
         });
 
         var result = GeneratorHarness.Run(generator, []);

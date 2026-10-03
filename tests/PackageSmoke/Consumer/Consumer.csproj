@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
         <LangVersion>14</LangVersion>
@@ -13,10 +12,13 @@
         <!-- Haitch.Roslyn ships as contentFiles and deliberately does not flow Microsoft.CodeAnalysis
              as a transitive dependency (PrivateAssets="all" on the source project); a real generator
              project brings its own Roslyn reference, so the consumer must too. -->
-        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0" PrivateAssets="all"/>
+        <PackageReference
+            Include="Microsoft.CodeAnalysis.CSharp"
+            Version="4.12.0"
+            PrivateAssets="all"
+        />
         <!-- HaitchRoslynPackageVersion is supplied per run via -p: by PackageSmokeTests so the
              consumer always restores the freshly packed version, never a cached one. -->
-        <PackageReference Include="Haitch.Roslyn" Version="$(HaitchRoslynPackageVersion)"/>
+        <PackageReference Include="Haitch.Roslyn" Version="$(HaitchRoslynPackageVersion)" />
     </ItemGroup>
-
 </Project>

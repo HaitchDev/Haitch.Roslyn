@@ -26,29 +26,39 @@ internal static class CompilationHelper
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable,
-                allowUnsafe: true));
+                allowUnsafe: true
+            )
+        );
 
-        Diagnostic[] errors = compilation.GetDiagnostics()
+        Diagnostic[] errors = compilation
+            .GetDiagnostics()
             .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .ToArray();
 
         if (!allowErrors && errors.Length > 0)
         {
             throw new InvalidOperationException(
-                $"Source failed to compile:{Environment.NewLine}{string.Join(Environment.NewLine, errors)}");
+                $"Source failed to compile:{Environment.NewLine}{string.Join(Environment.NewLine, errors)}"
+            );
         }
 
         return compilation;
     }
 
-    public static INamedTypeSymbol GetNamedTypeSymbol(string source, string metadataName, bool allowErrors = false)
+    public static INamedTypeSymbol GetNamedTypeSymbol(
+        string source,
+        string metadataName,
+        bool allowErrors = false
+    )
     {
         CSharpCompilation compilation = Compile(source, allowErrors);
         INamedTypeSymbol? symbol = compilation.GetTypeByMetadataName(metadataName);
 
         if (symbol is null)
         {
-            throw new InvalidOperationException($"Type '{metadataName}' was not found in the compiled source.");
+            throw new InvalidOperationException(
+                $"Type '{metadataName}' was not found in the compiled source."
+            );
         }
 
         return symbol;

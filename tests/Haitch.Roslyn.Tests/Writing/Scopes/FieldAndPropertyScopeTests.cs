@@ -10,8 +10,7 @@ namespace Haitch.Roslyn.Tests.Writing.Scopes;
 
 public class FieldAndPropertyScopeTests
 {
-    private const string MemberSource =
-        """
+    private const string MemberSource = """
         public enum Color { Red = 1 }
 
         public abstract class Source
@@ -87,7 +86,8 @@ public class FieldAndPropertyScopeTests
     private static string RenderInInterface(WriteMembers write)
     {
         TypeModel model = TypeModel.From(
-            CompilationHelper.GetNamedTypeSymbol("public partial interface ISample { }", "ISample"));
+            CompilationHelper.GetNamedTypeSymbol("public partial interface ISample { }", "ISample")
+        );
 
         return RenderIn(model, "partial interface ISample", write);
     }
@@ -116,7 +116,9 @@ public class FieldAndPropertyScopeTests
 
         await Assert
             .That(body)
-            .IsEqualTo("    private static readonly global::System.Collections.Generic.List<int> Cache = new();\n");
+            .IsEqualTo(
+                "    private static readonly global::System.Collections.Generic.List<int> Cache = new();\n"
+            );
     }
 
     [Test]
@@ -150,7 +152,8 @@ public class FieldAndPropertyScopeTests
         await Assert
             .That(body)
             .IsEqualTo(
-                "    public const string Label = \"a\\\"b\";\n\n    public const global::Color Default = (global::Color)1;\n");
+                "    public const string Label = \"a\\\"b\";\n\n    public const global::Color Default = (global::Color)1;\n"
+            );
     }
 
     [Test]
@@ -164,7 +167,9 @@ public class FieldAndPropertyScopeTests
 
         await Assert
             .That(body)
-            .IsEqualTo("    public required int Id;\n\n    protected internal readonly string? Note;\n");
+            .IsEqualTo(
+                "    public required int Id;\n\n    protected internal readonly string? Note;\n"
+            );
     }
 
     [Test]
@@ -183,10 +188,12 @@ public class FieldAndPropertyScopeTests
     {
         FieldModel field = FieldFrom("Max") with { ConstantValue = null };
 
-        await Assert.That(() =>
-        {
-            Render(type => type.Field(field));
-        }).Throws<ArgumentException>();
+        await Assert
+            .That(() =>
+            {
+                Render(type => type.Field(field));
+            })
+            .Throws<ArgumentException>();
     }
 
     [Test]
@@ -237,12 +244,12 @@ public class FieldAndPropertyScopeTests
         await Assert
             .That(body)
             .IsEqualTo(
-                "    public static int Shared { get; set; }\n\n    public int ReadOnly { get; }\n\n    public virtual int Virt { get; set; }\n");
+                "    public static int Shared { get; set; }\n\n    public int ReadOnly { get; }\n\n    public virtual int Virt { get; set; }\n"
+            );
     }
 
     [Test]
-    public async Task
-        Should_render_override_and_sealed_override_properties_and_accessor_accessibility_relative_to_the_property()
+    public async Task Should_render_override_and_sealed_override_properties_and_accessor_accessibility_relative_to_the_property()
     {
         string body = Render(type =>
         {
@@ -254,7 +261,8 @@ public class FieldAndPropertyScopeTests
         await Assert
             .That(body)
             .IsEqualTo(
-                "    public override int Virt { get; set; }\n\n    public sealed override int Abs { get; set; }\n\n    protected internal int Wide { get; protected set; }\n");
+                "    public override int Virt { get; set; }\n\n    public sealed override int Abs { get; set; }\n\n    protected internal int Wide { get; protected set; }\n"
+            );
     }
 
     [Test]
@@ -284,10 +292,12 @@ public class FieldAndPropertyScopeTests
     {
         PropertyModel property = PropertyFrom("Count") with { Accessors = default };
 
-        await Assert.That(() =>
-        {
-            Render(type => type.AutoProperty(property));
-        }).Throws<ArgumentException>();
+        await Assert
+            .That(() =>
+            {
+                Render(type => type.AutoProperty(property));
+            })
+            .Throws<ArgumentException>();
     }
 
     [Test]
@@ -295,23 +305,31 @@ public class FieldAndPropertyScopeTests
     {
         PropertyModel setOnly = PropertyFrom("Count") with
         {
-            Accessors = new[] { new PropertyAccessorModel(PropertyAccessorKind.Set, Accessibility.Public) }
-                .ToEquatableArray(),
+            Accessors = new[]
+            {
+                new PropertyAccessorModel(PropertyAccessorKind.Set, Accessibility.Public),
+            }.ToEquatableArray(),
         };
         PropertyModel initOnly = setOnly with
         {
-            Accessors = new[] { new PropertyAccessorModel(PropertyAccessorKind.Init, Accessibility.Public) }
-                .ToEquatableArray(),
+            Accessors = new[]
+            {
+                new PropertyAccessorModel(PropertyAccessorKind.Init, Accessibility.Public),
+            }.ToEquatableArray(),
         };
 
-        await Assert.That(() =>
-        {
-            Render(type => type.AutoProperty(setOnly));
-        }).Throws<ArgumentException>();
-        await Assert.That(() =>
-        {
-            Render(type => type.AutoProperty(initOnly));
-        }).Throws<ArgumentException>();
+        await Assert
+            .That(() =>
+            {
+                Render(type => type.AutoProperty(setOnly));
+            })
+            .Throws<ArgumentException>();
+        await Assert
+            .That(() =>
+            {
+                Render(type => type.AutoProperty(initOnly));
+            })
+            .Throws<ArgumentException>();
     }
 
     [Test]
@@ -320,14 +338,22 @@ public class FieldAndPropertyScopeTests
         PropertyModel property = PropertyFrom("Count") with
         {
             Name = "Member",
-            ExplicitInterface = new TypeRef("global::ISource", NullableAnnotation.NotAnnotated, SpecialType.None, TypeKind.Interface, false),
+            ExplicitInterface = new TypeRef(
+                "global::ISource",
+                NullableAnnotation.NotAnnotated,
+                SpecialType.None,
+                TypeKind.Interface,
+                false
+            ),
             ExplicitInterfaceMemberName = "Member",
         };
 
-        await Assert.That(() =>
-        {
-            Render(type => type.AutoProperty(property));
-        }).Throws<ArgumentException>();
+        await Assert
+            .That(() =>
+            {
+                Render(type => type.AutoProperty(property));
+            })
+            .Throws<ArgumentException>();
     }
 
     [Test]
@@ -356,15 +382,23 @@ public class FieldAndPropertyScopeTests
             type.AutoProperty(PropertyFrom("Shared"));
         });
 
-        await Assert.That(body)
-            .IsEqualTo("    public const int Max = 5;\n\n    public static int Shared { get; set; }\n");
+        await Assert
+            .That(body)
+            .IsEqualTo(
+                "    public const int Max = 5;\n\n    public static int Shared { get; set; }\n"
+            );
     }
 
     [Test]
     public async Task Should_separate_members_from_each_other_and_from_methods_with_a_blank_line()
     {
-        INamedTypeSymbol source = CompilationHelper.GetNamedTypeSymbol("public class S { public void M() { } }", "S");
-        MethodModel method = MethodModel.From(source.GetMembers("M").OfType<IMethodSymbol>().Single());
+        INamedTypeSymbol source = CompilationHelper.GetNamedTypeSymbol(
+            "public class S { public void M() { } }",
+            "S"
+        );
+        MethodModel method = MethodModel.From(
+            source.GetMembers("M").OfType<IMethodSymbol>().Single()
+        );
 
         string body = Render(type =>
         {
@@ -379,7 +413,8 @@ public class FieldAndPropertyScopeTests
         await Assert
             .That(body)
             .IsEqualTo(
-                "    public int Plain;\n\n    public int Count { get; private set; }\n\n    public void M()\n    {\n    }\n\n    public const int Max = 5;\n");
+                "    public int Plain;\n\n    public int Count { get; private set; }\n\n    public void M()\n    {\n    }\n\n    public const int Max = 5;\n"
+            );
     }
 
     [Test]
@@ -416,7 +451,12 @@ public class FieldAndPropertyScopeTests
         CSharpCompilation compilation = CompilationHelper.Compile(source, allowErrors: true);
 
         await Assert
-            .That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Id))
+            .That(
+                compilation
+                    .GetDiagnostics()
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => d.Id)
+            )
             .IsEmpty();
     }
 
@@ -450,7 +490,8 @@ public class FieldAndPropertyScopeTests
             .That(body)
             .IsEqualTo(
                 "    public ref int Slot\n    {\n        get\n        {\n            return ref _slot;\n        }\n    }\n\n"
-                + "    public ref readonly int View\n    {\n        get\n        {\n            return ref _slot;\n        }\n    }\n");
+                    + "    public ref readonly int View\n    {\n        get\n        {\n            return ref _slot;\n        }\n    }\n"
+            );
     }
 
     [Test]
@@ -476,11 +517,17 @@ public class FieldAndPropertyScopeTests
             }
         }
 
-        string source = SampleSource + "\npublic partial class Sample { private int _slot; }\n" + writer;
+        string source =
+            SampleSource + "\npublic partial class Sample { private int _slot; }\n" + writer;
         CSharpCompilation compilation = CompilationHelper.Compile(source, allowErrors: true);
 
         await Assert
-            .That(compilation.GetDiagnostics().Where(d => d.Severity != DiagnosticSeverity.Hidden).Select(d => d.Id))
+            .That(
+                compilation
+                    .GetDiagnostics()
+                    .Where(d => d.Severity != DiagnosticSeverity.Hidden)
+                    .Select(d => d.Id)
+            )
             .IsEmpty();
     }
 
@@ -571,7 +618,8 @@ public class FieldAndPropertyScopeTests
                     using var file = writer.File();
                     using var ns = file.Namespace("A");
                     ns.Field(field);
-            """);
+            """
+        );
 
         await Assert.That(errors).IsEquivalentTo(new[] { "CS1061" });
     }
@@ -588,7 +636,8 @@ public class FieldAndPropertyScopeTests
                     using var t = file.Type(type);
                     using var body = t.Method(method);
                     body.AutoProperty(property);
-            """);
+            """
+        );
 
         await Assert.That(errors).IsEquivalentTo(new[] { "CS1061" });
     }

@@ -15,7 +15,8 @@ public class ResultTests
         "Test message '{0}'",
         "Test",
         DiagnosticSeverity.Error,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true
+    );
 #pragma warning restore RS2008
 
     [Test]
@@ -42,7 +43,8 @@ public class ResultTests
     [Test]
     public async Task Should_throw_when_created_from_an_empty_diagnostic_array()
     {
-        await Assert.That(() => Result<int>.Failure(default(EquatableArray<DiagnosticInfo>)))
+        await Assert
+            .That(() => Result<int>.Failure(default(EquatableArray<DiagnosticInfo>)))
             .Throws<ArgumentException>();
     }
 
@@ -115,7 +117,10 @@ public class ResultTests
     {
         Result<int> result = Result<int>.Success(5);
 
-        var matched = result.Match(value => $"ok:{value}", diagnostics => $"error:{diagnostics.Count}");
+        var matched = result.Match(
+            value => $"ok:{value}",
+            diagnostics => $"error:{diagnostics.Count}"
+        );
 
         await Assert.That(matched).IsEqualTo("ok:5");
     }
@@ -126,7 +131,10 @@ public class ResultTests
         var diagnostic = new DiagnosticInfo(Descriptor, null, "value");
         Result<int> result = Result<int>.Failure(diagnostic);
 
-        var matched = result.Match(value => $"ok:{value}", diagnostics => $"error:{diagnostics.Count}");
+        var matched = result.Match(
+            value => $"ok:{value}",
+            diagnostics => $"error:{diagnostics.Count}"
+        );
 
         await Assert.That(matched).IsEqualTo("error:1");
     }
@@ -184,7 +192,10 @@ public class ResultTests
     {
         Result<int> result = default;
 
-        var matched = result.Match(value => $"ok:{value}", diagnostics => $"error:{diagnostics.Count}");
+        var matched = result.Match(
+            value => $"ok:{value}",
+            diagnostics => $"error:{diagnostics.Count}"
+        );
 
         await Assert.That(matched).IsEqualTo("error:0");
     }

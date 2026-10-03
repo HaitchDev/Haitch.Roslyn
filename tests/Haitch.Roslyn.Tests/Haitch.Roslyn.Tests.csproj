@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <OutputType>Exe</OutputType>
@@ -11,28 +10,34 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="TUnit"/>
-        <PackageReference Include="Microsoft.CodeAnalysis.CSharp"/>
-        <PackageReference Include="Polyfill" PrivateAssets="all"/>
+        <PackageReference Include="TUnit" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+        <PackageReference Include="Polyfill" PrivateAssets="all" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\Haitch.Roslyn.Testing\Haitch.Roslyn.Testing.csproj"/>
+        <ProjectReference Include="..\..\src\Haitch.Roslyn.Testing\Haitch.Roslyn.Testing.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <Compile Include="..\..\src\Haitch.Roslyn\**\*.cs" Exclude="..\..\src\Haitch.Roslyn\bin\**;..\..\src\Haitch.Roslyn\obj\**" Link="Src\%(RecursiveDir)%(Filename)%(Extension)"/>
+        <Compile
+            Include="..\..\src\Haitch.Roslyn\**\*.cs"
+            Exclude="..\..\src\Haitch.Roslyn\bin\**;..\..\src\Haitch.Roslyn\obj\**"
+            Link="Src\%(RecursiveDir)%(Filename)%(Extension)"
+        />
     </ItemGroup>
 
     <ItemGroup>
-        <AssemblyMetadata Include="RepoRoot" Value="$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../'))"/>
+        <AssemblyMetadata
+            Include="RepoRoot"
+            Value="$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../'))"
+        />
     </ItemGroup>
 
     <ItemGroup>
         <!-- The package smoke-test consumer lives beside this project but is built out-of-process
              by PackageSmokeTests; it must never be compiled or restored as part of this project. -->
-        <Compile Remove="../PackageSmoke/**/*.cs"/>
-        <None Remove="../PackageSmoke/**/*.cs"/>
+        <Compile Remove="../PackageSmoke/**/*.cs" />
+        <None Remove="../PackageSmoke/**/*.cs" />
     </ItemGroup>
-
 </Project>

@@ -35,24 +35,24 @@ public class LabeledJumpTests
             .That(output)
             .IsEqualTo(
                 Prefix
-                + "        outer:\n"
-                + "        for (int i = 0; i < 3; i++)\n"
-                + "        {\n"
-                + "            inner:\n"
-                + "            foreach (int x in xs)\n"
-                + "            {\n"
-                + "                if (x == i)\n"
-                + "                {\n"
-                + "                    continue outer;\n"
-                + "                }\n"
-                + "                if (x > 9)\n"
-                + "                {\n"
-                + "                    break outer;\n"
-                + "                }\n"
-                + "                break inner;\n"
-                + "            }\n"
-                + "        }\n"
-                + Suffix
+                    + "        outer:\n"
+                    + "        for (int i = 0; i < 3; i++)\n"
+                    + "        {\n"
+                    + "            inner:\n"
+                    + "            foreach (int x in xs)\n"
+                    + "            {\n"
+                    + "                if (x == i)\n"
+                    + "                {\n"
+                    + "                    continue outer;\n"
+                    + "                }\n"
+                    + "                if (x > 9)\n"
+                    + "                {\n"
+                    + "                    break outer;\n"
+                    + "                }\n"
+                    + "                break inner;\n"
+                    + "            }\n"
+                    + "        }\n"
+                    + Suffix
             );
         await AssertCompiles(output);
     }
@@ -97,19 +97,19 @@ public class LabeledJumpTests
             .That(output)
             .IsEqualTo(
                 Prefix
-                + "        sw:\n"
-                + "        switch (n)\n"
-                + "        {\n"
-                + "            case 1:\n"
-                + "            {\n"
-                + "                break sw;\n"
-                + "            }\n"
-                + "            default:\n"
-                + "            {\n"
-                + "                break;\n"
-                + "            }\n"
-                + "        }\n"
-                + Suffix
+                    + "        sw:\n"
+                    + "        switch (n)\n"
+                    + "        {\n"
+                    + "            case 1:\n"
+                    + "            {\n"
+                    + "                break sw;\n"
+                    + "            }\n"
+                    + "            default:\n"
+                    + "            {\n"
+                    + "                break;\n"
+                    + "            }\n"
+                    + "        }\n"
+                    + Suffix
             );
         await AssertCompiles(output);
     }
@@ -239,7 +239,7 @@ public class LabeledJumpTests
                 section.Continue("sw");
             },
             "        while (true)\n        {\n            sw:\n            switch (n)\n            {\n"
-            + "                default:\n                {\n                    break;\n                }\n            }\n        }\n"
+                + "                default:\n                {\n                    break;\n                }\n            }\n        }\n"
         );
     }
 

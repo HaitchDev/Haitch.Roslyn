@@ -15,7 +15,8 @@ public class ResultCombineTests
         "Test message '{0}'",
         "Test",
         DiagnosticSeverity.Error,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true
+    );
 #pragma warning restore RS2008
 
     [Test]
@@ -40,7 +41,9 @@ public class ResultCombineTests
         Result<(int, string, bool)> combined = Result.Combine(first, second, third);
 
         await Assert.That(combined.IsSuccess).IsTrue();
-        await Assert.That(combined.Match(value => value, _ => (-1, "?", false))).IsEqualTo((1, "a", true));
+        await Assert
+            .That(combined.Match(value => value, _ => (-1, "?", false)))
+            .IsEqualTo((1, "a", true));
     }
 
     [Test]

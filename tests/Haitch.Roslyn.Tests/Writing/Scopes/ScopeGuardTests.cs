@@ -163,7 +163,9 @@ public class ScopeGuardTests
             child.Dispose();
         });
 
-        await Assert.That(output).Contains("        while (true)\n        {\n            work();\n        }\n    }");
+        await Assert
+            .That(output)
+            .Contains("        while (true)\n        {\n            work();\n        }\n    }");
     }
 
     [Test]
@@ -192,21 +194,23 @@ public class ScopeGuardTests
             .That(output)
             .Contains(
                 "        a();\n"
-                + "        if (x)\n"
-                + "        {\n"
-                + "            b();\n"
-                + "            foreach (var i in is)\n"
-                + "            {\n"
-                + "                c();\n"
-                + "            }\n"
-                + "            d();\n"
-                + "        }\n"
-                + "        e();\n"
+                    + "        if (x)\n"
+                    + "        {\n"
+                    + "            b();\n"
+                    + "            foreach (var i in is)\n"
+                    + "            {\n"
+                    + "                c();\n"
+                    + "            }\n"
+                    + "            d();\n"
+                    + "        }\n"
+                    + "        e();\n"
             );
     }
 
     // The scenario runs once with the chaining call and once without; a rejected call must leave identical output.
-    private static async Task AssertChainRejectedWithoutWriting(Func<BodyScope, bool, bool> scenario)
+    private static async Task AssertChainRejectedWithoutWriting(
+        Func<BodyScope, bool, bool> scenario
+    )
     {
         bool threw = false;
         string attempted = Render(outer => threw = scenario(outer, true));
@@ -392,7 +396,8 @@ public class ScopeGuardTests
         );
     }
 
-    private const string PropertySource = "public partial class Sample { public int P { get; set; } }";
+    private const string PropertySource =
+        "public partial class Sample { public int P { get; set; } }";
 
     private static PropertyModel P()
     {
@@ -604,7 +609,9 @@ public class ScopeGuardTests
     [Arguments("else if")]
     [Arguments("try")]
     [Arguments("catch")]
-    public async Task Branch_write_while_a_nested_block_is_open_throws_and_writes_nothing(string kind)
+    public async Task Branch_write_while_a_nested_block_is_open_throws_and_writes_nothing(
+        string kind
+    )
     {
         SourceWriter writer = new();
         string before = null!;

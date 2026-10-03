@@ -9,12 +9,12 @@ namespace Haitch.Roslyn.CSharp15.Tests;
 public class NewTypeCSharp15Tests
 {
     private const string Support = """
-                                   public record Cat(string Name);
-                                   public record Dog(string Name);
-                                   public interface IMarker { }
-                                   public class BaseClass { }
+        public record Cat(string Name);
+        public record Dog(string Name);
+        public interface IMarker { }
+        public class BaseClass { }
 
-                                   """;
+        """;
 
     private static readonly MetadataReference[] References = CreateReferences();
 
@@ -147,7 +147,9 @@ public class NewTypeCSharp15Tests
 
     [Test]
     [MethodDataSource(nameof(IllegalModels))]
-    public async Task WriteNewTypeDeclaration_IllegalCombination_ThrowsAndLeavesWriterEmpty(int caseIndex)
+    public async Task WriteNewTypeDeclaration_IllegalCombination_ThrowsAndLeavesWriterEmpty(
+        int caseIndex
+    )
     {
         var writer = new SourceWriter();
         var model = IllegalCases()[caseIndex]();
@@ -168,53 +170,97 @@ public class NewTypeCSharp15Tests
 
     private static IEnumerable<Func<NewTypeModel>> IllegalCaseIterator()
     {
-        yield return () => Model(TypeDeclarationKind.Class) with { IsClosed = true, IsAbstract = true };
-        yield return () => Model(TypeDeclarationKind.RecordClass) with { IsClosed = true, IsAbstract = true };
-        yield return () => Model(TypeDeclarationKind.Class) with { IsClosed = true, IsSealed = true };
-        yield return () => Model(TypeDeclarationKind.Class) with { IsClosed = true, IsStatic = true };
+        yield return () =>
+            Model(TypeDeclarationKind.Class) with
+            {
+                IsClosed = true,
+                IsAbstract = true,
+            };
+        yield return () =>
+            Model(TypeDeclarationKind.RecordClass) with
+            {
+                IsClosed = true,
+                IsAbstract = true,
+            };
+        yield return () =>
+            Model(TypeDeclarationKind.Class) with
+            {
+                IsClosed = true,
+                IsSealed = true,
+            };
+        yield return () =>
+            Model(TypeDeclarationKind.Class) with
+            {
+                IsClosed = true,
+                IsStatic = true,
+            };
 
-        foreach (var kind in new[]
-                 {
-                     TypeDeclarationKind.Struct, TypeDeclarationKind.RecordStruct, TypeDeclarationKind.Interface,
-                     TypeDeclarationKind.Union
-                 })
+        foreach (
+            var kind in new[]
+            {
+                TypeDeclarationKind.Struct,
+                TypeDeclarationKind.RecordStruct,
+                TypeDeclarationKind.Interface,
+                TypeDeclarationKind.Union,
+            }
+        )
         {
             var captured = kind;
 
-            yield return () => Model(captured) with
-            {
-                IsClosed = true,
-                UnionCaseTypes = captured == TypeDeclarationKind.Union
-                    ? new[] { "global::Cat" }.ToEquatableArray()
-                    : default,
-            };
+            yield return () =>
+                Model(captured) with
+                {
+                    IsClosed = true,
+                    UnionCaseTypes =
+                        captured == TypeDeclarationKind.Union
+                            ? new[] { "global::Cat" }.ToEquatableArray()
+                            : default,
+                };
         }
 
         yield return () => Model(TypeDeclarationKind.Union);
-        yield return () => Model(TypeDeclarationKind.Union) with
-        {
-            UnionCaseTypes = new[] { "global::Cat", " " }.ToEquatableArray(),
-        };
-        yield return () => Model(TypeDeclarationKind.Union) with
-        {
-            UnionCaseTypes = new[] { "" }.ToEquatableArray(),
-        };
-        yield return () => Model(TypeDeclarationKind.Union) with { IsPartial = false, UnionCaseTypes = default };
-        yield return () => Model(TypeDeclarationKind.Union) with
-        {
-            UnionCaseTypes = new[] { "global::Cat" }.ToEquatableArray(),
-            BaseTypes = new[] { BaseClass }.ToEquatableArray(),
-        };
-        yield return () => Model(TypeDeclarationKind.Union) with
-        {
-            UnionCaseTypes = new[] { "global::Cat" }.ToEquatableArray(),
-            BaseTypes = new[] { Marker, BaseClass }.ToEquatableArray(),
-        };
+        yield return () =>
+            Model(TypeDeclarationKind.Union) with
+            {
+                UnionCaseTypes = new[] { "global::Cat", " " }.ToEquatableArray(),
+            };
+        yield return () =>
+            Model(TypeDeclarationKind.Union) with
+            {
+                UnionCaseTypes = new[] { "" }.ToEquatableArray(),
+            };
+        yield return () =>
+            Model(TypeDeclarationKind.Union) with
+            {
+                IsPartial = false,
+                UnionCaseTypes = default,
+            };
+        yield return () =>
+            Model(TypeDeclarationKind.Union) with
+            {
+                UnionCaseTypes = new[] { "global::Cat" }.ToEquatableArray(),
+                BaseTypes = new[] { BaseClass }.ToEquatableArray(),
+            };
+        yield return () =>
+            Model(TypeDeclarationKind.Union) with
+            {
+                UnionCaseTypes = new[] { "global::Cat" }.ToEquatableArray(),
+                BaseTypes = new[] { Marker, BaseClass }.ToEquatableArray(),
+            };
     }
 
     private static TypeParameterModel Parameter(string name)
     {
-        return new TypeParameterModel(name, default, false, NullableAnnotation.None, false, false, false, false);
+        return new TypeParameterModel(
+            name,
+            default,
+            false,
+            NullableAnnotation.None,
+            false,
+            false,
+            false,
+            false
+        );
     }
 
     private static NewTypeModel Model(TypeDeclarationKind kind)

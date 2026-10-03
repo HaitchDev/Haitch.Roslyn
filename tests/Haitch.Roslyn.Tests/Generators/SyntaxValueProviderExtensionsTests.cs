@@ -15,21 +15,21 @@ public class SyntaxValueProviderExtensionsTests
     // AllowMultiple lets the fixture apply Mark more than once to the same declaration, which
     // several tests below rely on.
     private const string MarkAttributeSource = """
-                                               namespace Sample;
+        namespace Sample;
 
-                                               [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
-                                               public class MarkAttribute : System.Attribute { }
-                                               """;
+        [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+        public class MarkAttribute : System.Attribute { }
+        """;
 
     [Test]
     public async Task Should_find_types_marked_with_the_attribute_and_ignore_unmarked_types()
     {
         const string source = """
-                              [Sample.Mark]
-                              public partial class Widget { }
+            [Sample.Mark]
+            public partial class Widget { }
 
-                              public class Plain { }
-                              """;
+            public class Plain { }
+            """;
 
         GeneratorDriverRunResult result = RunGenerator(MarkAttributeSource, source);
 
@@ -43,10 +43,10 @@ public class SyntaxValueProviderExtensionsTests
     public async Task Should_return_every_attribute_application_when_the_attribute_allows_multiple()
     {
         const string source = """
-                              [Sample.Mark]
-                              [Sample.Mark]
-                              public partial class Widget { }
-                              """;
+            [Sample.Mark]
+            [Sample.Mark]
+            public partial class Widget { }
+            """;
 
         var results = CollectResults(MarkAttributeSource, source);
 
@@ -60,7 +60,8 @@ public class SyntaxValueProviderExtensionsTests
         var results = CollectResultsFromFiles(
             MarkAttributeSource,
             "[Sample.Mark] public partial class Widget { }",
-            "[Sample.Mark] public partial class Widget { }");
+            "[Sample.Mark] public partial class Widget { }"
+        );
 
         await Assert.That(results.Length).IsEqualTo(1);
         await Assert.That(results[0].Type.Name).IsEqualTo("Widget");
@@ -74,7 +75,8 @@ public class SyntaxValueProviderExtensionsTests
         var results = CollectResultsFromFiles(
             MarkAttributeSource,
             "public partial class Widget { }",
-            "[Sample.Mark] public partial class Widget { }");
+            "[Sample.Mark] public partial class Widget { }"
+        );
 
         await Assert.That(results.Length).IsEqualTo(1);
         await Assert.That(results[0].Attributes.Count).IsEqualTo(1);
@@ -88,7 +90,8 @@ public class SyntaxValueProviderExtensionsTests
             MarkAttributeSource,
             "public partial class Widget { }",
             "[Sample.Mark] public partial class Widget { }",
-            "[Sample.Mark] public partial class Widget { }");
+            "[Sample.Mark] public partial class Widget { }"
+        );
 
         await Assert.That(results.Length).IsEqualTo(1);
         await Assert.That(results[0].Attributes.Count).IsEqualTo(2);
@@ -112,7 +115,8 @@ public class SyntaxValueProviderExtensionsTests
                 "public class Unrelated { }",
             ],
             [AttributeProviderTestGenerator.ValuesStepName],
-            options: new CacheabilityOptions { UnrelatedEditSourceIndex = 2 });
+            options: new CacheabilityOptions { UnrelatedEditSourceIndex = 2 }
+        );
     }
 
     [Test]
@@ -128,43 +132,70 @@ public class SyntaxValueProviderExtensionsTests
                 MarkAttributeSource,
                 "[Sample.Mark] public partial class Widget { }",
             ],
-            AttributeProviderTestGenerator.ValuesStepName);
+            AttributeProviderTestGenerator.ValuesStepName
+        );
     }
 
     [Test]
     public async Task Should_modify_the_step_when_a_member_of_the_second_part_changes_but_not_for_trivia()
     {
-        CSharpCompilation compilation = CreateCompilation(
-        [
+        CSharpCompilation compilation = CreateCompilation([
             CSharpSyntaxTree.ParseText(MarkAttributeSource, path: "Source0.cs"),
-            CSharpSyntaxTree.ParseText("[Sample.Mark] public partial class Widget { }", path: "Source1.cs"),
-            CSharpSyntaxTree.ParseText("public partial class Widget { public int First; }", path: "Source2.cs"),
+            CSharpSyntaxTree.ParseText(
+                "[Sample.Mark] public partial class Widget { }",
+                path: "Source1.cs"
+            ),
+            CSharpSyntaxTree.ParseText(
+                "public partial class Widget { public int First; }",
+                path: "Source2.cs"
+            ),
         ]);
 
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new AttributeProviderTestGenerator(includeMembers: true).AsSourceGenerator()],
-            driverOptions: new GeneratorDriverOptions(IncrementalGeneratorOutputKind.None,
-                trackIncrementalGeneratorSteps: true));
+            driverOptions: new GeneratorDriverOptions(
+                IncrementalGeneratorOutputKind.None,
+                trackIncrementalGeneratorSteps: true
+            )
+        );
         driver = driver.RunGenerators(compilation);
 
         SyntaxTree tree2 = compilation.SyntaxTrees.Single(tree => tree.FilePath == "Source2.cs");
         Compilation trivia = compilation.ReplaceSyntaxTree(
             tree2,
-            CSharpSyntaxTree.ParseText("public partial class Widget { public int First; } // note",
-                path: "Source2.cs"));
+            CSharpSyntaxTree.ParseText(
+                "public partial class Widget { public int First; } // note",
+                path: "Source2.cs"
+            )
+        );
         driver = driver.RunGenerators(trivia);
 
         await Assert.That(GetValuesStepReasons(driver)).IsNotEmpty();
-        await Assert.That(GetValuesStepReasons(driver).All(reason =>
-            reason == IncrementalStepRunReason.Cached || reason == IncrementalStepRunReason.Unchanged)).IsTrue();
+        await Assert
+            .That(
+                GetValuesStepReasons(driver)
+                    .All(reason =>
+                        reason == IncrementalStepRunReason.Cached
+                        || reason == IncrementalStepRunReason.Unchanged
+                    )
+            )
+            .IsTrue();
 
         SyntaxTree triviaTree2 = trivia.SyntaxTrees.Single(tree => tree.FilePath == "Source2.cs");
         Compilation edited = trivia.ReplaceSyntaxTree(
             triviaTree2,
-            CSharpSyntaxTree.ParseText("public partial class Widget { public int Renamed; }", path: "Source2.cs"));
+            CSharpSyntaxTree.ParseText(
+                "public partial class Widget { public int Renamed; }",
+                path: "Source2.cs"
+            )
+        );
         driver = driver.RunGenerators(edited);
 
-        await Assert.That(GetValuesStepReasons(driver).Any(reason => reason == IncrementalStepRunReason.Modified))
+        await Assert
+            .That(
+                GetValuesStepReasons(driver)
+                    .Any(reason => reason == IncrementalStepRunReason.Modified)
+            )
             .IsTrue();
     }
 
@@ -175,12 +206,20 @@ public class SyntaxValueProviderExtensionsTests
             MarkAttributeSource,
             "Sample.MarkAttribute",
             [
-                "[Sample.Mark] public partial class Widget { public int this[int i] => i; public int Count { get; set; } }"
+                "[Sample.Mark] public partial class Widget { public int this[int i] => i; public int Count { get; set; } }",
             ],
-            includeMembers: true);
+            includeMembers: true
+        );
 
         await Assert.That(results.Length).IsEqualTo(1);
-        await Assert.That(results[0].Type.Properties.AsSpan().ToArray().Select(property => property.Name).ToArray())
+        await Assert
+            .That(
+                results[0]
+                    .Type.Properties.AsSpan()
+                    .ToArray()
+                    .Select(property => property.Name)
+                    .ToArray()
+            )
             .IsEquivalentTo(new[] { "Count" });
     }
 
@@ -194,10 +233,19 @@ public class SyntaxValueProviderExtensionsTests
                 "[Sample.Mark] public partial class Widget { public int First; }",
                 "[Sample.Mark] public partial class Widget { public int Second; }",
             ],
-            includeMembers: true);
+            includeMembers: true
+        );
 
         await Assert.That(results.Length).IsEqualTo(1);
-        await Assert.That(results[0].Type.Fields.AsSpan().ToArray().Select(field => field.Name).Order().ToArray())
+        await Assert
+            .That(
+                results[0]
+                    .Type.Fields.AsSpan()
+                    .ToArray()
+                    .Select(field => field.Name)
+                    .Order()
+                    .ToArray()
+            )
             .IsEquivalentTo(new[] { "First", "Second" });
     }
 
@@ -205,11 +253,11 @@ public class SyntaxValueProviderExtensionsTests
     public async Task Should_return_one_item_with_both_applications_when_parts_use_different_generic_instantiations()
     {
         const string genericAttributeSource = """
-                                              namespace Sample;
+            namespace Sample;
 
-                                              [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
-                                              public class MarkAttribute<T> : System.Attribute { }
-                                              """;
+            [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+            public class MarkAttribute<T> : System.Attribute { }
+            """;
 
         var results = CollectResultsFromFiles(
             genericAttributeSource,
@@ -217,7 +265,8 @@ public class SyntaxValueProviderExtensionsTests
             [
                 "[Sample.Mark<int>] public partial class Widget { }",
                 "[Sample.Mark<string>] public partial class Widget { }",
-            ]);
+            ]
+        );
 
         await Assert.That(results.Length).IsEqualTo(1);
         await Assert.That(results[0].Attributes.Count).IsEqualTo(2);
@@ -229,8 +278,7 @@ public class SyntaxValueProviderExtensionsTests
     {
         const string part = "[Sample.Mark] public partial class Widget { }";
 
-        CSharpCompilation compilation = CreateCompilation(
-        [
+        CSharpCompilation compilation = CreateCompilation([
             CSharpSyntaxTree.ParseText(MarkAttributeSource, path: "Source0.cs"),
             CSharpSyntaxTree.ParseText(part, path: "Source1.cs"),
             CSharpSyntaxTree.ParseText(part, path: "Source2.cs"),
@@ -245,7 +293,9 @@ public class SyntaxValueProviderExtensionsTests
 
         SyntaxTree tree1 = compilation.SyntaxTrees.Single(tree => tree.FilePath == "Source1.cs");
         Compilation unmarked = compilation.ReplaceSyntaxTree(
-            tree1, CSharpSyntaxTree.ParseText("public partial class Widget { }", path: "Source1.cs"));
+            tree1,
+            CSharpSyntaxTree.ParseText("public partial class Widget { }", path: "Source1.cs")
+        );
 
         generator.Collected.Clear();
         driver = driver.RunGenerators(unmarked);
@@ -254,9 +304,13 @@ public class SyntaxValueProviderExtensionsTests
         await Assert.That(generator.Collected[0].Syntax.Location!.FilePath).IsEqualTo("Source2.cs");
         await Assert.That(generator.Collected[0].Attributes.Count).IsEqualTo(1);
 
-        SyntaxTree unmarkedTree1 = unmarked.SyntaxTrees.Single(tree => tree.FilePath == "Source1.cs");
+        SyntaxTree unmarkedTree1 = unmarked.SyntaxTrees.Single(tree =>
+            tree.FilePath == "Source1.cs"
+        );
         Compilation remarked = unmarked.ReplaceSyntaxTree(
-            unmarkedTree1, CSharpSyntaxTree.ParseText(part, path: "Source1.cs"));
+            unmarkedTree1,
+            CSharpSyntaxTree.ParseText(part, path: "Source1.cs")
+        );
 
         generator.Collected.Clear();
         driver.RunGenerators(remarked);
@@ -266,11 +320,14 @@ public class SyntaxValueProviderExtensionsTests
         await Assert.That(generator.Collected[0].Attributes.Count).IsEqualTo(2);
     }
 
-    private static ImmutableArray<IncrementalStepRunReason> GetValuesStepReasons(GeneratorDriver driver)
+    private static ImmutableArray<IncrementalStepRunReason> GetValuesStepReasons(
+        GeneratorDriver driver
+    )
     {
         GeneratorDriverRunResult result = driver.GetRunResult();
-        ImmutableArray<IncrementalGeneratorRunStep> steps =
-            result.Results[0].TrackedSteps[AttributeProviderTestGenerator.ValuesStepName];
+        ImmutableArray<IncrementalGeneratorRunStep> steps = result.Results[0].TrackedSteps[
+            AttributeProviderTestGenerator.ValuesStepName
+        ];
 
         return steps
             .SelectMany(step => step.Outputs)
@@ -278,23 +335,34 @@ public class SyntaxValueProviderExtensionsTests
             .ToImmutableArray();
     }
 
-    private static ImmutableArray<(TypeModel Type, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes)>
-        CollectResultsFromFiles(string attributeSource, params string[] sources)
+    private static ImmutableArray<(
+        TypeModel Type,
+        SyntaxInfo Syntax,
+        EquatableArray<AttributeModel> Attributes
+    )> CollectResultsFromFiles(string attributeSource, params string[] sources)
     {
         return CollectResultsFromFiles(attributeSource, "Sample.MarkAttribute", sources);
     }
 
-    private static ImmutableArray<(TypeModel Type, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes)>
-        CollectResultsFromFiles(
-            string attributeSource,
-            string metadataName,
-            string[] sources,
-            bool includeMembers = false)
+    private static ImmutableArray<(
+        TypeModel Type,
+        SyntaxInfo Syntax,
+        EquatableArray<AttributeModel> Attributes
+    )> CollectResultsFromFiles(
+        string attributeSource,
+        string metadataName,
+        string[] sources,
+        bool includeMembers = false
+    )
     {
         CSharpCompilation compilation = CreateCompilation(
-            new[] { CSharpSyntaxTree.ParseText(attributeSource, path: "Source0.cs") }
-                .Concat(sources.Select((source, index) =>
-                    CSharpSyntaxTree.ParseText(source, path: $"Source{index + 1}.cs"))));
+            new[] { CSharpSyntaxTree.ParseText(attributeSource, path: "Source0.cs") }.Concat(
+                sources.Select(
+                    (source, index) =>
+                        CSharpSyntaxTree.ParseText(source, path: $"Source{index + 1}.cs")
+                )
+            )
+        );
 
         var generator = new CollectingAttributeProviderTestGenerator(metadataName, includeMembers);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(generator.AsSourceGenerator());
@@ -303,11 +371,13 @@ public class SyntaxValueProviderExtensionsTests
         return generator.Collected.ToImmutableArray();
     }
 
-    private static ImmutableArray<(TypeModel Type, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes)>
-        CollectResults(string attributeSource, string source)
+    private static ImmutableArray<(
+        TypeModel Type,
+        SyntaxInfo Syntax,
+        EquatableArray<AttributeModel> Attributes
+    )> CollectResults(string attributeSource, string source)
     {
-        CSharpCompilation compilation = CreateCompilation(
-        [
+        CSharpCompilation compilation = CreateCompilation([
             CSharpSyntaxTree.ParseText(attributeSource),
             CSharpSyntaxTree.ParseText(source),
         ]);
@@ -321,13 +391,14 @@ public class SyntaxValueProviderExtensionsTests
 
     private static GeneratorDriverRunResult RunGenerator(string attributeSource, string source)
     {
-        CSharpCompilation compilation = CreateCompilation(
-        [
+        CSharpCompilation compilation = CreateCompilation([
             CSharpSyntaxTree.ParseText(attributeSource),
             CSharpSyntaxTree.ParseText(source),
         ]);
 
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(new AttributeProviderTestGenerator().AsSourceGenerator());
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            new AttributeProviderTestGenerator().AsSourceGenerator()
+        );
         driver = driver.RunGenerators(compilation);
 
         return driver.GetRunResult();
@@ -339,7 +410,8 @@ public class SyntaxValueProviderExtensionsTests
             "Tests",
             trees,
             [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+        );
     }
 
     private static string ConcatTrees(GeneratorDriverRunResult result)
@@ -362,15 +434,26 @@ public class SyntaxValueProviderExtensionsTests
 
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            IncrementalValuesProvider<(TypeModel Type, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes)>
-                results = context.SyntaxProvider.ForTypesWithAttribute("Sample.MarkAttribute", ValuesStepName,
-                    _includeMembers);
+            IncrementalValuesProvider<(
+                TypeModel Type,
+                SyntaxInfo Syntax,
+                EquatableArray<AttributeModel> Attributes
+            )> results = context.SyntaxProvider.ForTypesWithAttribute(
+                "Sample.MarkAttribute",
+                ValuesStepName,
+                _includeMembers
+            );
 
-            context.RegisterSourceOutput(results,
+            context.RegisterSourceOutput(
+                results,
                 static (spc, value) =>
                 {
-                    spc.AddSource($"{value.Type.Name}.g.cs", $"// generated for {value.Type.Name}\n");
-                });
+                    spc.AddSource(
+                        $"{value.Type.Name}.g.cs",
+                        $"// generated for {value.Type.Name}\n"
+                    );
+                }
+            );
         }
     }
 
@@ -384,19 +467,30 @@ public class SyntaxValueProviderExtensionsTests
 
         public CollectingAttributeProviderTestGenerator(
             string metadataName = "Sample.MarkAttribute",
-            bool includeMembers = false)
+            bool includeMembers = false
+        )
         {
             _metadataName = metadataName;
             _includeMembers = includeMembers;
         }
 
-        public List<(TypeModel Type, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes)> Collected { get; } =
-            [];
+        public List<(
+            TypeModel Type,
+            SyntaxInfo Syntax,
+            EquatableArray<AttributeModel> Attributes
+        )> Collected { get; } = [];
 
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            IncrementalValuesProvider<(TypeModel Type, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes)>
-                results = context.SyntaxProvider.ForTypesWithAttribute(_metadataName, "Values", _includeMembers);
+            IncrementalValuesProvider<(
+                TypeModel Type,
+                SyntaxInfo Syntax,
+                EquatableArray<AttributeModel> Attributes
+            )> results = context.SyntaxProvider.ForTypesWithAttribute(
+                _metadataName,
+                "Values",
+                _includeMembers
+            );
 
             context.RegisterSourceOutput(results, (_, value) => Collected.Add(value));
         }
@@ -412,15 +506,39 @@ public class SyntaxValueProviderExtensionsTests
                 "[Sample.Mark] public partial class Widget { public int First; public string Name { get; set; } = \"\"; public void Run() { } }",
                 "public partial class Widget { public int Second; public int Count { get; set; } public void Stop() { } }",
             ],
-            includeMembers: true);
+            includeMembers: true
+        );
 
         await Assert.That(results.Length).IsEqualTo(1);
-        await Assert.That(results[0].Type.Fields.AsSpan().ToArray().Select(field => field.Name).Order().ToArray())
+        await Assert
+            .That(
+                results[0]
+                    .Type.Fields.AsSpan()
+                    .ToArray()
+                    .Select(field => field.Name)
+                    .Order()
+                    .ToArray()
+            )
             .IsEquivalentTo(new[] { "First", "Second" });
-        await Assert.That(results[0].Type.Properties.AsSpan().ToArray().Select(property => property.Name).Order()
-                .ToArray())
+        await Assert
+            .That(
+                results[0]
+                    .Type.Properties.AsSpan()
+                    .ToArray()
+                    .Select(property => property.Name)
+                    .Order()
+                    .ToArray()
+            )
             .IsEquivalentTo(new[] { "Count", "Name" });
-        await Assert.That(results[0].Type.Methods.AsSpan().ToArray().Select(method => method.Name).Order().ToArray())
+        await Assert
+            .That(
+                results[0]
+                    .Type.Methods.AsSpan()
+                    .ToArray()
+                    .Select(method => method.Name)
+                    .Order()
+                    .ToArray()
+            )
             .IsEquivalentTo(new[] { "Run", "Stop" });
     }
 
@@ -429,7 +547,8 @@ public class SyntaxValueProviderExtensionsTests
     {
         var results = CollectResultsFromFiles(
             MarkAttributeSource,
-            "[Sample.Mark] public partial class Widget { public int First; public int Count { get; set; } public void Run() { } }");
+            "[Sample.Mark] public partial class Widget { public int First; public int Count { get; set; } public void Run() { } }"
+        );
 
         await Assert.That(results.Length).IsEqualTo(1);
         await Assert.That(results[0].Type.Fields.Count).IsEqualTo(0);
@@ -440,10 +559,11 @@ public class SyntaxValueProviderExtensionsTests
     [Test]
     public async Task Should_pass_the_token_to_the_member_capture()
     {
-        CSharpCompilation compilation = CreateCompilation(
-        [
+        CSharpCompilation compilation = CreateCompilation([
             CSharpSyntaxTree.ParseText(MarkAttributeSource),
-            CSharpSyntaxTree.ParseText("[Sample.Mark] public partial class Widget { public int Value; }"),
+            CSharpSyntaxTree.ParseText(
+                "[Sample.Mark] public partial class Widget { public int Value; }"
+            ),
         ]);
         ContextCapturingTestGenerator generator = new();
         CSharpGeneratorDriver.Create(generator.AsSourceGenerator()).RunGenerators(compilation);
@@ -452,7 +572,8 @@ public class SyntaxValueProviderExtensionsTests
         // cannot tell whether the transform forwards the token; the transform is called directly instead.
         MethodInfo transform = typeof(SyntaxValueProviderExtensions).GetMethod(
             "Transform",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
+            BindingFlags.NonPublic | BindingFlags.Static
+        )!;
         CancellationToken cancelled = new CancellationToken(canceled: true);
 
         TargetInvocationException? thrown = await Assert
@@ -473,8 +594,10 @@ public class SyntaxValueProviderExtensionsTests
                 context.SyntaxProvider.ForAttributeWithMetadataName(
                     "Sample.MarkAttribute",
                     static (node, _) => node is TypeDeclarationSyntax,
-                    static (attributeContext, _) => attributeContext),
-                (_, attributeContext) => Captured = attributeContext);
+                    static (attributeContext, _) => attributeContext
+                ),
+                (_, attributeContext) => Captured = attributeContext
+            );
         }
     }
 
@@ -490,6 +613,7 @@ public class SyntaxValueProviderExtensionsTests
                 """,
                 MarkAttributeSource,
             ],
-            AttributeProviderTestGenerator.ValuesStepName);
+            AttributeProviderTestGenerator.ValuesStepName
+        );
     }
 }

@@ -24,8 +24,7 @@ public class TypeRefTests
     [Test]
     public async Task Should_capture_a_generic_type()
     {
-        const string source =
-            """
+        const string source = """
             using System.Collections.Generic;
 
             class Sample { public List<int> Field; }
@@ -35,7 +34,9 @@ public class TypeRefTests
 
         TypeRef typeRef = TypeRef.From(type);
 
-        await Assert.That(typeRef.FullyQualifiedName).IsEqualTo("global::System.Collections.Generic.List<int>");
+        await Assert
+            .That(typeRef.FullyQualifiedName)
+            .IsEqualTo("global::System.Collections.Generic.List<int>");
         await Assert.That(typeRef.IsValueType).IsFalse();
     }
 
@@ -55,8 +56,7 @@ public class TypeRefTests
     [Test]
     public async Task Should_capture_a_nested_type()
     {
-        const string source =
-            """
+        const string source = """
             namespace Example;
 
             class Outer { public class Inner { } public Outer.Inner Field; }
@@ -127,8 +127,7 @@ public class TypeRefTests
     [Test]
     public async Task Should_capture_nested_nullability_in_a_generic_type_argument()
     {
-        const string source =
-            """
+        const string source = """
             using System.Collections.Generic;
 
             class Sample { public List<string?> Field; }
@@ -138,7 +137,9 @@ public class TypeRefTests
 
         TypeRef typeRef = TypeRef.From(type);
 
-        await Assert.That(typeRef.FullyQualifiedName).IsEqualTo("global::System.Collections.Generic.List<string?>");
+        await Assert
+            .That(typeRef.FullyQualifiedName)
+            .IsEqualTo("global::System.Collections.Generic.List<string?>");
     }
 
     [Test]
@@ -168,8 +169,7 @@ public class TypeRefTests
     [Test]
     public async Task Should_capture_nested_nullability_across_multiple_levels_of_generics()
     {
-        const string source =
-            """
+        const string source = """
             using System.Collections.Generic;
 
             class Sample { public Dictionary<string, List<int?>> Field; }
@@ -179,8 +179,11 @@ public class TypeRefTests
 
         TypeRef typeRef = TypeRef.From(type);
 
-        await Assert.That(typeRef.FullyQualifiedName).IsEqualTo(
-            "global::System.Collections.Generic.Dictionary<string, global::System.Collections.Generic.List<int?>>");
+        await Assert
+            .That(typeRef.FullyQualifiedName)
+            .IsEqualTo(
+                "global::System.Collections.Generic.Dictionary<string, global::System.Collections.Generic.List<int?>>"
+            );
     }
 
     [Test]
@@ -210,7 +213,8 @@ public class TypeRefTests
     [Test]
     public async Task Should_capture_the_type_kind()
     {
-        const string source = "class Sample<T> { public Sample<T> ClassField; public T TypeParameterField; }";
+        const string source =
+            "class Sample<T> { public Sample<T> ClassField; public T TypeParameterField; }";
 
         ITypeSymbol classType = GetFieldType(source, "Sample`1", "ClassField");
         ITypeSymbol typeParameterType = GetFieldType(source, "Sample`1", "TypeParameterField");

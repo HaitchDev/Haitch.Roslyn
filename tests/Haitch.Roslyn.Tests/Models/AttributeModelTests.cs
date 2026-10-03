@@ -8,8 +8,7 @@ public class AttributeModelTests
     [Test]
     public async Task Should_capture_an_attribute_with_no_arguments()
     {
-        const string source =
-            """
+        const string source = """
             using System;
 
             class SampleAttribute : Attribute { }
@@ -23,7 +22,9 @@ public class AttributeModelTests
         AttributeModel? model = AttributeModel.From(attributeData);
 
         await Assert.That(model).IsNotNull();
-        await Assert.That(model!.AttributeType.FullyQualifiedName).IsEqualTo("global::SampleAttribute");
+        await Assert
+            .That(model!.AttributeType.FullyQualifiedName)
+            .IsEqualTo("global::SampleAttribute");
         await Assert.That(model.ConstructorArguments.Count).IsEqualTo(0);
         await Assert.That(model.NamedArguments.Count).IsEqualTo(0);
     }
@@ -31,8 +32,7 @@ public class AttributeModelTests
     [Test]
     public async Task Should_capture_primitive_constructor_arguments()
     {
-        const string source =
-            """
+        const string source = """
             using System;
 
             class SampleAttribute : Attribute
@@ -51,15 +51,16 @@ public class AttributeModelTests
         await Assert.That(model).IsNotNull();
         await Assert.That(model!.ConstructorArguments.Count).IsEqualTo(3);
         await Assert.That(model.ConstructorArguments[0]).IsEqualTo(ConstantValue.ForPrimitive(42));
-        await Assert.That(model.ConstructorArguments[1]).IsEqualTo(ConstantValue.ForPrimitive(true));
+        await Assert
+            .That(model.ConstructorArguments[1])
+            .IsEqualTo(ConstantValue.ForPrimitive(true));
         await Assert.That(model.ConstructorArguments[2]).IsEqualTo(ConstantValue.ForPrimitive(1.5));
     }
 
     [Test]
     public async Task Should_capture_a_string_constructor_argument()
     {
-        const string source =
-            """
+        const string source = """
             using System;
 
             class SampleAttribute : Attribute
@@ -76,15 +77,16 @@ public class AttributeModelTests
         AttributeModel? model = AttributeModel.From(attributeData);
 
         await Assert.That(model).IsNotNull();
-        await Assert.That(model!.ConstructorArguments[0]).IsEqualTo(ConstantValue.ForString("hello"));
+        await Assert
+            .That(model!.ConstructorArguments[0])
+            .IsEqualTo(ConstantValue.ForString("hello"));
         await Assert.That(model.ConstructorArguments[0].Kind).IsEqualTo(ConstantValueKind.String);
     }
 
     [Test]
     public async Task Should_capture_an_enum_constructor_argument()
     {
-        const string source =
-            """
+        const string source = """
             using System;
 
             enum Color { Red, Green, Blue }
@@ -114,8 +116,7 @@ public class AttributeModelTests
     [Test]
     public async Task Should_capture_a_typeof_constructor_argument()
     {
-        const string source =
-            """
+        const string source = """
             using System;
 
             class SampleAttribute : Attribute
@@ -142,8 +143,7 @@ public class AttributeModelTests
     [Test]
     public async Task Should_capture_an_array_constructor_argument()
     {
-        const string source =
-            """
+        const string source = """
             using System;
 
             class SampleAttribute : Attribute
@@ -174,8 +174,7 @@ public class AttributeModelTests
     [Test]
     public async Task Should_capture_named_arguments()
     {
-        const string source =
-            """
+        const string source = """
             using System;
 
             class SampleAttribute : Attribute
@@ -194,14 +193,15 @@ public class AttributeModelTests
         await Assert.That(model).IsNotNull();
         await Assert.That(model!.NamedArguments.Count).IsEqualTo(1);
         await Assert.That(model.NamedArguments[0].Name).IsEqualTo("Named");
-        await Assert.That(model.NamedArguments[0].Value).IsEqualTo(ConstantValue.ForString("value"));
+        await Assert
+            .That(model.NamedArguments[0].Value)
+            .IsEqualTo(ConstantValue.ForString("value"));
     }
 
     [Test]
     public async Task Should_capture_a_null_argument_with_its_declared_type()
     {
-        const string source =
-            """
+        const string source = """
             using System;
 
             class SampleAttribute : Attribute
@@ -228,8 +228,7 @@ public class AttributeModelTests
     [Test]
     public async Task Should_capture_an_error_constructor_argument_without_throwing()
     {
-        const string source =
-            """
+        const string source = """
             using System;
 
             class NotConstant
@@ -258,8 +257,7 @@ public class AttributeModelTests
     [Test]
     public async Task Should_capture_an_error_element_inside_an_array_constructor_argument_without_throwing()
     {
-        const string source =
-            """
+        const string source = """
             using System;
 
             class NotConstant
@@ -291,8 +289,7 @@ public class AttributeModelTests
     [Test]
     public async Task Should_return_null_when_the_attribute_type_is_unresolved()
     {
-        const string source =
-            """
+        const string source = """
             [Bogus]
             class Target { }
             """;
@@ -307,8 +304,7 @@ public class AttributeModelTests
     [Test]
     public async Task Should_be_equal_for_captures_from_two_separate_compilations_of_the_same_source()
     {
-        const string source =
-            """
+        const string source = """
             using System;
 
             enum Color { Red, Green, Blue }
@@ -337,8 +333,7 @@ public class AttributeModelTests
     [Test]
     public async Task Should_not_be_equal_when_constructor_argument_order_differs()
     {
-        const string firstSource =
-            """
+        const string firstSource = """
             using System;
 
             class SampleAttribute : Attribute
@@ -350,8 +345,7 @@ public class AttributeModelTests
             class Target { }
             """;
 
-        const string secondSource =
-            """
+        const string secondSource = """
             using System;
 
             class SampleAttribute : Attribute
@@ -372,9 +366,17 @@ public class AttributeModelTests
         await Assert.That<AttributeModel?>(firstModel).IsNotEqualTo(secondModel);
     }
 
-    private static AttributeData GetAttribute(string source, string metadataName, bool allowErrors = false)
+    private static AttributeData GetAttribute(
+        string source,
+        string metadataName,
+        bool allowErrors = false
+    )
     {
-        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, metadataName, allowErrors);
+        INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(
+            source,
+            metadataName,
+            allowErrors
+        );
 
         return type.GetAttributes().Single();
     }

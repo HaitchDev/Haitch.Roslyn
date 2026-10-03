@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
         <RootNamespace>Haitch.Roslyn</RootNamespace>
@@ -14,12 +13,17 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all"/>
-        <PackageReference Include="Polyfill" PrivateAssets="none"/>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+        <PackageReference Include="Polyfill" PrivateAssets="none" />
     </ItemGroup>
 
     <ItemGroup>
-        <None Include="**/*.cs" Exclude="bin/**;obj/**" Pack="true" PackagePath="contentFiles/cs/any/Haitch.Roslyn/%(RecursiveDir)%(Filename)%(Extension)" BuildAction="Compile"/>
+        <None
+            Include="**/*.cs"
+            Exclude="bin/**;obj/**"
+            Pack="true"
+            PackagePath="contentFiles/cs/any/Haitch.Roslyn/%(RecursiveDir)%(Filename)%(Extension)"
+            BuildAction="Compile"
+        />
     </ItemGroup>
-
 </Project>

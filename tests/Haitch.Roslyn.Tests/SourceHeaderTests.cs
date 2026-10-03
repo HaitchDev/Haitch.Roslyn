@@ -19,17 +19,21 @@ public class SourceHeaderTests
     {
         string sourceDirectory = Path.Combine(RepoPaths.Root, "src", "Haitch.Roslyn");
 
-        return Directory.EnumerateFiles(sourceDirectory, "*.cs", SearchOption.AllDirectories)
+        return Directory
+            .EnumerateFiles(sourceDirectory, "*.cs", SearchOption.AllDirectories)
             .Where(path => !IsInBinOrObj(sourceDirectory, path));
     }
 
     private static bool IsInBinOrObj(string sourceDirectory, string filePath)
     {
         string relativePath = Path.GetRelativePath(sourceDirectory, filePath);
-        string[] segments = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string[] segments = relativePath.Split(
+            Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar
+        );
 
-        return segments.Contains("bin", StringComparer.OrdinalIgnoreCase) ||
-               segments.Contains("obj", StringComparer.OrdinalIgnoreCase);
+        return segments.Contains("bin", StringComparer.OrdinalIgnoreCase)
+            || segments.Contains("obj", StringComparer.OrdinalIgnoreCase);
     }
 
     private static bool StartsWithHeader(string filePath)

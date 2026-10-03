@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using Haitch.Roslyn.Models;
-using Haitch.Roslyn.Tests.Models;
 using Haitch.Roslyn.Testing;
+using Haitch.Roslyn.Tests.Models;
 using Haitch.Roslyn.Types;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -12,17 +12,17 @@ namespace Haitch.Roslyn.Tests.Testing;
 public class CachingHazardWalkerTests
 {
     private const string Source = """
-                                  using System;
-                                  namespace Example;
-                                  public sealed class MarkAttribute(Type type, DayOfWeek day, string[] names, int number) : Attribute;
-                                  [Mark(typeof(string), DayOfWeek.Monday, new[] { "a", "b" }, 3)]
-                                  public class Sample
-                                  {
-                                      public int Field;
-                                      public string Name { get; set; } = "";
-                                      public void Run(int value) { }
-                                  }
-                                  """;
+        using System;
+        namespace Example;
+        public sealed class MarkAttribute(Type type, DayOfWeek day, string[] names, int number) : Attribute;
+        [Mark(typeof(string), DayOfWeek.Monday, new[] { "a", "b" }, 3)]
+        public class Sample
+        {
+            public int Field;
+            public string Name { get; set; } = "";
+            public void Run(int value) { }
+        }
+        """;
 
     private sealed record Member(ISymbol Symbol);
 
@@ -93,7 +93,9 @@ public class CachingHazardWalkerTests
     {
         var (compilation, _) = Compile();
 
-        await Assert.That(CachingHazardWalker.Find(new TreeHolder(compilation.SyntaxTrees.Single()))).IsEqualTo("Tree");
+        await Assert
+            .That(CachingHazardWalker.Find(new TreeHolder(compilation.SyntaxTrees.Single())))
+            .IsEqualTo("Tree");
     }
 
     [Test]
@@ -111,7 +113,9 @@ public class CachingHazardWalkerTests
         var (compilation, _) = Compile();
         var location = compilation.SyntaxTrees.Single().GetRoot().GetLocation();
 
-        await Assert.That(CachingHazardWalker.Find(new LocationHolder(location))).IsEqualTo("Where");
+        await Assert
+            .That(CachingHazardWalker.Find(new LocationHolder(location)))
+            .IsEqualTo("Where");
     }
 
     [Test]
@@ -119,7 +123,9 @@ public class CachingHazardWalkerTests
     {
         var (compilation, _) = Compile();
 
-        await Assert.That(CachingHazardWalker.Find(new CompilationHolder(compilation))).IsEqualTo("Compilation");
+        await Assert
+            .That(CachingHazardWalker.Find(new CompilationHolder(compilation)))
+            .IsEqualTo("Compilation");
     }
 
     [Test]
@@ -137,7 +143,9 @@ public class CachingHazardWalkerTests
     [Test]
     public async Task Should_report_a_class_without_value_equality()
     {
-        await Assert.That(CachingHazardWalker.Find(new PlainHolder(new Plain()))).IsEqualTo("Child");
+        await Assert
+            .That(CachingHazardWalker.Find(new PlainHolder(new Plain())))
+            .IsEqualTo("Child");
     }
 
     [Test]
@@ -151,7 +159,14 @@ public class CachingHazardWalkerTests
     [Test]
     public async Task Should_report_nothing_for_null_and_safe_leaves()
     {
-        var descriptor = new DiagnosticDescriptor("T001", "title", "message", "cat", DiagnosticSeverity.Warning, true);
+        var descriptor = new DiagnosticDescriptor(
+            "T001",
+            "title",
+            "message",
+            "cat",
+            DiagnosticSeverity.Warning,
+            true
+        );
         var leaves = new SafeLeaves(
             1,
             "text",
@@ -196,10 +211,19 @@ public class CachingHazardWalkerTests
     [Test]
     public async Task Should_report_a_diagnostic()
     {
-        var diagnostic = Diagnostic.Create("T001", "cat", "message", DiagnosticSeverity.Warning,
-            DiagnosticSeverity.Warning, true, 1);
+        var diagnostic = Diagnostic.Create(
+            "T001",
+            "cat",
+            "message",
+            DiagnosticSeverity.Warning,
+            DiagnosticSeverity.Warning,
+            true,
+            1
+        );
 
-        await Assert.That(CachingHazardWalker.Find(new DiagnosticHolder(diagnostic))).IsEqualTo("Diagnostic");
+        await Assert
+            .That(CachingHazardWalker.Find(new DiagnosticHolder(diagnostic)))
+            .IsEqualTo("Diagnostic");
     }
 
     [Test]
@@ -249,13 +273,18 @@ public class CachingHazardWalkerTests
                     static (node, _) => node is ClassDeclarationSyntax,
                     static (ctx, ct) =>
                     {
-                        var symbol = ctx.SemanticModel.GetDeclaredSymbol((ClassDeclarationSyntax)ctx.Node, ct)!;
+                        var symbol = ctx.SemanticModel.GetDeclaredSymbol(
+                            (ClassDeclarationSyntax)ctx.Node,
+                            ct
+                        )!;
                         return new NameEqual(symbol.Name, symbol);
                     }
                 )
                 .WithTrackingName("model");
-            context.RegisterSourceOutput(tracked,
-                static (ctx, m) => ctx.AddSource(m.Name + ".g.cs", "class G { }"));
+            context.RegisterSourceOutput(
+                tracked,
+                static (ctx, m) => ctx.AddSource(m.Name + ".g.cs", "class G { }")
+            );
         }
     }
 
@@ -263,10 +292,16 @@ public class CachingHazardWalkerTests
     public async Task Should_report_a_hazard_in_an_output_that_reruns_unchanged()
     {
         var ex = Assert.Throws<GeneratorTestException>(() =>
-            GeneratorHarness.AssertCacheable(new UnchangedHazardGenerator(), ["class A { }\n"], "model")
+            GeneratorHarness.AssertCacheable(
+                new UnchangedHazardGenerator(),
+                ["class A { }\n"],
+                "model"
+            )
         );
 
-        await Assert.That(ex.Message).Contains("Step 'model' output 0 holds a caching hazard at Symbol");
+        await Assert
+            .That(ex.Message)
+            .Contains("Step 'model' output 0 holds a caching hazard at Symbol");
         await Assert.That(ex.Message).DoesNotContain("expected Cached");
     }
 
@@ -278,11 +313,18 @@ public class CachingHazardWalkerTests
                 .SyntaxProvider.CreateSyntaxProvider(
                     static (node, _) => node is ClassDeclarationSyntax,
                     static (ctx, ct) =>
-                        new Member(ctx.SemanticModel.GetDeclaredSymbol((ClassDeclarationSyntax)ctx.Node, ct)!)
+                        new Member(
+                            ctx.SemanticModel.GetDeclaredSymbol(
+                                (ClassDeclarationSyntax)ctx.Node,
+                                ct
+                            )!
+                        )
                 )
                 .WithTrackingName("model");
-            context.RegisterSourceOutput(tracked,
-                static (ctx, m) => ctx.AddSource(m.Symbol.Name + ".g.cs", "class G { }"));
+            context.RegisterSourceOutput(
+                tracked,
+                static (ctx, m) => ctx.AddSource(m.Symbol.Name + ".g.cs", "class G { }")
+            );
         }
     }
 
@@ -290,7 +332,11 @@ public class CachingHazardWalkerTests
     public async Task Should_name_step_and_member_path_when_assert_cacheable_meets_a_hazard()
     {
         var ex = Assert.Throws<GeneratorTestException>(() =>
-            GeneratorHarness.AssertCacheable(new SymbolInModelGenerator(), ["class A { }\n"], "model")
+            GeneratorHarness.AssertCacheable(
+                new SymbolInModelGenerator(),
+                ["class A { }\n"],
+                "model"
+            )
         );
 
         await Assert.That(ex.Message).Contains("Step 'model'");

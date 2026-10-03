@@ -10,8 +10,7 @@ namespace Haitch.Roslyn.Tests.Writing;
 
 public class AttributeRenderingTests
 {
-    private const string Definitions =
-        """
+    private const string Definitions = """
         using System;
 
         namespace Attrs;
@@ -156,8 +155,11 @@ public class AttributeRenderingTests
     {
         string rendered = RenderUsage("[Primitives(42, 5L, 7U, 9UL, true, 'x', 1.5f, 2.5)]");
 
-        await Assert.That(rendered)
-            .IsEqualTo("[global::Attrs.PrimitivesAttribute(42, 5L, 7U, 9UL, true, 'x', 1.5f, 2.5d)]");
+        await Assert
+            .That(rendered)
+            .IsEqualTo(
+                "[global::Attrs.PrimitivesAttribute(42, 5L, 7U, 9UL, true, 'x', 1.5f, 2.5d)]"
+            );
     }
 
     [Test]
@@ -165,7 +167,9 @@ public class AttributeRenderingTests
     {
         string rendered = RenderUsage("[Text(\"a\\\"b\\\\c\\n\\t\")]");
 
-        await Assert.That(rendered).IsEqualTo("[global::Attrs.TextAttribute(\"a\\\"b\\\\c\\n\\t\")]");
+        await Assert
+            .That(rendered)
+            .IsEqualTo("[global::Attrs.TextAttribute(\"a\\\"b\\\\c\\n\\t\")]");
     }
 
     [Test]
@@ -173,7 +177,9 @@ public class AttributeRenderingTests
     {
         string rendered = RenderUsage("[Chars('\\'', '\\n', '\\\\')]");
 
-        await Assert.That(rendered).IsEqualTo("[global::Attrs.CharsAttribute('\\'', '\\n', '\\\\')]");
+        await Assert
+            .That(rendered)
+            .IsEqualTo("[global::Attrs.CharsAttribute('\\'', '\\n', '\\\\')]");
     }
 
     [Test]
@@ -181,8 +187,11 @@ public class AttributeRenderingTests
     {
         string rendered = RenderUsage("[Enums(Color.Red, Color.Negative)]");
 
-        await Assert.That(rendered)
-            .IsEqualTo("[global::Attrs.EnumsAttribute(global::Attrs.Color.Red, global::Attrs.Color.Negative)]");
+        await Assert
+            .That(rendered)
+            .IsEqualTo(
+                "[global::Attrs.EnumsAttribute(global::Attrs.Color.Red, global::Attrs.Color.Negative)]"
+            );
     }
 
     [Test]
@@ -190,8 +199,11 @@ public class AttributeRenderingTests
     {
         string rendered = RenderUsage("[Enums((Color)5, (Color)(-2))]");
 
-        await Assert.That(rendered)
-            .IsEqualTo("[global::Attrs.EnumsAttribute((global::Attrs.Color)5, (global::Attrs.Color)(-2))]");
+        await Assert
+            .That(rendered)
+            .IsEqualTo(
+                "[global::Attrs.EnumsAttribute((global::Attrs.Color)5, (global::Attrs.Color)(-2))]"
+            );
     }
 
     [Test]
@@ -199,7 +211,9 @@ public class AttributeRenderingTests
     {
         string rendered = RenderUsage("[Mode(Mode.A | Mode.B)]");
 
-        await Assert.That(rendered).IsEqualTo("[global::Attrs.ModeAttribute((global::Attrs.Mode)3)]");
+        await Assert
+            .That(rendered)
+            .IsEqualTo("[global::Attrs.ModeAttribute((global::Attrs.Mode)3)]");
     }
 
     [Test]
@@ -207,8 +221,11 @@ public class AttributeRenderingTests
     {
         string rendered = RenderUsage("[TypeArg(typeof(System.Collections.Generic.List<int>))]");
 
-        await Assert.That(rendered)
-            .IsEqualTo("[global::Attrs.TypeArgAttribute(typeof(global::System.Collections.Generic.List<int>))]");
+        await Assert
+            .That(rendered)
+            .IsEqualTo(
+                "[global::Attrs.TypeArgAttribute(typeof(global::System.Collections.Generic.List<int>))]"
+            );
     }
 
     [Test]
@@ -216,7 +233,9 @@ public class AttributeRenderingTests
     {
         string rendered = RenderUsage("[Array(new[] { 1, 2, 3 })]");
 
-        await Assert.That(rendered).IsEqualTo("[global::Attrs.ArrayAttribute(new int[] { 1, 2, 3 })]");
+        await Assert
+            .That(rendered)
+            .IsEqualTo("[global::Attrs.ArrayAttribute(new int[] { 1, 2, 3 })]");
     }
 
     [Test]
@@ -224,8 +243,11 @@ public class AttributeRenderingTests
     {
         string rendered = RenderUsage("[Nulls(null, null)]");
 
-        await Assert.That(rendered)
-            .IsEqualTo("[global::Attrs.NullsAttribute(default(string), default(global::System.Type))]");
+        await Assert
+            .That(rendered)
+            .IsEqualTo(
+                "[global::Attrs.NullsAttribute(default(string), default(global::System.Type))]"
+            );
     }
 
     [Test]
@@ -233,7 +255,9 @@ public class AttributeRenderingTests
     {
         string rendered = RenderUsage("[Named(\"x\", Count = 3, Label = \"n\")]");
 
-        await Assert.That(rendered).IsEqualTo("[global::Attrs.NamedAttribute(\"x\", Count = 3, Label = \"n\")]");
+        await Assert
+            .That(rendered)
+            .IsEqualTo("[global::Attrs.NamedAttribute(\"x\", Count = 3, Label = \"n\")]");
     }
 
     [Test]
@@ -241,7 +265,9 @@ public class AttributeRenderingTests
     {
         string rendered = RenderUsage("[Params(1, 2, 3)]");
 
-        await Assert.That(rendered).IsEqualTo("[global::Attrs.ParamsAttribute(new int[] { 1, 2, 3 })]");
+        await Assert
+            .That(rendered)
+            .IsEqualTo("[global::Attrs.ParamsAttribute(new int[] { 1, 2, 3 })]");
     }
 
     [Test]
@@ -257,7 +283,8 @@ public class AttributeRenderingTests
     {
         string rendered = RenderUsage("[Objects(1, \"a\", null, Color.Red)]");
 
-        await Assert.That(rendered)
+        await Assert
+            .That(rendered)
             .IsEqualTo(
                 "[global::Attrs.ObjectsAttribute(new object?[] { 1, \"a\", default(object), global::Attrs.Color.Red })]"
             );
@@ -268,8 +295,11 @@ public class AttributeRenderingTests
     {
         string rendered = RenderUsage("[Objects(null, null)]");
 
-        await Assert.That(rendered)
-            .IsEqualTo("[global::Attrs.ObjectsAttribute(new object?[] { default(object), default(object) })]");
+        await Assert
+            .That(rendered)
+            .IsEqualTo(
+                "[global::Attrs.ObjectsAttribute(new object?[] { default(object), default(object) })]"
+            );
     }
 
     [Test]
@@ -285,7 +315,9 @@ public class AttributeRenderingTests
     {
         string rendered = RenderUsage("[Overloaded((string?)null)]");
 
-        await Assert.That(rendered).IsEqualTo("[global::Attrs.OverloadedAttribute(default(string))]");
+        await Assert
+            .That(rendered)
+            .IsEqualTo("[global::Attrs.OverloadedAttribute(default(string))]");
     }
 
     [Test]
@@ -293,7 +325,9 @@ public class AttributeRenderingTests
     {
         string rendered = RenderUsage("[AliasUse(Alias.None)]");
 
-        await Assert.That(rendered).IsEqualTo("[global::Attrs.AliasUseAttribute((global::Attrs.Alias)0)]");
+        await Assert
+            .That(rendered)
+            .IsEqualTo("[global::Attrs.AliasUseAttribute((global::Attrs.Alias)0)]");
     }
 
     [Test]
@@ -317,8 +351,11 @@ public class AttributeRenderingTests
     {
         string rendered = RenderUsage("[TypeArg(typeof(System.Collections.Generic.List<>))]");
 
-        await Assert.That(rendered)
-            .IsEqualTo("[global::Attrs.TypeArgAttribute(typeof(global::System.Collections.Generic.List<>))]");
+        await Assert
+            .That(rendered)
+            .IsEqualTo(
+                "[global::Attrs.TypeArgAttribute(typeof(global::System.Collections.Generic.List<>))]"
+            );
     }
 
     [Test]
@@ -351,7 +388,8 @@ public class AttributeRenderingTests
 
         writer.WriteAttributes(models.ToEquatableArray());
 
-        await Assert.That(writer.ToString())
+        await Assert
+            .That(writer.ToString())
             .IsEqualTo("[global::Attrs.PlainAttribute]\n[global::Attrs.TextAttribute(\"a\")]\n");
     }
 
@@ -371,7 +409,7 @@ public class AttributeRenderingTests
         AttributeModel plain = GetModels(["[Plain]"])[0];
         AttributeModel withError = plain with
         {
-            ConstructorArguments = new[] { ConstantValue.Error }.ToEquatableArray()
+            ConstructorArguments = new[] { ConstantValue.Error }.ToEquatableArray(),
         };
         SourceWriter writer = new();
 
@@ -385,11 +423,12 @@ public class AttributeRenderingTests
         AttributeModel plain = GetModels(["[Plain]"])[0];
         AttributeModel withError = plain with
         {
-            ConstructorArguments = new[] { ConstantValue.Error }.ToEquatableArray()
+            ConstructorArguments = new[] { ConstantValue.Error }.ToEquatableArray(),
         };
         SourceWriter writer = new();
 
-        await Assert.That(() => writer.WriteAttributes(new[] { plain, withError }.ToEquatableArray()))
+        await Assert
+            .That(() => writer.WriteAttributes(new[] { plain, withError }.ToEquatableArray()))
             .Throws<ArgumentException>();
         await Assert.That(writer.ToString()).IsEqualTo(string.Empty);
     }
@@ -400,7 +439,8 @@ public class AttributeRenderingTests
         AttributeModel[] models = GetModels(Usages);
         string declarations = string.Join(
             "\n",
-            models.Select((model, i) =>
+            models.Select(
+                (model, i) =>
                 {
                     SourceWriter writer = new();
                     writer.WriteAttribute(model);
@@ -425,18 +465,26 @@ public class AttributeRenderingTests
     [Test]
     public async Task Should_render_the_generated_code_attribute()
     {
-        string rendered = SourceWriterExtensions.RenderAttribute(WellKnownAttributes.GeneratedCode("Tool", "1.0.0"));
+        string rendered = SourceWriterExtensions.RenderAttribute(
+            WellKnownAttributes.GeneratedCode("Tool", "1.0.0")
+        );
 
-        await Assert.That(rendered)
-            .IsEqualTo("[global::System.CodeDom.Compiler.GeneratedCodeAttribute(\"Tool\", \"1.0.0\")]");
+        await Assert
+            .That(rendered)
+            .IsEqualTo(
+                "[global::System.CodeDom.Compiler.GeneratedCodeAttribute(\"Tool\", \"1.0.0\")]"
+            );
     }
 
     [Test]
     public async Task Should_render_the_editor_browsable_never_attribute()
     {
-        string rendered = SourceWriterExtensions.RenderAttribute(WellKnownAttributes.EditorBrowsableNever);
+        string rendered = SourceWriterExtensions.RenderAttribute(
+            WellKnownAttributes.EditorBrowsableNever
+        );
 
-        await Assert.That(rendered)
+        await Assert
+            .That(rendered)
             .IsEqualTo(
                 "[global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]"
             );
@@ -445,9 +493,9 @@ public class AttributeRenderingTests
     [Test]
     public async Task Should_build_generated_code_equal_to_the_model_read_from_source()
     {
-        AttributeModel fromSource = GetModelsFromSource(
-            ["[System.CodeDom.Compiler.GeneratedCode(\"Tool\", \"1.0.0\")]"]
-        )[0];
+        AttributeModel fromSource = GetModelsFromSource([
+            "[System.CodeDom.Compiler.GeneratedCode(\"Tool\", \"1.0.0\")]",
+        ])[0];
 
         await Assert.That(WellKnownAttributes.GeneratedCode("Tool", "1.0.0")).IsEqualTo(fromSource);
     }
@@ -455,9 +503,9 @@ public class AttributeRenderingTests
     [Test]
     public async Task Should_build_editor_browsable_never_equal_to_the_model_read_from_source()
     {
-        AttributeModel fromSource = GetModelsFromSource(
-            ["[System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]"]
-        )[0];
+        AttributeModel fromSource = GetModelsFromSource([
+            "[System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]",
+        ])[0];
 
         await Assert.That(WellKnownAttributes.EditorBrowsableNever).IsEqualTo(fromSource);
     }
@@ -489,16 +537,16 @@ public class AttributeRenderingTests
         writer.WriteAttribute(WellKnownAttributes.EditorBrowsableNever);
 
         string source = $$"""
-                          namespace Consumer
-                          {
-                              class System { }
-                              class GeneratedCodeAttribute : global::System.Attribute { }
-                              class EditorBrowsableAttribute : global::System.Attribute { }
-                              class EditorBrowsableState { }
+            namespace Consumer
+            {
+                class System { }
+                class GeneratedCodeAttribute : global::System.Attribute { }
+                class EditorBrowsableAttribute : global::System.Attribute { }
+                class EditorBrowsableState { }
 
-                              {{writer}}class Decorated { }
-                          }
-                          """;
+                {{writer}}class Decorated { }
+            }
+            """;
         CSharpCompilation compilation = CompilationHelper.Compile(source, allowErrors: true);
         string[] errors = compilation
             .GetDiagnostics()
@@ -511,11 +559,16 @@ public class AttributeRenderingTests
 
     private static AttributeModel[] GetModelsFromSource(string[] usages)
     {
-        string source = string.Join("\n", usages.Select((usage, i) => $"{usage}\nclass Target{i} {{ }}"));
+        string source = string.Join(
+            "\n",
+            usages.Select((usage, i) => $"{usage}\nclass Target{i} {{ }}")
+        );
         CSharpCompilation compilation = CompilationHelper.Compile(source);
 
         return usages
-            .Select((_, i) => compilation.GetTypeByMetadataName($"Target{i}")!.GetAttributes().Single())
+            .Select(
+                (_, i) => compilation.GetTypeByMetadataName($"Target{i}")!.GetAttributes().Single()
+            )
             .Select(attribute => AttributeModel.From(attribute)!)
             .ToArray();
     }
@@ -534,7 +587,10 @@ public class AttributeRenderingTests
         CSharpCompilation compilation = CompilationHelper.Compile(source);
 
         return usages
-            .Select((_, i) => compilation.GetTypeByMetadataName($"Attrs.Target{i}")!.GetAttributes().Single())
+            .Select(
+                (_, i) =>
+                    compilation.GetTypeByMetadataName($"Attrs.Target{i}")!.GetAttributes().Single()
+            )
             .Select(attribute => AttributeModel.From(attribute)!)
             .ToArray();
     }

@@ -21,8 +21,7 @@ public class SourceWriterTests
             }
         }
 
-        string expected =
-            """
+        string expected = """
             namespace Foo
             {
                 public class Bar
@@ -47,8 +46,7 @@ public class SourceWriterTests
             writer.WriteLine("public int X;\npublic int Y;");
         }
 
-        string expected =
-            """
+        string expected = """
             public class Bar
             {
                 public int X;
@@ -73,8 +71,7 @@ public class SourceWriterTests
             writer.WriteLine("public int Y;");
         }
 
-        string expected =
-            """
+        string expected = """
             public class Bar
             {
                 public int X;
@@ -98,8 +95,7 @@ public class SourceWriterTests
             writer.WriteLine("public int X;\n\npublic int Y;");
         }
 
-        string expected =
-            """
+        string expected = """
             public class Bar
             {
                 public int X;
@@ -124,8 +120,7 @@ public class SourceWriterTests
             writer.WriteLine("2,");
         }
 
-        string expected =
-            """
+        string expected = """
             private static readonly int[] Values =
             {
                 1,
@@ -187,8 +182,7 @@ public class SourceWriterTests
             writer.WriteLine();
         }
 
-        string expected =
-            """
+        string expected = """
             public class Bar
             {
                 public void Foo()
@@ -210,8 +204,7 @@ public class SourceWriterTests
             writer.WriteLine("a;\r\nb;");
         }
 
-        string expected =
-            """
+        string expected = """
             public class Bar
             {
                 a;
@@ -236,8 +229,7 @@ public class SourceWriterTests
             writer.WriteLine("b;");
         }
 
-        string expected =
-            """
+        string expected = """
             public class Bar
             {
                 a;
@@ -261,8 +253,7 @@ public class SourceWriterTests
             writer.WriteLine("b;");
         }
 
-        string expected =
-            """
+        string expected = """
             public class Bar
             {
                 a;
@@ -285,8 +276,7 @@ public class SourceWriterTests
         scope.Dispose();
         scope.Dispose();
 
-        string expected =
-            """
+        string expected = """
             public class Bar
             {
                 public int X;

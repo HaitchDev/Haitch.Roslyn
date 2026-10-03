@@ -10,7 +10,10 @@ public class SyntaxInfoTests
     [Test]
     public async Task Should_be_partial_for_a_partial_top_level_type()
     {
-        TypeDeclarationSyntax type = GetTypeDeclaration("public partial class Sample { }", "Sample");
+        TypeDeclarationSyntax type = GetTypeDeclaration(
+            "public partial class Sample { }",
+            "Sample"
+        );
 
         SyntaxInfo info = SyntaxInfo.From(type);
 
@@ -32,8 +35,7 @@ public class SyntaxInfoTests
     [Test]
     public async Task Should_not_flag_containing_types_partial_when_nested_in_a_non_partial_containing_type()
     {
-        const string source =
-            """
+        const string source = """
             public class Outer
             {
                 public partial class Inner { }
@@ -51,8 +53,7 @@ public class SyntaxInfoTests
     [Test]
     public async Task Should_flag_containing_types_partial_when_it_and_every_containing_type_are_partial()
     {
-        const string source =
-            """
+        const string source = """
             public partial class Outer
             {
                 public partial class Inner { }
@@ -88,7 +89,10 @@ public class SyntaxInfoTests
     [Test]
     public async Task Should_capture_the_location_of_the_identifier()
     {
-        TypeDeclarationSyntax type = GetTypeDeclaration("public partial class Sample { }", "Sample");
+        TypeDeclarationSyntax type = GetTypeDeclaration(
+            "public partial class Sample { }",
+            "Sample"
+        );
 
         SyntaxInfo info = SyntaxInfo.From(type);
 

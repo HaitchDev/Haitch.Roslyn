@@ -19,18 +19,17 @@ internal static class ScopeCompileCheck
     /// </summary>
     public static string[] Compile(string body)
     {
-        string source =
-            $$"""
-              using Haitch.Roslyn.Writing;
+        string source = $$"""
+            using Haitch.Roslyn.Writing;
 
-              internal static class Snippet
-              {
-                  internal static void Run(SourceWriter writer)
-                  {
-              {{body}}
-                  }
-              }
-              """;
+            internal static class Snippet
+            {
+                internal static void Run(SourceWriter writer)
+                {
+            {{body}}
+                }
+            }
+            """;
 
         var parseOptions = new CSharpParseOptions(LanguageVersion.Latest);
         SyntaxTree snippet = CSharpSyntaxTree.ParseText(source, parseOptions);
@@ -41,7 +40,9 @@ internal static class ScopeCompileCheck
             References,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions: NullableContextOptions.Enable));
+                nullableContextOptions: NullableContextOptions.Enable
+            )
+        );
 
         return compilation
             .GetDiagnostics()
@@ -61,8 +62,13 @@ internal static class ScopeCompileCheck
         {
             string relative = Path.GetRelativePath(root, file);
 
-            if (relative.StartsWith("bin" + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-                || relative.StartsWith("obj" + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            if (
+                relative.StartsWith("bin" + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                || relative.StartsWith(
+                    "obj" + Path.DirectorySeparatorChar,
+                    StringComparison.Ordinal
+                )
+            )
             {
                 continue;
             }
@@ -84,7 +90,9 @@ internal static class ScopeCompileCheck
 
         // The shipped sources use Roslyn types (SourceText, Accessibility, ...).
         references.Add(MetadataReference.CreateFromFile(typeof(Compilation).Assembly.Location));
-        references.Add(MetadataReference.CreateFromFile(typeof(CSharpCompilation).Assembly.Location));
+        references.Add(
+            MetadataReference.CreateFromFile(typeof(CSharpCompilation).Assembly.Location)
+        );
 
         return references.ToArray();
     }

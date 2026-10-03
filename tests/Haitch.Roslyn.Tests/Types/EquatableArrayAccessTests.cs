@@ -263,7 +263,10 @@ public class EquatableArrayAccessTests
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic
         );
 
-        await Assert.That(field).IsNotNull().Because("EquatableArray<T> must have a private _array field");
+        await Assert
+            .That(field)
+            .IsNotNull()
+            .Because("EquatableArray<T> must have a private _array field");
 
         // Create returns default (null backing array); the parameterless constructor would not.
         await Assert.That(field!.GetValue(values)).IsNull();

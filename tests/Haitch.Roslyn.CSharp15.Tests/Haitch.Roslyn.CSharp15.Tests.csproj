@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <OutputType>Exe</OutputType>
@@ -11,18 +10,21 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="TUnit"/>
+        <PackageReference Include="TUnit" />
         <!-- Roslyn 4.12 has no preview language version that parses unions or closed types. -->
-        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0"/>
-        <PackageReference Include="Polyfill" PrivateAssets="all"/>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
+        <PackageReference Include="Polyfill" PrivateAssets="all" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\Haitch.Roslyn.Testing\Haitch.Roslyn.Testing.csproj"/>
+        <ProjectReference Include="..\..\src\Haitch.Roslyn.Testing\Haitch.Roslyn.Testing.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <Compile Include="..\..\src\Haitch.Roslyn\**\*.cs" Exclude="..\..\src\Haitch.Roslyn\bin\**;..\..\src\Haitch.Roslyn\obj\**" Link="Src\%(RecursiveDir)%(Filename)%(Extension)"/>
+        <Compile
+            Include="..\..\src\Haitch.Roslyn\**\*.cs"
+            Exclude="..\..\src\Haitch.Roslyn\bin\**;..\..\src\Haitch.Roslyn\obj\**"
+            Link="Src\%(RecursiveDir)%(Filename)%(Extension)"
+        />
     </ItemGroup>
-
 </Project>

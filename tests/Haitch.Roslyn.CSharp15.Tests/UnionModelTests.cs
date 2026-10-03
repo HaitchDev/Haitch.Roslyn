@@ -8,12 +8,12 @@ namespace Haitch.Roslyn.CSharp15.Tests;
 public class UnionModelTests
 {
     private const string PetSource = """
-                                     #nullable enable
-                                     namespace App;
-                                     public record Cat(string Name);
-                                     public record Dog(string Name);
-                                     public partial union Pet(Cat, Dog);
-                                     """;
+        #nullable enable
+        namespace App;
+        public record Cat(string Name);
+        public record Dog(string Name);
+        public partial union Pet(Cat, Dog);
+        """;
 
     private static readonly MetadataReference[] References = CreateReferences();
 
@@ -34,12 +34,12 @@ public class UnionModelTests
     public async Task From_HandWrittenStructImplementingIUnion_StaysStructAndGeneratedPartCompiles()
     {
         const string source = """
-                              #nullable enable
-                              public partial struct Manual : System.Runtime.CompilerServices.IUnion
-                              {
-                                  public object? Value => null;
-                              }
-                              """;
+            #nullable enable
+            public partial struct Manual : System.Runtime.CompilerServices.IUnion
+            {
+                public object? Value => null;
+            }
+            """;
         var compilation = Compile(source);
 
         var model = TypeModel.From(compilation.GetTypeByMetadataName("Manual")!);
@@ -150,15 +150,15 @@ public class UnionModelTests
     public async Task WriteTypeDeclaration_NestedPartialClassInUnion_CompilesWithZeroDiagnostics()
     {
         const string source = """
-                              #nullable enable
-                              namespace App;
-                              public record Cat(string Name);
-                              public record Dog(string Name);
-                              public partial union Pet(Cat, Dog)
-                              {
-                                  public partial class Inner { }
-                              }
-                              """;
+            #nullable enable
+            namespace App;
+            public record Cat(string Name);
+            public record Dog(string Name);
+            public partial union Pet(Cat, Dog)
+            {
+                public partial class Inner { }
+            }
+            """;
         var compilation = Compile(source);
         var model = TypeModel.From(compilation.GetTypeByMetadataName("App.Pet+Inner")!);
 

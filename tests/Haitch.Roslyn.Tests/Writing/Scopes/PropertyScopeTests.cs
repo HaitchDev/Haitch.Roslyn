@@ -10,8 +10,7 @@ namespace Haitch.Roslyn.Tests.Writing.Scopes;
 
 public class PropertyScopeTests
 {
-    private const string PropertySource =
-        """
+    private const string PropertySource = """
         public abstract class Source
         {
             private int _count;
@@ -89,7 +88,8 @@ public class PropertyScopeTests
         await Assert
             .That(body)
             .IsEqualTo(
-                "    public int Count\n    {\n        get\n        {\n            return _count;\n        }\n        private set\n        {\n            _count = value;\n        }\n    }\n");
+                "    public int Count\n    {\n        get\n        {\n            return _count;\n        }\n        private set\n        {\n            _count = value;\n        }\n    }\n"
+            );
     }
 
     [Test]
@@ -111,7 +111,8 @@ public class PropertyScopeTests
         await Assert
             .That(body)
             .IsEqualTo(
-                "    public string Tag\n    {\n        get\n        {\n        }\n        init\n        {\n        }\n    }\n\n    public int Open\n    {\n        set\n        {\n        }\n    }\n");
+                "    public string Tag\n    {\n        get\n        {\n        }\n        init\n        {\n        }\n    }\n\n    public int Open\n    {\n        set\n        {\n        }\n    }\n"
+            );
     }
 
     [Test]
@@ -125,7 +126,9 @@ public class PropertyScopeTests
 
         await Assert
             .That(body)
-            .IsEqualTo("    public int WriteOnly\n    {\n        set\n        {\n        }\n    }\n");
+            .IsEqualTo(
+                "    public int WriteOnly\n    {\n        set\n        {\n        }\n    }\n"
+            );
     }
 
     [Test]
@@ -147,7 +150,8 @@ public class PropertyScopeTests
         await Assert
             .That(body)
             .IsEqualTo(
-                "    public static int Shared\n    {\n        get\n        {\n            if (true)\n            {\n                return 2;\n            }\n        }\n    }\n\n    public virtual int Virt\n    {\n        get\n        {\n        }\n    }\n");
+                "    public static int Shared\n    {\n        get\n        {\n            if (true)\n            {\n                return 2;\n            }\n        }\n    }\n\n    public virtual int Virt\n    {\n        get\n        {\n        }\n    }\n"
+            );
     }
 
     [Test]
@@ -161,7 +165,9 @@ public class PropertyScopeTests
                         .GetNamedTypeSymbol("public class F { public int X; }", "F")
                         .GetMembers("X")
                         .OfType<IFieldSymbol>()
-                        .Single()));
+                        .Single()
+                )
+            );
 
             using (var property = type.Property(PropertyFrom("WriteOnly")))
             {
@@ -174,7 +180,8 @@ public class PropertyScopeTests
         await Assert
             .That(body)
             .IsEqualTo(
-                "    public int X;\n\n    public int WriteOnly\n    {\n        set\n        {\n        }\n    }\n\n    public int Count { get; private set; }\n");
+                "    public int X;\n\n    public int WriteOnly\n    {\n        set\n        {\n        }\n    }\n\n    public int Count { get; private set; }\n"
+            );
     }
 
     [Test]
@@ -211,7 +218,13 @@ public class PropertyScopeTests
         PropertyModel property = PropertyFrom("Open") with
         {
             Name = "Member",
-            ExplicitInterface = new TypeRef("global::ISource", NullableAnnotation.NotAnnotated, SpecialType.None, TypeKind.Interface, false),
+            ExplicitInterface = new TypeRef(
+                "global::ISource",
+                NullableAnnotation.NotAnnotated,
+                SpecialType.None,
+                TypeKind.Interface,
+                false
+            ),
             ExplicitInterfaceMemberName = "Member",
         };
 
@@ -318,9 +331,7 @@ public class PropertyScopeTests
             {
                 try
                 {
-                    using var second = kind == "get"
-                        ? property.Get()
-                        : property.Set();
+                    using var second = kind == "get" ? property.Get() : property.Set();
                     failures.Add(kind + ": no exception");
                 }
                 catch (InvalidOperationException) { }
@@ -428,7 +439,12 @@ public class PropertyScopeTests
         CSharpCompilation compilation = CompilationHelper.Compile(source, allowErrors: true);
 
         await Assert
-            .That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Id))
+            .That(
+                compilation
+                    .GetDiagnostics()
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => d.Id)
+            )
             .IsEmpty();
     }
 
@@ -443,8 +459,11 @@ public class PropertyScopeTests
             "PartialPropertyAssembly",
             [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp13))],
             references,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions: NullableContextOptions.Enable));
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable
+            )
+        );
     }
 
     private static string[] ErrorIds(CSharpCompilation compilation)
@@ -456,7 +475,11 @@ public class PropertyScopeTests
             .ToArray();
     }
 
-    private static PropertyModel PropertyOf(CSharpCompilation compilation, string typeName, string name)
+    private static PropertyModel PropertyOf(
+        CSharpCompilation compilation,
+        string typeName,
+        string name
+    )
     {
         INamedTypeSymbol type = compilation.GetTypeByMetadataName(typeName)!;
 
@@ -518,7 +541,11 @@ public class PropertyScopeTests
         await Assert.That(ErrorIds(CompileCSharp13(user + "\n" + writer))).IsEmpty();
     }
 
-    private static async Task<string[]> ImplementedPartialX(string user, string getBody = "return 0;", bool set = false)
+    private static async Task<string[]> ImplementedPartialX(
+        string user,
+        string getBody = "return 0;",
+        bool set = false
+    )
     {
         CSharpCompilation userCompilation = CompileCSharp13(user);
 
@@ -552,7 +579,9 @@ public class PropertyScopeTests
             .That(
                 await ImplementedPartialX(
                     "public partial struct Host { public partial int X { readonly get; set; } }",
-                    set: true))
+                    set: true
+                )
+            )
             .IsEmpty();
     }
 
@@ -562,15 +591,18 @@ public class PropertyScopeTests
         await Assert
             .That(
                 await ImplementedPartialX(
-                    "public readonly partial struct Host { public readonly partial int X { get; } }"))
+                    "public readonly partial struct Host { public readonly partial int X { get; } }"
+                )
+            )
             .IsEmpty();
     }
 
     [Test]
     public async Task Should_compile_a_sealed_interface_property()
     {
-        CSharpCompilation source =
-            CompileCSharp13("public interface ISealed { sealed int Value { get { return 1; } } }");
+        CSharpCompilation source = CompileCSharp13(
+            "public interface ISealed { sealed int Value { get { return 1; } } }"
+        );
         const string user = "public partial interface IHost { }";
         CSharpCompilation userCompilation = CompileCSharp13(user);
 
@@ -580,7 +612,12 @@ public class PropertyScopeTests
         {
             using var type = file.Type(TypeOf(userCompilation, "IHost"));
             // Roslyn reports IsSealed = false for a sealed interface member, so the flag is set by hand.
-            using var value = type.Property(PropertyOf(source, "ISealed", "Value") with { IsSealed = true });
+            using var value = type.Property(
+                PropertyOf(source, "ISealed", "Value") with
+                {
+                    IsSealed = true,
+                }
+            );
             using var get = value.Get();
             get.Line("return 1;");
         }
@@ -600,7 +637,8 @@ public class PropertyScopeTests
                     using var t = file.Type(type);
                     using var property = t.Property(model);
                     property.Line("x");
-            """);
+            """
+        );
 
         await Assert.That(errors).IsEquivalentTo(new[] { "CS1061" });
     }
@@ -617,7 +655,8 @@ public class PropertyScopeTests
                     using var t = file.Type(type);
                     using var property = t.Property(model);
                     property.Method(method);
-            """);
+            """
+        );
 
         await Assert.That(errors).IsEquivalentTo(new[] { "CS1061" });
     }

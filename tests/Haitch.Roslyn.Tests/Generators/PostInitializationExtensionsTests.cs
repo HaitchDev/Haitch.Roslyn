@@ -18,7 +18,8 @@ public class PostInitializationExtensionsTests
             AttributeTargets.Class | AttributeTargets.Struct,
             allowMultiple: true,
             inherited: true,
-            properties: [("string", "Name"), ("bool", "IsEnabled")]);
+            properties: [("string", "Name"), ("bool", "IsEnabled")]
+        );
 
         GeneratorDriverRunResult result = RunGenerator(generator);
 
@@ -32,7 +33,9 @@ public class PostInitializationExtensionsTests
         await Assert.That(generatedSource).Contains("Inherited = true");
         await Assert.That(generatedSource).Contains("public string Name { get; set; }");
         await Assert.That(generatedSource).Contains("public bool IsEnabled { get; set; }");
-        await Assert.That(generatedSource).Contains("[global::Microsoft.CodeAnalysis.EmbeddedAttribute]");
+        await Assert
+            .That(generatedSource)
+            .Contains("[global::Microsoft.CodeAnalysis.EmbeddedAttribute]");
     }
 
     [Test]
@@ -43,11 +46,14 @@ public class PostInitializationExtensionsTests
         (Compilation compilation, ImmutableArray<Diagnostic> diagnostics) = RunAndCompile(
             generator,
             "Consumer",
-            "namespace Consumer { [Sample.MarkerAttribute] class Usage { } }");
+            "namespace Consumer { [Sample.MarkerAttribute] class Usage { } }"
+        );
 
         await Assert.That(HasDiagnosticsAtWarningOrAbove(diagnostics)).IsFalse();
 
-        INamedTypeSymbol? attributeSymbol = compilation.GetTypeByMetadataName("Sample.MarkerAttribute");
+        INamedTypeSymbol? attributeSymbol = compilation.GetTypeByMetadataName(
+            "Sample.MarkerAttribute"
+        );
 
         await Assert.That(attributeSymbol).IsNotNull();
         await Assert.That(attributeSymbol!.DeclaredAccessibility).IsEqualTo(Accessibility.Internal);
@@ -62,7 +68,8 @@ public class PostInitializationExtensionsTests
         (Compilation library, ImmutableArray<Diagnostic> libraryDiagnostics) = RunAndCompile(
             generator,
             "Library",
-            "[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(\"Consumer\")]");
+            "[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(\"Consumer\")]"
+        );
 
         await Assert.That(HasDiagnosticsAtWarningOrAbove(libraryDiagnostics)).IsFalse();
 
@@ -72,7 +79,8 @@ public class PostInitializationExtensionsTests
             generator,
             "Consumer",
             "namespace Consumer { [Shared.MarkerAttribute] class Usage { } }",
-            [libraryReference]);
+            [libraryReference]
+        );
 
         // The hand-rolled EmbeddedAttribute helper (needed because Roslyn 4.8 has no built-in
         // AddEmbeddedAttributeDefinition) cannot mark itself with [EmbeddedAttribute] without
@@ -84,21 +92,28 @@ public class PostInitializationExtensionsTests
     }
 
     [Test]
-    public async Task
-        Should_not_raise_CS0101_when_two_generators_in_one_project_each_add_the_embedded_attribute_definition()
+    public async Task Should_not_raise_CS0101_when_two_generators_in_one_project_each_add_the_embedded_attribute_definition()
     {
         MarkerGenerator generatorA = new("Sample.First", "FirstAttribute", AttributeTargets.Class);
-        MarkerGenerator generatorB = new("Sample.Second", "SecondAttribute", AttributeTargets.Method);
+        MarkerGenerator generatorB = new(
+            "Sample.Second",
+            "SecondAttribute",
+            AttributeTargets.Method
+        );
 
         CSharpGeneratorDriver driver = CSharpGeneratorDriver.Create(generatorA, generatorB);
         CSharpCompilation compilation = CreateCompilation("TwoGenerators", []);
 
-        driver = (CSharpGeneratorDriver)driver.RunGeneratorsAndUpdateCompilation(
-            compilation,
-            out Compilation outputCompilation,
-            out _);
+        driver = (CSharpGeneratorDriver)
+            driver.RunGeneratorsAndUpdateCompilation(
+                compilation,
+                out Compilation outputCompilation,
+                out _
+            );
 
-        await Assert.That(HasDiagnosticsAtWarningOrAbove(outputCompilation.GetDiagnostics())).IsFalse();
+        await Assert
+            .That(HasDiagnosticsAtWarningOrAbove(outputCompilation.GetDiagnostics()))
+            .IsFalse();
     }
 
     [Test]
@@ -108,7 +123,8 @@ public class PostInitializationExtensionsTests
             "Sample.NonNullable",
             "MarkerAttribute",
             AttributeTargets.Class,
-            properties: [("string", "Name")]);
+            properties: [("string", "Name")]
+        );
 
         (_, ImmutableArray<Diagnostic> diagnostics) = RunAndCompile(generator, "NonNullable");
 
@@ -120,11 +136,16 @@ public class PostInitializationExtensionsTests
     {
         IncrementalGeneratorPostInitializationContext context = default;
 
-        await Assert.That(() => context.AddMarkerAttribute(
-            "Marker.g.cs",
-            "1Invalid.Namespace",
-            "MarkerAttribute",
-            AttributeTargets.Class)).Throws<ArgumentException>();
+        await Assert
+            .That(() =>
+                context.AddMarkerAttribute(
+                    "Marker.g.cs",
+                    "1Invalid.Namespace",
+                    "MarkerAttribute",
+                    AttributeTargets.Class
+                )
+            )
+            .Throws<ArgumentException>();
     }
 
     [Test]
@@ -132,11 +153,16 @@ public class PostInitializationExtensionsTests
     {
         IncrementalGeneratorPostInitializationContext context = default;
 
-        await Assert.That(() => context.AddMarkerAttribute(
-            "Marker.g.cs",
-            "Sample",
-            "not an identifier",
-            AttributeTargets.Class)).Throws<ArgumentException>();
+        await Assert
+            .That(() =>
+                context.AddMarkerAttribute(
+                    "Marker.g.cs",
+                    "Sample",
+                    "not an identifier",
+                    AttributeTargets.Class
+                )
+            )
+            .Throws<ArgumentException>();
     }
 
     [Test]
@@ -144,12 +170,17 @@ public class PostInitializationExtensionsTests
     {
         IncrementalGeneratorPostInitializationContext context = default;
 
-        await Assert.That(() => context.AddMarkerAttribute(
-            "Marker.g.cs",
-            "Sample",
-            "MarkerAttribute",
-            AttributeTargets.Class,
-            properties: [("string", "not valid")])).Throws<ArgumentException>();
+        await Assert
+            .That(() =>
+                context.AddMarkerAttribute(
+                    "Marker.g.cs",
+                    "Sample",
+                    "MarkerAttribute",
+                    AttributeTargets.Class,
+                    properties: [("string", "not valid")]
+                )
+            )
+            .Throws<ArgumentException>();
     }
 
     [Test]
@@ -157,12 +188,17 @@ public class PostInitializationExtensionsTests
     {
         IncrementalGeneratorPostInitializationContext context = default;
 
-        await Assert.That(() => context.AddMarkerAttribute(
-            "Marker.g.cs",
-            "Sample",
-            "MarkerAttribute",
-            AttributeTargets.Class,
-            properties: [("System.Type", "Value")])).Throws<ArgumentException>();
+        await Assert
+            .That(() =>
+                context.AddMarkerAttribute(
+                    "Marker.g.cs",
+                    "Sample",
+                    "MarkerAttribute",
+                    AttributeTargets.Class,
+                    properties: [("System.Type", "Value")]
+                )
+            )
+            .Throws<ArgumentException>();
     }
 
     [Test]
@@ -170,11 +206,16 @@ public class PostInitializationExtensionsTests
     {
         IncrementalGeneratorPostInitializationContext context = default;
 
-        await Assert.That(() => context.AddMarkerAttribute(
-            "Marker.g.cs",
-            "Sample",
-            "MarkerAttribute",
-            (AttributeTargets)0)).Throws<ArgumentException>();
+        await Assert
+            .That(() =>
+                context.AddMarkerAttribute(
+                    "Marker.g.cs",
+                    "Sample",
+                    "MarkerAttribute",
+                    (AttributeTargets)0
+                )
+            )
+            .Throws<ArgumentException>();
     }
 
     [Test]
@@ -182,11 +223,16 @@ public class PostInitializationExtensionsTests
     {
         IncrementalGeneratorPostInitializationContext context = default;
 
-        await Assert.That(() => context.AddMarkerAttribute(
-            "Marker.g.cs",
-            "Sample",
-            "MarkerAttribute",
-            (AttributeTargets)(1 << 30))).Throws<ArgumentException>();
+        await Assert
+            .That(() =>
+                context.AddMarkerAttribute(
+                    "Marker.g.cs",
+                    "Sample",
+                    "MarkerAttribute",
+                    (AttributeTargets)(1 << 30)
+                )
+            )
+            .Throws<ArgumentException>();
     }
 
     private static GeneratorDriverRunResult RunGenerator(IIncrementalGenerator generator)
@@ -203,7 +249,8 @@ public class PostInitializationExtensionsTests
         IIncrementalGenerator generator,
         string assemblyName,
         string? consumerSource = null,
-        IEnumerable<MetadataReference>? extraReferences = null)
+        IEnumerable<MetadataReference>? extraReferences = null
+    )
     {
         List<SyntaxTree> trees = [];
 
@@ -215,10 +262,12 @@ public class PostInitializationExtensionsTests
         CSharpCompilation compilation = CreateCompilation(assemblyName, trees, extraReferences);
 
         CSharpGeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
-        driver = (CSharpGeneratorDriver)driver.RunGeneratorsAndUpdateCompilation(
-            compilation,
-            out Compilation outputCompilation,
-            out _);
+        driver = (CSharpGeneratorDriver)
+            driver.RunGeneratorsAndUpdateCompilation(
+                compilation,
+                out Compilation outputCompilation,
+                out _
+            );
 
         return (outputCompilation, outputCompilation.GetDiagnostics());
     }
@@ -226,9 +275,13 @@ public class PostInitializationExtensionsTests
     private static CSharpCompilation CreateCompilation(
         string assemblyName,
         IEnumerable<SyntaxTree> trees,
-        IEnumerable<MetadataReference>? extraReferences = null)
+        IEnumerable<MetadataReference>? extraReferences = null
+    )
     {
-        List<MetadataReference> references = [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)];
+        List<MetadataReference> references =
+        [
+            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+        ];
 
         if (extraReferences is not null)
         {
@@ -239,7 +292,8 @@ public class PostInitializationExtensionsTests
             assemblyName,
             trees,
             references,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+        );
     }
 
     private static MetadataReference EmitToReference(Compilation compilation)
@@ -249,7 +303,9 @@ public class PostInitializationExtensionsTests
 
         if (!result.Success)
         {
-            throw new InvalidOperationException(string.Join('\n', result.Diagnostics.Select(d => d.ToString())));
+            throw new InvalidOperationException(
+                string.Join('\n', result.Diagnostics.Select(d => d.ToString()))
+            );
         }
 
         stream.Position = 0;
@@ -299,7 +355,8 @@ public class PostInitializationExtensionsTests
             AttributeTargets targets,
             bool allowMultiple = false,
             bool inherited = false,
-            IReadOnlyList<(string Type, string Name)>? properties = null)
+            IReadOnlyList<(string Type, string Name)>? properties = null
+        )
         {
             _namespace = @namespace;
             _attributeName = attributeName;
@@ -321,7 +378,8 @@ public class PostInitializationExtensionsTests
                     _targets,
                     _allowMultiple,
                     _inherited,
-                    _properties);
+                    _properties
+                );
             });
         }
     }

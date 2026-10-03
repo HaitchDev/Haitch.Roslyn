@@ -13,29 +13,42 @@ public class PartialTypeValidationTests
     private static readonly PartialTypeDiagnostics Descriptors = new(
         Create("PT0001"),
         Create("PT0002"),
-        Create("PT0003"));
+        Create("PT0003")
+    );
 #pragma warning restore RS2008
 
-    private static readonly LocationInfo Location = new("Widget.cs", new TextSpan(10, 6),
-        new LinePositionSpan(new LinePosition(1, 4), new LinePosition(1, 10)));
+    private static readonly LocationInfo Location = new(
+        "Widget.cs",
+        new TextSpan(10, 6),
+        new LinePositionSpan(new LinePosition(1, 4), new LinePosition(1, 10))
+    );
 
     [Test]
     public async Task Should_succeed_with_the_same_model_for_a_valid_partial_type()
     {
         var model = CreateModel(isFileLocal: false);
 
-        var result = PartialTypeValidation.Validate(model, new SyntaxInfo(true, true, Location), Descriptors);
+        var result = PartialTypeValidation.Validate(
+            model,
+            new SyntaxInfo(true, true, Location),
+            Descriptors
+        );
 
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(result.Match(value => value, _ => null!)).IsEqualTo(model);
-        await Assert.That(ReferenceEquals(result.Match(value => value, _ => null!), model)).IsTrue();
+        await Assert
+            .That(ReferenceEquals(result.Match(value => value, _ => null!), model))
+            .IsTrue();
     }
 
     [Test]
     public async Task Should_fail_when_the_type_is_not_partial()
     {
-        var result =
-            PartialTypeValidation.Validate(CreateModel(false), new SyntaxInfo(false, true, Location), Descriptors);
+        var result = PartialTypeValidation.Validate(
+            CreateModel(false),
+            new SyntaxInfo(false, true, Location),
+            Descriptors
+        );
 
         await AssertSingle(result, "PT0001");
     }
@@ -43,8 +56,11 @@ public class PartialTypeValidationTests
     [Test]
     public async Task Should_fail_when_a_containing_type_is_not_partial()
     {
-        var result =
-            PartialTypeValidation.Validate(CreateModel(false), new SyntaxInfo(true, false, Location), Descriptors);
+        var result = PartialTypeValidation.Validate(
+            CreateModel(false),
+            new SyntaxInfo(true, false, Location),
+            Descriptors
+        );
 
         await AssertSingle(result, "PT0002");
     }
@@ -52,8 +68,11 @@ public class PartialTypeValidationTests
     [Test]
     public async Task Should_fail_when_the_type_is_file_local()
     {
-        var result =
-            PartialTypeValidation.Validate(CreateModel(true), new SyntaxInfo(true, true, Location), Descriptors);
+        var result = PartialTypeValidation.Validate(
+            CreateModel(true),
+            new SyntaxInfo(true, true, Location),
+            Descriptors
+        );
 
         await AssertSingle(result, "PT0003");
     }
@@ -61,8 +80,11 @@ public class PartialTypeValidationTests
     [Test]
     public async Task Should_report_every_broken_rule_in_order()
     {
-        var result =
-            PartialTypeValidation.Validate(CreateModel(true), new SyntaxInfo(false, false, Location), Descriptors);
+        var result = PartialTypeValidation.Validate(
+            CreateModel(true),
+            new SyntaxInfo(false, false, Location),
+            Descriptors
+        );
 
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(result.Diagnostics.Count).IsEqualTo(3);
@@ -81,8 +103,11 @@ public class PartialTypeValidationTests
     [Test]
     public async Task Should_report_a_null_location_when_the_syntax_has_none()
     {
-        var result =
-            PartialTypeValidation.Validate(CreateModel(true), new SyntaxInfo(false, false, null), Descriptors);
+        var result = PartialTypeValidation.Validate(
+            CreateModel(true),
+            new SyntaxInfo(false, false, null),
+            Descriptors
+        );
 
         await Assert.That(result.Diagnostics.Count).IsEqualTo(3);
 
@@ -106,7 +131,14 @@ public class PartialTypeValidationTests
 
     private static DiagnosticDescriptor Create(string id)
     {
-        return new DiagnosticDescriptor(id, "Title", "Message '{0}'", "Test", DiagnosticSeverity.Error, true);
+        return new DiagnosticDescriptor(
+            id,
+            "Title",
+            "Message '{0}'",
+            "Test",
+            DiagnosticSeverity.Error,
+            true
+        );
     }
 
     private static TypeModel CreateModel(bool isFileLocal)
@@ -127,6 +159,7 @@ public class PartialTypeValidationTests
             default,
             default,
             default,
-            default);
+            default
+        );
     }
 }

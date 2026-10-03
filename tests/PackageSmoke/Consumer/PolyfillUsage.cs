@@ -52,7 +52,8 @@ internal static class PolyfillUsage
         return text is not null;
     }
 
-    internal static int LengthOrZero(string? text) => TryGetLength(text, out int length) ? text.Length + length : 0;
+    internal static int LengthOrZero(string? text) =>
+        TryGetLength(text, out int length) ? text.Length + length : 0;
 
     // string.Contains(char) is an instance member missing from netstandard2.0, supplied as an extension.
     internal static bool ContainsChar(string text) => text.Contains('a');
