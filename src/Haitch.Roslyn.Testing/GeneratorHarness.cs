@@ -58,10 +58,7 @@ public static class GeneratorHarness
                 (AdditionalText)new HarnessAdditionalTextFile(t)
             ),
             parseOptions: parseOptions,
-            optionsProvider: new HarnessAnalyzerConfigOptionsProvider(
-                input.GlobalOptions,
-                input.PerFileOptions
-            ),
+            optionsProvider: NewOptionsProvider(input),
             driverOptions: new GeneratorDriverOptions(
                 IncrementalGeneratorOutputKind.None,
                 trackIncrementalGeneratorSteps: true
@@ -159,6 +156,7 @@ public static class GeneratorHarness
     /// Runs <paramref name="generator"/>, then reruns it on a cloned compilation (run 1) and on a compilation whose
     /// first source gained a trailing comment (run 2), and requires every output of the named steps to be cached or unchanged.
     /// An output that holds a caching hazard (see <see cref="CachingHazardWalker.Find"/>) also fails.
+    /// Every rerun uses a new options provider built from the same options, so a step that holds the provider by reference fails.
     /// </summary>
     /// <param name="generator">The generator under test.</param>
     /// <param name="sources">C# source texts forming the input compilation; at least one.</param>
@@ -235,6 +233,7 @@ public static class GeneratorHarness
     /// Runs <paramref name="generator"/> over <paramref name="input"/>, then reruns it on a cloned compilation (run 1)
     /// and on a compilation whose first source gained a trailing comment (run 2), and requires every output of the
     /// named steps to be cached or unchanged. An output that holds a caching hazard (see <see cref="CachingHazardWalker.Find"/>) also fails.
+    /// Every rerun uses a new options provider built from the same options, so a step that holds the provider by reference fails.
     /// </summary>
     /// <param name="generator">The generator under test.</param>
     /// <param name="input">The sources, references and options the generator runs against; at least one source.</param>
@@ -301,7 +300,9 @@ public static class GeneratorHarness
             );
         }
 
-        var driver = first.Driver.RunGenerators(first.InputCompilation.Clone());
+        var driver = first
+            .Driver.WithUpdatedAnalyzerConfigOptions(NewOptionsProvider(input))
+            .RunGenerators(first.InputCompilation.Clone());
         AssertStepsCached(driver, names, 1, "an unchanged compilation clone");
 
         var firstTree = first.InputCompilation.SyntaxTrees.First();
@@ -311,7 +312,9 @@ public static class GeneratorHarness
             firstTree.FilePath
         );
         var triviaCompilation = first.InputCompilation.ReplaceSyntaxTree(firstTree, edited);
-        driver = driver.RunGenerators(triviaCompilation);
+        driver = driver
+            .WithUpdatedAnalyzerConfigOptions(NewOptionsProvider(input))
+            .RunGenerators(triviaCompilation);
         AssertStepsCached(
             driver,
             names,
@@ -329,7 +332,9 @@ public static class GeneratorHarness
                 (CSharpParseOptions)target.Options,
                 target.FilePath
             );
-            driver = driver.RunGenerators(triviaCompilation.ReplaceSyntaxTree(target, changed));
+            driver = driver
+                .WithUpdatedAnalyzerConfigOptions(NewOptionsProvider(input))
+                .RunGenerators(triviaCompilation.ReplaceSyntaxTree(target, changed));
             AssertStepsCached(driver, names, 3, $"an unrelated edit in {path}");
         }
 
@@ -337,6 +342,11 @@ public static class GeneratorHarness
 
         return first;
     }
+
+    // A fresh instance per rerun, as the IDE supplies, so a generator that keeps the provider in a tracked step is caught.
+    private static HarnessAnalyzerConfigOptionsProvider NewOptionsProvider(
+        GeneratorHarnessInput input
+    ) => new(input.GlobalOptions, input.PerFileOptions);
 
     private static void AssertNoHazards(
         ImmutableDictionary<string, ImmutableArray<IncrementalGeneratorRunStep>> trackedSteps,
