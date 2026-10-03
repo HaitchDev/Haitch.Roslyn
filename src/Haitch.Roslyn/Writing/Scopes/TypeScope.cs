@@ -358,6 +358,16 @@ internal ref struct TypeScope
         }
     }
 
+    /// <summary>Writes <paramref name="text"/> as one or more lines and returns this scope for chaining.</summary>
+    /// <remarks>A buffered attribute is written after the line, above the next member.</remarks>
+    public readonly TypeScope Line(string text = "")
+    {
+        RequireInnermost();
+        _writer.WriteLine(text);
+
+        return this;
+    }
+
     private static bool HasSetOrInit(PropertyModel property)
     {
         for (var i = 0; i < property.Accessors.Count; i++)

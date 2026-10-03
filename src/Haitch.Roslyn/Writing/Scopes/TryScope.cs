@@ -51,7 +51,7 @@ internal ref struct TryScope
     }
 
     /// <summary>Writes <paramref name="text"/> as one or more lines and returns this scope for chaining.</summary>
-    public readonly TryScope Line(string text)
+    public readonly TryScope Line(string text = "")
     {
         RequireInnermost();
         _writer.WriteLine(text);

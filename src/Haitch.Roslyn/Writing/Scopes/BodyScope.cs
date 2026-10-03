@@ -35,7 +35,7 @@ internal ref struct BodyScope
     }
 
     /// <summary>Writes <paramref name="text"/> as one or more lines and returns this scope for chaining.</summary>
-    public readonly BodyScope Line(string text)
+    public readonly BodyScope Line(string text = "")
     {
         RequireInnermost();
         _writer.WriteLine(text);

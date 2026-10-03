@@ -424,18 +424,18 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             if (type.Type.Namespace is { } @namespace)
             {
                 using var ns = file.Namespace(@namespace);
-                WriteMembers(writer, ns.Type(type.Type, baseTypes), type);
+                WriteMembers(ns.Type(type.Type, baseTypes), type);
             }
             else
             {
-                WriteMembers(writer, file.Type(type.Type, baseTypes), type);
+                WriteMembers(file.Type(type.Type, baseTypes), type);
             }
         }
 
         return writer.ToString();
     }
 
-    private static void WriteMembers(SourceWriter writer, TypeScope scope, NotifyType type)
+    private static void WriteMembers(TypeScope scope, NotifyType type)
     {
         using (scope)
         {
@@ -445,14 +445,14 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 var raised = type.Fields.Any(f => f.Raise);
                 if (!raised)
                 {
-                    writer.WriteLine("#pragma warning disable CS0067");
+                    scope.Line("#pragma warning disable CS0067");
                 }
 
                 scope.Event(NotifyEvent);
 
                 if (!raised)
                 {
-                    writer.WriteLine("#pragma warning restore CS0067");
+                    scope.Line("#pragma warning restore CS0067");
                 }
             }
 

@@ -32,7 +32,7 @@ internal ref struct IfScope
     }
 
     /// <summary>Writes <paramref name="text"/> as one or more lines and returns this scope for chaining.</summary>
-    public readonly IfScope Line(string text)
+    public readonly IfScope Line(string text = "")
     {
         RequireInnermost();
         _writer.WriteLine(text);
