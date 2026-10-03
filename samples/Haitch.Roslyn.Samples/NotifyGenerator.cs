@@ -39,7 +39,11 @@ namespace Haitch.Roslyn.Samples;
 //
 // Diagnostics: NOTIFY001 not partial, NOTIFY002 field name unchanged by the naming rule,
 // NOTIFY003 interface or event cannot be used, NOTIFY004 field cannot become a property,
-// NOTIFY005 generated property name is invalid or already taken.
+// NOTIFY005 generated property name is invalid or already taken, NOTIFY006 Name argument is not
+// an identifier.
+//
+// Arguments: Name = "X" replaces the derived property name, Raise = false leaves out the
+// PropertyChanged call in the setter.
 public sealed class NotifyGenerator : IIncrementalGenerator
 {
     private const string AttributeName = "Notify.NotifyAttribute";
@@ -93,6 +97,15 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         isEnabledByDefault: true
     );
 
+    private static readonly DiagnosticDescriptor InvalidName = new(
+        "NOTIFY006",
+        "Name argument is not an identifier",
+        "Field '{0}' has Name = \"{1}\", which {2}",
+        "Notify",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true
+    );
+
     private static readonly TypeRef NotifyInterface = new(
         FullyQualifiedName: "global::" + InterfaceMetadataName,
         NullableAnnotation: NullableAnnotation.NotAnnotated,
@@ -124,7 +137,8 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 "NotifyAttribute.g.cs",
                 "Notify",
                 "NotifyAttribute",
-                AttributeTargets.Field
+                AttributeTargets.Field,
+                properties: [("string", "Name"), ("bool", "Raise")]
             );
         });
 
@@ -274,7 +288,15 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                 continue;
             }
 
-            var property = PropertyName(name);
+            if (NameOverride(item) is { } custom && InvalidNameReason(custom, name) is { } invalid)
+            {
+                failures.Add(
+                    new DiagnosticInfo(InvalidName, item.Syntax.Location, name, custom, invalid)
+                );
+                continue;
+            }
+
+            var property = TargetName(item);
 
             if (property == name)
             {
@@ -285,7 +307,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                     property,
                     owner.Type.Name,
                     owner.MemberNames,
-                    supported.Count(s => PropertyName(s.Field.Name) == property)
+                    supported.Count(s => TargetName(s) == property)
                 ) is
                 { } why
             )
@@ -298,8 +320,44 @@ public sealed class NotifyGenerator : IIncrementalGenerator
 
         return failures.Count > 0
             ? Result<EquatableArray<NotifyField>>.Failure(failures.ToEquatableArray())
-            : items.Select(f => new NotifyField(f.Field.Name, f.Field.Type)).ToEquatableArray();
+            : items
+                .Select(f => new NotifyField(
+                    f.Field.Name,
+                    f.Field.Type,
+                    TargetName(f),
+                    RaisesEvent(f)
+                ))
+                .ToEquatableArray();
     }
+
+    // IsValidIdentifier accepts keywords, which the generated property could not be named. "value" and
+    // "field" are rejected because they bind to the accessor parameter and the field keyword there.
+    private static string? InvalidNameReason(string custom, string fieldName) =>
+        !SyntaxFacts.IsValidIdentifier(custom)
+            ? "is not a valid identifier ('@'-prefixed names are not supported)"
+        : SyntaxFacts.GetKeywordKind(custom) != SyntaxKind.None ? "is a keyword"
+        : custom is "value" or "field"
+            ? "would be read as the setter's value or the field keyword inside the accessors"
+        : custom == fieldName
+            ? "is the field's own name; the property name must differ from the field name"
+        : null;
+
+    // A Name that is absent, or not a string constant, leaves the derived name in place.
+    private static string? NameOverride(MarkedField item) =>
+        item.Attributes.Find(AttributeName) is { } notify
+        && notify.TryGetNamedArgument("Name", out var argument)
+        && argument.TryGetString(out var name)
+            ? name
+            : null;
+
+    private static string TargetName(MarkedField item) =>
+        NameOverride(item) ?? PropertyName(item.Field.Name);
+
+    private static bool RaisesEvent(MarkedField item) =>
+        item.Attributes.Find(AttributeName) is not { } notify
+        || !notify.TryGetNamedArgument("Raise", out var argument)
+        || !argument.TryGetBoolean(out var raise)
+        || raise;
 
     // "value" is the setter's parameter and "field" is a C# 14 keyword inside accessors, so a field
     // with either name cannot be read or assigned there.
@@ -366,24 +424,36 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             if (type.Type.Namespace is { } @namespace)
             {
                 using var ns = file.Namespace(@namespace);
-                WriteMembers(ns.Type(type.Type, baseTypes), type);
+                WriteMembers(writer, ns.Type(type.Type, baseTypes), type);
             }
             else
             {
-                WriteMembers(file.Type(type.Type, baseTypes), type);
+                WriteMembers(writer, file.Type(type.Type, baseTypes), type);
             }
         }
 
         return writer.ToString();
     }
 
-    private static void WriteMembers(TypeScope scope, NotifyType type)
+    private static void WriteMembers(SourceWriter writer, TypeScope scope, NotifyType type)
     {
         using (scope)
         {
             if (type.AddEvent)
             {
+                // An event nothing raises triggers CS0067 in the consumer, an error under warnings-as-errors.
+                var raised = type.Fields.Any(f => f.Raise);
+                if (!raised)
+                {
+                    writer.WriteLine("#pragma warning disable CS0067");
+                }
+
                 scope.Event(NotifyEvent);
+
+                if (!raised)
+                {
+                    writer.WriteLine("#pragma warning restore CS0067");
+                }
             }
 
             foreach (var field in type.Fields)
@@ -396,7 +466,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
     private static void WriteProperty(TypeScope scope, NotifyField field)
     {
         var property = new PropertyModel(
-            Name: PropertyName(field.Name),
+            Name: field.PropertyName,
             Type: field.Type,
             Accessibility: Accessibility.Public,
             IsStatic: false,
@@ -440,14 +510,17 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             }
 
             set.Line($"{member} = value;");
-            set.Line(
-                $"PropertyChanged?.Invoke(this, new global::System.ComponentModel.PropertyChangedEventArgs(nameof({property.Name})));"
-            );
+            if (field.Raise)
+            {
+                set.Line(
+                    $"PropertyChanged?.Invoke(this, new global::System.ComponentModel.PropertyChangedEventArgs(nameof({property.Name})));"
+                );
+            }
         }
     }
 }
 
-internal sealed record NotifyField(string Name, TypeRef Type);
+internal sealed record NotifyField(string Name, TypeRef Type, string PropertyName, bool Raise);
 
 // What the checks need to know about the type that owns [Notify] fields. MemberNames covers every
 // kind of member, nested types included; an explicit implementation is stored under its qualified

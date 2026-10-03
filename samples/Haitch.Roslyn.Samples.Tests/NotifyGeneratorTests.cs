@@ -116,6 +116,141 @@ public class NotifyGeneratorTests
     }
 
     [Test]
+    public void Name_argument_overrides_the_property_name()
+    {
+        const string source = """
+            namespace App;
+
+            public partial class Article
+            {
+                [Notify.Notify(Name = "Headline")]
+                private string _title = "";
+            }
+            """;
+
+        Run(source)
+            .AssertNoDiagnostics()
+            .AssertSourceFile("App.Article.Notify.g.cs", "Expected/Article.Notify.g.cs.txt");
+    }
+
+    [Test]
+    public void Raise_false_suppresses_the_event()
+    {
+        const string source = """
+            namespace App;
+
+            public partial class Counter
+            {
+                [Notify.Notify(Raise = false)]
+                private int _count;
+            }
+            """;
+
+        Run(source)
+            .AssertNoDiagnostics()
+            .AssertSourceFile("App.Counter.Notify.g.cs", "Expected/Counter.Notify.g.cs.txt");
+    }
+
+    [Test]
+    public void Name_and_Raise_arguments_combine()
+    {
+        const string source = """
+            namespace App;
+
+            public partial class Label
+            {
+                [Notify.Notify(Name = "Caption", Raise = false)]
+                private string _text = "";
+            }
+            """;
+
+        Run(source)
+            .AssertNoDiagnostics()
+            .AssertSourceFile("App.Label.Notify.g.cs", "Expected/Label.Notify.g.cs.txt");
+    }
+
+    [Test]
+    public async Task Type_where_nothing_raises_compiles_without_warnings()
+    {
+        const string source = """
+            namespace App;
+
+            public partial class Counter
+            {
+                [Notify.Notify(Raise = false)]
+                private int _count;
+            }
+            """;
+
+        var diagnostics = Run(source).Compilation.GetDiagnostics();
+
+        await Assert.That(diagnostics.Select(d => d.ToString())).IsEmpty();
+    }
+
+    [Test]
+    public async Task Name_equal_to_the_field_name_is_reported_as_an_invalid_name()
+    {
+        const string source = """
+            namespace App;
+
+            public partial class Person
+            {
+                [Notify.Notify(Name = "_title")]
+                private string _title = "";
+            }
+            """;
+
+        var result = Run(source);
+
+        result.AssertDiagnostic("NOTIFY006", messageContains: "differ");
+        await Assert.That(result.Diagnostics).HasCount(1);
+        await Assert.That(result.Sources.Keys).DoesNotContain("App.Person.Notify.g.cs");
+    }
+
+    [Test]
+    public void At_prefixed_Name_is_reported_with_a_message_saying_it_is_unsupported()
+    {
+        const string source = """
+            namespace App;
+
+            public partial class Person
+            {
+                [Notify.Notify(Name = "@title")]
+                private string _title = "";
+            }
+            """;
+
+        Run(source).AssertDiagnostic("NOTIFY006", messageContains: "'@'-prefixed");
+    }
+
+    [Test]
+    [Arguments("not an identifier")]
+    [Arguments("")]
+    [Arguments("class")]
+    [Arguments("1st")]
+    [Arguments("field")]
+    [Arguments("value")]
+    [Arguments("@title")]
+    public async Task Invalid_Name_argument_reports_one_diagnostic_and_emits_nothing(string name)
+    {
+        var source = $$"""
+            namespace App;
+
+            public partial class Person
+            {
+                [Notify.Notify(Name = "{{name}}")]
+                private string _title = "";
+            }
+            """;
+
+        var result = Run(source);
+
+        result.AssertDiagnostic("NOTIFY006", messageContains: "_title");
+        await Assert.That(result.Diagnostics).HasCount(1);
+        await Assert.That(result.Sources.Keys).DoesNotContain("App.Person.Notify.g.cs");
+    }
+
+    [Test]
     public async Task Non_partial_type_reports_one_diagnostic_and_emits_nothing()
     {
         const string source = """

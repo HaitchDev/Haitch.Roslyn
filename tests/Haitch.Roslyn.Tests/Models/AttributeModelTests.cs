@@ -366,6 +366,24 @@ public class AttributeModelTests
         await Assert.That<AttributeModel?>(firstModel).IsNotEqualTo(secondModel);
     }
 
+    [Test]
+    public async Task Should_not_be_equal_when_only_the_metadata_name_differs()
+    {
+        const string source = """
+            using System;
+
+            class SampleAttribute : Attribute { }
+
+            [Sample]
+            class Target { }
+            """;
+
+        AttributeModel model = AttributeModel.From(GetAttribute(source, "Target"))!;
+        AttributeModel other = model with { MetadataName = "Other.SampleAttribute" };
+
+        await Assert.That(model).IsNotEqualTo(other);
+    }
+
     private static AttributeData GetAttribute(
         string source,
         string metadataName,

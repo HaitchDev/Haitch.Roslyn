@@ -1111,6 +1111,38 @@ public class SourceWriterExtensionsTests
         CompilationHelper.Compile(originalSource + "\n" + generatedSource);
     }
 
+    [Test]
+    public async Task Should_keep_override_on_an_abstract_override_method()
+    {
+        MethodModel method = new(
+            Name: "M",
+            MethodKind: MethodKind.Ordinary,
+            ReturnType: TypeRef.From(VoidSymbol()),
+            ReturnRefKind: ReturnRefKind.None,
+            Accessibility: Accessibility.Public,
+            IsStatic: false,
+            IsAbstract: true,
+            IsVirtual: false,
+            IsOverride: true,
+            IsSealed: false,
+            IsAsync: false,
+            IsExtern: false,
+            IsExtensionMethod: false,
+            IsPartialDefinition: false,
+            IsReadOnly: false,
+            ExplicitInterface: null,
+            ExplicitInterfaceMemberName: null,
+            TypeParameters: default,
+            Parameters: default,
+            Attributes: default
+        );
+
+        SourceWriter writer = new();
+        writer.WriteMethodSignature(method);
+
+        await Assert.That(writer.ToString()).IsEqualTo("public abstract override void M();\n");
+    }
+
     private static ITypeSymbol StringSymbol()
     {
         return FieldType("string");

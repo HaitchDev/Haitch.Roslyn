@@ -511,6 +511,22 @@ public class AttributeRenderingTests
     }
 
     [Test]
+    public async Task Should_give_well_known_models_the_metadata_name_read_from_source()
+    {
+        AttributeModel[] fromSource = GetModelsFromSource([
+            "[System.CodeDom.Compiler.GeneratedCode(\"Tool\", \"1.0.0\")]",
+            "[System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]",
+        ]);
+
+        await Assert
+            .That(WellKnownAttributes.GeneratedCode("Tool", "1.0.0").MetadataName)
+            .IsEqualTo(fromSource[0].MetadataName);
+        await Assert
+            .That(WellKnownAttributes.EditorBrowsableNever.MetadataName)
+            .IsEqualTo(fromSource[1].MetadataName);
+    }
+
+    [Test]
     public async Task Should_compile_a_type_and_a_method_carrying_both_well_known_attributes()
     {
         SourceWriter writer = new();

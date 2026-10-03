@@ -409,7 +409,11 @@ internal static class SourceWriterExtensions
 
         if (!isExplicitInterfaceImplementation)
         {
-            if (method.IsAbstract)
+            if (method.IsAbstract && method.IsOverride)
+            {
+                builder.Append("abstract override ");
+            }
+            else if (method.IsAbstract)
             {
                 builder.Append("abstract ");
             }

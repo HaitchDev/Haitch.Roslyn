@@ -15,7 +15,7 @@ internal static class EquatableArray
     /// <param name="items">The elements to copy.</param>
     /// <returns>The populated array.</returns>
     public static EquatableArray<T> Create<T>(ReadOnlySpan<T> items)
-        where T : IEquatable<T>
+        where T : IEquatable<T>?
     {
         return EquatableArray<T>.FromOwnedArray(items.ToArray());
     }
@@ -23,7 +23,7 @@ internal static class EquatableArray
 
 [CollectionBuilder(typeof(EquatableArray), nameof(EquatableArray.Create))]
 internal readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IReadOnlyList<T>
-    where T : IEquatable<T>
+    where T : IEquatable<T>?
 {
     private readonly T[] _array;
 
@@ -120,7 +120,9 @@ internal readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IRea
 
             foreach (var item in self)
             {
-                hash = (hash * 31) + EqualityComparer<T>.Default.GetHashCode(item);
+                // GetHashCode is annotated DisallowNull on newer TFMs, but the default comparer
+                // returns 0 for a null item, which nullable-element arrays rely on.
+                hash = (hash * 31) + EqualityComparer<T>.Default.GetHashCode(item!);
             }
 
             return hash;

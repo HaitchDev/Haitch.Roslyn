@@ -43,7 +43,10 @@ internal static class WellKnownAttributes
         return new AttributeModel(
             GeneratedCodeType,
             new[] { ConstantValue.ForString(tool), ConstantValue.ForString(version) }.ToEquatableArray(),
-            default);
+            default)
+        {
+            MetadataName = "System.CodeDom.Compiler.GeneratedCodeAttribute",
+        };
     }
 
     /// <summary>
@@ -52,5 +55,8 @@ internal static class WellKnownAttributes
     public static readonly AttributeModel EditorBrowsableNever = new(
         EditorBrowsableType,
         new[] { ConstantValue.ForEnum(EditorBrowsableStateType, 1, "Never") }.ToEquatableArray(),
-        default);
+        default)
+    {
+        MetadataName = "System.ComponentModel.EditorBrowsableAttribute",
+    };
 }

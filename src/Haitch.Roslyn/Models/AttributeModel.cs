@@ -14,6 +14,44 @@ internal sealed record AttributeModel(
     EquatableArray<ConstantValue> ConstructorArguments,
     EquatableArray<NamedArgument> NamedArguments)
 {
+    /// <summary>
+    /// The attribute class's metadata name, in the form <c>ForAttributeWithMetadataName</c> takes
+    /// (<c>Ns.Outer+Inner</c>, <c>Ns.Foo`1</c>). Null on a hand-built model, which then never matches
+    /// <see cref="AttributeModelExtensions.Find"/>.
+    /// </summary>
+    public string? MetadataName { get; init; }
+
+    /// <summary>Finds a named argument by exact, case-sensitive name.</summary>
+    public bool TryGetNamedArgument(string name, out ConstantValue value)
+    {
+        foreach (var argument in NamedArguments)
+        {
+            if (string.Equals(argument.Name, name, System.StringComparison.Ordinal))
+            {
+                value = argument.Value;
+                return true;
+            }
+        }
+
+        value = default!;
+        return false;
+    }
+
+    /// <summary>
+    /// Reads a constructor argument by position; a <c>params</c> argument is one array value.
+    /// </summary>
+    public bool TryGetConstructorArgument(int index, out ConstantValue value)
+    {
+        if (index >= 0 && index < ConstructorArguments.Count)
+        {
+            value = ConstructorArguments[index];
+            return true;
+        }
+
+        value = default!;
+        return false;
+    }
+
     public static AttributeModel? From(AttributeData attributeData)
     {
         INamedTypeSymbol? attributeClass = attributeData.AttributeClass;
@@ -33,6 +71,31 @@ internal sealed record AttributeModel(
             .Select(pair => new NamedArgument(pair.Key, ConstantValue.From(pair.Value)))
             .ToEquatableArray();
 
-        return new AttributeModel(attributeType, constructorArguments, namedArguments);
+        return new AttributeModel(attributeType, constructorArguments, namedArguments)
+        {
+            MetadataName = GetMetadataName(attributeClass.OriginalDefinition),
+        };
+    }
+
+    // The constructed type's display name carries type arguments, so the form
+    // ForAttributeWithMetadataName expects has to be rebuilt from the original definition.
+    internal static string GetMetadataName(INamedTypeSymbol type)
+    {
+        var name = type.MetadataName;
+
+        for (INamedTypeSymbol? outer = type.ContainingType; outer is not null; outer = outer.ContainingType)
+        {
+            name = outer.MetadataName + "+" + name;
+        }
+
+        INamespaceSymbol? container = type.ContainingNamespace;
+
+        while (container is not null && !container.IsGlobalNamespace)
+        {
+            name = container.Name + "." + name;
+            container = container.ContainingNamespace;
+        }
+
+        return name;
     }
 }

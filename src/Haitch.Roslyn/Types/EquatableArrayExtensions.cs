@@ -11,13 +11,13 @@ namespace Haitch.Roslyn.Types;
 internal static class EquatableArrayExtensions
 {
     public static EquatableArray<T> ToEquatableArray<T>(this T[] array)
-        where T : IEquatable<T>
+        where T : IEquatable<T>?
     {
         return new EquatableArray<T>(array);
     }
 
     public static EquatableArray<T> ToEquatableArray<T>(this ImmutableArray<T> array)
-        where T : IEquatable<T>
+        where T : IEquatable<T>?
     {
         if (array.IsDefaultOrEmpty)
         {
@@ -31,13 +31,13 @@ internal static class EquatableArrayExtensions
 
     // Without this, an EquatableArray binds to the IEnumerable<T> overload, which boxes and copies.
     public static EquatableArray<T> ToEquatableArray<T>(this EquatableArray<T> source)
-        where T : IEquatable<T>
+        where T : IEquatable<T>?
     {
         return source;
     }
 
     public static EquatableArray<T> ToEquatableArray<T>(this IEnumerable<T> source)
-        where T : IEquatable<T>
+        where T : IEquatable<T>?
     {
         // ToArray() already allocates a fresh, exclusively-owned array; adopt it directly
         // instead of copying it again in the EquatableArray constructor.

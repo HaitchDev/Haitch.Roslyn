@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+using System.Linq;
 using Haitch.Roslyn.Types;
 
 namespace Haitch.Roslyn.Tests.Types;
@@ -74,6 +76,29 @@ public class EquatableArrayTests
 
         await Assert.That(first.Equals(second)).IsTrue();
         await Assert.That(first.GetHashCode()).IsEqualTo(second.GetHashCode());
+    }
+
+    [Test]
+    public async Task Should_hash_equal_arrays_with_a_null_element_equally()
+    {
+        var first = new EquatableArray<string?>(["a", null]);
+        var second = new EquatableArray<string?>(["a", null]);
+
+        await Assert.That(first).IsEqualTo(second);
+        await Assert.That(first.GetHashCode()).IsEqualTo(second.GetHashCode());
+    }
+
+    [Test]
+    public async Task Should_convert_nullable_reference_items_to_an_equatable_array()
+    {
+        string?[] items = ["a", null];
+
+        var fromArray = items.ToEquatableArray();
+        var fromEnumerable = items.AsEnumerable().ToEquatableArray();
+        var fromImmutable = items.ToImmutableArray().ToEquatableArray();
+
+        await Assert.That(fromArray).IsEqualTo(fromEnumerable);
+        await Assert.That(fromArray).IsEqualTo(fromImmutable);
     }
 
     [Test]

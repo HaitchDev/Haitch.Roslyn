@@ -51,6 +51,128 @@ internal sealed record ConstantValue
     /// </summary>
     public string? EnumMemberName { get; }
 
+    public bool IsNull => Kind == ConstantValueKind.Null;
+
+    public bool TryGetString(out string value)
+    {
+        if (Kind == ConstantValueKind.String && Value is string text)
+        {
+            value = text;
+            return true;
+        }
+
+        value = "";
+        return false;
+    }
+
+    public bool TryGetBoolean(out bool value)
+    {
+        return TryGetPrimitive(out value);
+    }
+
+    public bool TryGetInt32(out int value)
+    {
+        return TryGetPrimitive(out value);
+    }
+
+    public bool TryGetInt64(out long value)
+    {
+        return TryGetPrimitive(out value);
+    }
+
+    public bool TryGetDouble(out double value)
+    {
+        return TryGetPrimitive(out value);
+    }
+
+    public bool TryGetEnum<TEnum>(out TEnum value)
+        where TEnum : struct, Enum
+    {
+        // Roslyn only reports integral underlying values, but a hand-built ForEnum can hold anything,
+        // and Enum.ToObject throws on those.
+        if (
+            Kind == ConstantValueKind.Enum
+            && Value is not null
+            && System.Type.GetTypeCode(Value.GetType())
+                is System.TypeCode.SByte
+                    or System.TypeCode.Byte
+                    or System.TypeCode.Int16
+                    or System.TypeCode.UInt16
+                    or System.TypeCode.Int32
+                    or System.TypeCode.UInt32
+                    or System.TypeCode.Int64
+                    or System.TypeCode.UInt64
+        )
+        {
+            value = (TEnum)Enum.ToObject(typeof(TEnum), Value);
+            return true;
+        }
+
+        value = default;
+        return false;
+    }
+
+    public bool TryGetType(out TypeRef value)
+    {
+        if (Kind == ConstantValueKind.Type && Type is not null)
+        {
+            value = Type;
+            return true;
+        }
+
+        value = null!;
+        return false;
+    }
+
+    public bool TryGetArray(out EquatableArray<ConstantValue> value)
+    {
+        value = Elements;
+        return Kind == ConstantValueKind.Array;
+    }
+
+    public bool TryGetStringArray(out EquatableArray<string?> value)
+    {
+        value = default;
+
+        if (Kind != ConstantValueKind.Array)
+        {
+            return false;
+        }
+
+        var items = new string?[Elements.Count];
+
+        for (var i = 0; i < items.Length; i++)
+        {
+            ConstantValue element = Elements[i];
+
+            if (element.Kind == ConstantValueKind.String)
+            {
+                items[i] = (string)element.Value!;
+            }
+            else if (element.Kind != ConstantValueKind.Null)
+            {
+                return false;
+            }
+        }
+
+        value = new EquatableArray<string?>(items);
+        return true;
+    }
+
+    // Exact CLR type match on purpose: a long argument must not satisfy TryGetInt32.
+    private bool TryGetPrimitive<T>(out T value)
+        where T : struct
+    {
+        if (Kind == ConstantValueKind.Primitive && Value is T typed)
+        {
+            value = typed;
+            return true;
+        }
+
+        value = default;
+        return false;
+    }
+
     public static ConstantValue ForNull(TypeRef? type)
     {
         return new ConstantValue(ConstantValueKind.Null, null, type, default, null);
