@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Haitch.Roslyn.Testing;
 
-/// <summary>The outcome of one <see cref="GeneratorHarness.Run"/>.</summary>
+/// <summary>The outcome of one <see cref="GeneratorHarness.Run(IIncrementalGenerator, GeneratorHarnessInput)"/>.</summary>
 public sealed class GeneratorHarnessResult
 {
     internal GeneratorHarnessResult(
@@ -12,7 +12,8 @@ public sealed class GeneratorHarnessResult
         Compilation compilation,
         GeneratorDriver driver,
         Compilation inputCompilation,
-        GeneratorDriverRunResult runResult
+        GeneratorDriverRunResult runResult,
+        ImmutableArray<Diagnostic> inputDiagnostics
     )
     {
         Sources = sources;
@@ -21,6 +22,7 @@ public sealed class GeneratorHarnessResult
         InputCompilation = inputCompilation;
         Driver = driver;
         RunResult = runResult;
+        InputDiagnostics = inputDiagnostics;
     }
 
     /// <summary>Generated source text keyed by hint name.</summary>
@@ -28,6 +30,12 @@ public sealed class GeneratorHarnessResult
 
     /// <summary>Diagnostics reported by the generator itself, not compiler diagnostics.</summary>
     public ImmutableArray<Diagnostic> Diagnostics { get; }
+
+    /// <summary>
+    /// Error diagnostics of the input compilation, kept apart from <see cref="Diagnostics"/>; empty unless
+    /// <see cref="GeneratorHarnessInput.AllowInputErrors"/> let errors through.
+    /// </summary>
+    public ImmutableArray<Diagnostic> InputDiagnostics { get; }
 
     /// <summary>The compilation after the generator's sources were added.</summary>
     public Compilation Compilation { get; }

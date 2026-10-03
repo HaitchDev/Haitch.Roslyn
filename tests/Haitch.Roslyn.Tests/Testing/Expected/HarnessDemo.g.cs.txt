@@ -1,0 +1,7 @@
+// Generated for My.Demo
+namespace My.Demo;
+
+public static class Greeting
+{
+    public const string Text = "hello from file";
+}

@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 
 namespace Haitch.Roslyn.Testing;
 
@@ -8,31 +9,36 @@ namespace Haitch.Roslyn.Testing;
 public static class GeneratorHarness
 {
     /// <summary>
-    /// Runs <paramref name="generator"/> over <paramref name="sources"/>.
+    /// Runs <paramref name="generator"/> over <paramref name="input"/>.
     /// </summary>
     /// <param name="generator">The generator under test.</param>
-    /// <param name="sources">C# source texts forming the input compilation.</param>
-    /// <param name="additionalReferences">Extra references; the running runtime's platform assemblies are always included.</param>
-    /// <param name="parseOptions">Parse options; defaults to the newest language version Roslyn knows.</param>
-    /// <remarks>The compilation is nullable-enabled; its references are the test host's trusted platform assemblies plus <paramref name="additionalReferences"/>.</remarks>
+    /// <param name="input">The sources, references and options the generator runs against.</param>
+    /// <remarks>The compilation is nullable-enabled; its references are the test host's trusted platform assemblies plus <see cref="GeneratorHarnessInput.AdditionalReferences"/>.</remarks>
     /// <returns>The generated sources by hint name and the generator's own diagnostics.</returns>
-    /// <exception cref="GeneratorTestException">The output compilation has error-severity diagnostics.</exception>
+    /// <exception cref="GeneratorTestException">
+    /// The generator threw; or the input compilation reports errors before generation and
+    /// <see cref="GeneratorHarnessInput.AllowInputErrors"/> is <see langword="false"/> (and they remain after generation);
+    /// or generation introduces an error, wherever it is located.
+    /// </exception>
+    /// <exception cref="ArgumentNullException"><paramref name="input"/> is <see langword="null"/>.</exception>
     public static GeneratorHarnessResult Run(
         IIncrementalGenerator generator,
-        IEnumerable<string> sources,
-        IEnumerable<MetadataReference>? additionalReferences = null,
-        CSharpParseOptions? parseOptions = null
+        GeneratorHarnessInput input
     )
     {
-        parseOptions ??= CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Latest);
+        ArgumentNullException.ThrowIfNull(input);
 
-        var trees = sources
-            .Select(
+        var parseOptions =
+            input.ParseOptions
+            ?? CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Latest);
+
+        var trees = input
+            .Sources.Select(
                 (text, i) => CSharpSyntaxTree.ParseText(text, parseOptions, path: $"Source{i}.cs")
             )
             .ToList();
 
-        var references = PlatformReferences.Value.Concat(additionalReferences ?? []).ToList();
+        var references = PlatformReferences.Value.Concat(input.AdditionalReferences ?? []).ToList();
 
         var compilation = CSharpCompilation.Create(
             "HarnessCompilation",
@@ -44,11 +50,18 @@ public static class GeneratorHarness
             )
         );
 
+        var errorsBeforeGeneration = Errors(compilation).Select(ErrorKey).ToHashSet();
+
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [generator.AsSourceGenerator()],
-            additionalTexts: null,
+            additionalTexts: (input.AdditionalTexts ?? []).Select(t =>
+                (AdditionalText)new HarnessAdditionalTextFile(t)
+            ),
             parseOptions: parseOptions,
-            optionsProvider: null,
+            optionsProvider: new HarnessAnalyzerConfigOptionsProvider(
+                input.GlobalOptions,
+                input.PerFileOptions
+            ),
             driverOptions: new GeneratorDriverOptions(
                 IncrementalGeneratorOutputKind.None,
                 trackIncrementalGeneratorSteps: true
@@ -68,17 +81,21 @@ public static class GeneratorHarness
         }
 
         // Checked after generation so input that references generated types (post-initialization
-        // markers) resolves; errors are grouped by whether their tree was part of the input.
-        var inputTrees = compilation.SyntaxTrees.ToHashSet();
+        // markers) resolves. An error is an input error only if the input compilation already reported it;
+        // anything new is the generator's doing, even when it lands on the user's tree.
         var allErrors = Errors(output);
         var inputErrors = allErrors
-            .Where(e => e.Location.SourceTree is not { } tree || inputTrees.Contains(tree))
+            .Where(e => errorsBeforeGeneration.Contains(ErrorKey(e)))
             .ToList();
         var outputErrors = allErrors.Where(e => !inputErrors.Contains(e)).ToList();
-        if (inputErrors.Count > 0 || outputErrors.Count > 0)
+        if ((inputErrors.Count > 0 && !input.AllowInputErrors) || outputErrors.Count > 0)
         {
             var message = new System.Text.StringBuilder();
-            AppendErrors(message, "Input source errors:", inputErrors);
+            if (!input.AllowInputErrors)
+            {
+                AppendErrors(message, "Input source errors:", inputErrors);
+            }
+
             AppendErrors(message, "Generated output errors:", outputErrors);
             throw new GeneratorTestException(message.ToString().TrimEnd());
         }
@@ -98,9 +115,38 @@ public static class GeneratorHarness
             output,
             driver,
             compilation,
-            runResult
+            runResult,
+            [.. inputErrors]
         );
     }
+
+    /// <summary>
+    /// Runs <paramref name="generator"/> over <paramref name="sources"/>.
+    /// </summary>
+    /// <param name="generator">The generator under test.</param>
+    /// <param name="sources">C# source texts forming the input compilation.</param>
+    /// <param name="additionalReferences">Extra references; the running runtime's platform assemblies are always included.</param>
+    /// <param name="parseOptions">Parse options; defaults to the newest language version Roslyn knows.</param>
+    /// <remarks>The compilation is nullable-enabled; its references are the test host's trusted platform assemblies plus <paramref name="additionalReferences"/>.</remarks>
+    /// <returns>The generated sources by hint name and the generator's own diagnostics.</returns>
+    /// <exception cref="GeneratorTestException">The output compilation has error-severity diagnostics.</exception>
+    public static GeneratorHarnessResult Run(
+        IIncrementalGenerator generator,
+        IEnumerable<string> sources,
+        IEnumerable<MetadataReference>? additionalReferences = null,
+        CSharpParseOptions? parseOptions = null
+    ) =>
+        Run(
+            generator,
+            new GeneratorHarnessInput
+            {
+                Sources = [.. sources],
+                AdditionalReferences = additionalReferences is null
+                    ? null
+                    : [.. additionalReferences],
+                ParseOptions = parseOptions,
+            }
+        );
 
     /// <inheritdoc cref="AssertCacheable(IIncrementalGenerator, IEnumerable{string}, IEnumerable{string}, IEnumerable{MetadataReference}?, CSharpParseOptions?)"/>
     public static GeneratorHarnessResult AssertCacheable(
@@ -170,13 +216,55 @@ public static class GeneratorHarness
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        var sourceList = sources.ToList();
+        return AssertCacheable(
+            generator,
+            new GeneratorHarnessInput
+            {
+                Sources = [.. sources],
+                AdditionalReferences = additionalReferences is null
+                    ? null
+                    : [.. additionalReferences],
+                ParseOptions = parseOptions,
+            },
+            trackedStepNames,
+            options
+        );
+    }
+
+    /// <summary>
+    /// Runs <paramref name="generator"/> over <paramref name="input"/>, then reruns it on a cloned compilation (run 1)
+    /// and on a compilation whose first source gained a trailing comment (run 2), and requires every output of the
+    /// named steps to be cached or unchanged. An output that holds a caching hazard (see <see cref="CachingHazardWalker.Find"/>) also fails.
+    /// </summary>
+    /// <param name="generator">The generator under test.</param>
+    /// <param name="input">The sources, references and options the generator runs against; at least one source.</param>
+    /// <param name="steps">Names given with <c>WithTrackingName</c>; at least one.</param>
+    /// <param name="options">Extra scenarios and strictness; defaults apply when <see langword="null"/>.</param>
+    /// <returns>The first run's result.</returns>
+    /// <exception cref="GeneratorTestException">
+    /// No sources or step names were given, a step is unknown, the generator threw on a rerun, a step has an output
+    /// that was recomputed to a different value, or a step output holds a caching hazard; also
+    /// <see cref="CacheabilityOptions.UnrelatedEditSourceIndex"/> is out of range, or a step output is <c>Modified</c> or
+    /// <c>New</c> after the unrelated edit, or <see cref="CacheabilityOptions.RequireRecomputationAfterTriviaEdit"/>
+    /// finds no <c>Unchanged</c> output of a named step after the trivia edit.
+    /// </exception>
+    public static GeneratorHarnessResult AssertCacheable(
+        IIncrementalGenerator generator,
+        GeneratorHarnessInput input,
+        IEnumerable<string> steps,
+        CacheabilityOptions? options = null
+    )
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        options ??= new CacheabilityOptions();
+
+        var sourceList = input.Sources.ToList();
         if (sourceList.Count == 0)
         {
             throw new GeneratorTestException("AssertCacheable needs at least one source");
         }
 
-        var names = trackedStepNames.ToList();
+        var names = steps.ToList();
         if (names.Count == 0)
         {
             throw new GeneratorTestException(
@@ -201,7 +289,7 @@ public static class GeneratorHarness
             }
         }
 
-        var first = Run(generator, sourceList, additionalReferences, parseOptions);
+        var first = Run(generator, input);
         var known = first.RunResult.Results[0].TrackedSteps;
 
         var unknown = names.Where(n => !known.ContainsKey(n)).ToList();
@@ -348,6 +436,16 @@ public static class GeneratorHarness
         ];
     });
 
+    private static (string Id, string Path, TextSpan Span, string Message) ErrorKey(
+        Diagnostic diagnostic
+    ) =>
+        (
+            diagnostic.Id,
+            diagnostic.Location.GetLineSpan().Path,
+            diagnostic.Location.SourceSpan,
+            diagnostic.GetMessage()
+        );
+
     private static List<Diagnostic> Errors(Compilation compilation) =>
         compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
 
@@ -372,7 +470,7 @@ public static class GeneratorHarness
     private static string Format(Diagnostic diagnostic)
     {
         var span = diagnostic.Location.GetLineSpan();
-        var file = span.Path.Length == 0 ? "<no file>" : span.Path;
+        var file = string.IsNullOrEmpty(span.Path) ? "<no file>" : span.Path;
         return $"{file}:{span.StartLinePosition.Line + 1}: {diagnostic.Id}: {diagnostic.GetMessage()}";
     }
 }
