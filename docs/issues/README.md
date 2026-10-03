@@ -76,3 +76,22 @@ Rules that apply to every issue:
 | | [16.2](16.2-loop-and-using-scopes.md) | Loop and using statement scopes |
 | | [16.3](16.3-try-catch-finally-scope.md) | Try/catch/finally statement scopes |
 | | [16.4](16.4-switch-scope.md) | Switch statement scope |
+| 17 C# 15 | [17.1](17.1-csharp15-test-project.md) | C# 15 test project |
+| | [17.2](17.2-dotnet11-ci-job.md) | .NET 11 CI job |
+| | [17.3](17.3-union-type-model.md) | Unions in TypeModel |
+| | [17.4](17.4-closed-type-model.md) | Closed types in TypeModel |
+| | [17.5](17.5-extension-block-type-model.md) | Extension blocks in TypeModel |
+| | [17.6](17.6-new-closed-and-union-types.md) | New closed and union types |
+| | [17.7](17.7-labeled-loops.md) | Labeled loops and jumps |
+| 18 Writer guards | [18.1](18.1-open-block-depth.md) | Open-block depth |
+| | [18.2](18.2-chaining-guards.md) | Chaining guards |
+| | [18.3](18.3-declaration-scope-guards.md) | Declaration scope guards |
+| | [18.4](18.4-try-guards.md) | Try guards |
+| | [18.5](18.5-switch-fall-through.md) | Switch fall-through |
+| | [18.6](18.6-buffered-attributes.md) | Buffered attributes |
+| 19 NewType gaps | [19.1](19.1-type-parameter-variance.md) | Type-parameter variance |
+| | [19.2](19.2-primary-constructors.md) | Primary constructors and positional records |
+| 20 Model fixes | [20.1](20.1-cancellation-token.md) | CancellationToken on model factories |
+| | [20.2](20.2-explicit-interface-members.md) | Explicit interface members |
+| | [20.3](20.3-volatile-and-ref-properties.md) | Volatile fields and ref properties |
+| 21 Hint names | [21.1](21.1-hint-name-case.md) | Hint-name case disambiguation |
