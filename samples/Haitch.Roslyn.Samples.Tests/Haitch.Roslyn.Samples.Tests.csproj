@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <RootNamespace>Haitch.Roslyn.Samples.Tests</RootNamespace>
+        <AssemblyName>Haitch.Roslyn.Samples.Tests</AssemblyName>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="TUnit" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Haitch.Roslyn.Samples\Haitch.Roslyn.Samples.csproj" />
+        <ProjectReference Include="..\..\src\Haitch.Roslyn.Testing\Haitch.Roslyn.Testing.csproj" />
+    </ItemGroup>
+</Project>

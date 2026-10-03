@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <RootNamespace>Haitch.Roslyn.Samples</RootNamespace>
+        <AssemblyName>Haitch.Roslyn.Samples</AssemblyName>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+        <PackageReference Include="Polyfill" PrivateAssets="all" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile
+            Include="..\..\src\Haitch.Roslyn\**\*.cs"
+            Exclude="..\..\src\Haitch.Roslyn\bin\**;..\..\src\Haitch.Roslyn\obj\**"
+            Link="Src\%(RecursiveDir)%(Filename)%(Extension)"
+        />
+    </ItemGroup>
+</Project>

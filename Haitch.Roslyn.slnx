@@ -8,4 +8,8 @@
         <Project Path="tests/Haitch.Roslyn.Tests/Haitch.Roslyn.Tests.csproj" />
         <Project Path="tests/Haitch.Roslyn.CSharp15.Tests/Haitch.Roslyn.CSharp15.Tests.csproj" />
     </Folder>
+    <Folder Name="/samples/">
+        <Project Path="samples/Haitch.Roslyn.Samples/Haitch.Roslyn.Samples.csproj" />
+        <Project Path="samples/Haitch.Roslyn.Samples.Tests/Haitch.Roslyn.Samples.Tests.csproj" />
+    </Folder>
 </Solution>
