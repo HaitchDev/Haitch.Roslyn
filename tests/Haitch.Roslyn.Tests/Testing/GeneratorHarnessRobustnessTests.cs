@@ -139,30 +139,6 @@ public class GeneratorHarnessRobustnessTests
     }
 
     [Test]
-    public async Task LegacyAssertCacheable_WithOptionsAcceptsOneShotIterator()
-    {
-        var result = GeneratorHarness.AssertCacheable(
-            new EmitGenerator("class Ok { }"),
-            OneShot("class A { }"),
-            (IEnumerable<string>)["Count"],
-            new CacheabilityOptions()
-        );
-
-        await Assert.That(result.Sources.ContainsKey("Out.g.cs")).IsTrue();
-    }
-
-    [Test]
-    public async Task LegacyRun_AcceptsOneShotIterator()
-    {
-        var result = GeneratorHarness.Run(
-            new EmitGenerator("class Ok { }"),
-            OneShot("class A { }", "class B { }")
-        );
-
-        await Assert.That(result.Sources.ContainsKey("Out.g.cs")).IsTrue();
-    }
-
-    [Test]
     public async Task Default_InputErrorMessageIsExact()
     {
         var ex = Assert.Throws<GeneratorTestException>(() =>
@@ -302,5 +278,28 @@ public class GeneratorHarnessRobustnessTests
 
         await Assert.That(ex.Message).Contains("k.Value");
         await Assert.That(ex.Message).Contains("K.VALUE");
+    }
+
+    [Test]
+    public async Task Run_NullSourcesArray_ThrowsArgumentNullException()
+    {
+        var ex = Assert.Throws<ArgumentNullException>(() =>
+            _ = GeneratorHarness.Run(new EmitGenerator("class Ok { }"), (string[])null!)
+        );
+
+        await Assert.That(ex.ParamName).IsEqualTo("sources");
+    }
+
+    [Test]
+    public async Task Run_NullSourceElement_ThrowsNamingTheIndex()
+    {
+        var ex = Assert.Throws<GeneratorTestException>(() =>
+            _ = GeneratorHarness.Run(
+                new EmitGenerator("class Ok { }"),
+                new GeneratorHarnessInput { Sources = ["class A { }", null!] }
+            )
+        );
+
+        await Assert.That(ex.Message).Contains("Sources[1] is null.");
     }
 }

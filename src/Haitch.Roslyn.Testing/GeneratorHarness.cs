@@ -28,6 +28,14 @@ public static class GeneratorHarness
     {
         ArgumentNullException.ThrowIfNull(input);
 
+        for (var i = 0; i < input.Sources.Count; i++)
+        {
+            if (input.Sources[i] is null)
+            {
+                throw new GeneratorTestException($"Sources[{i}] is null.");
+            }
+        }
+
         if (input.AdditionalTexts is { } texts)
         {
             for (var i = 0; i < texts.Count; i++)
@@ -127,44 +135,24 @@ public static class GeneratorHarness
     }
 
     /// <summary>
-    /// Runs <paramref name="generator"/> over <paramref name="sources"/>.
+    /// Runs <paramref name="generator"/> over <paramref name="sources"/> with default <see cref="GeneratorHarnessInput"/> settings.
     /// </summary>
     /// <param name="generator">The generator under test.</param>
     /// <param name="sources">C# source texts forming the input compilation.</param>
-    /// <param name="additionalReferences">Extra references; the running runtime's platform assemblies are always included.</param>
-    /// <param name="parseOptions">Parse options; defaults to the newest language version Roslyn knows.</param>
-    /// <remarks>The compilation is nullable-enabled; its references are the test host's trusted platform assemblies plus <paramref name="additionalReferences"/>.</remarks>
     /// <returns>The generated sources by hint name and the generator's own diagnostics.</returns>
-    /// <exception cref="GeneratorTestException">The output compilation has error-severity diagnostics.</exception>
+    /// <exception cref="GeneratorTestException">As <see cref="Run(IIncrementalGenerator, GeneratorHarnessInput)"/>.</exception>
     public static GeneratorHarnessResult Run(
         IIncrementalGenerator generator,
-        IEnumerable<string> sources,
-        IEnumerable<MetadataReference>? additionalReferences = null,
-        CSharpParseOptions? parseOptions = null
-    ) =>
-        Run(
-            generator,
-            new GeneratorHarnessInput
-            {
-                Sources = [.. sources],
-                AdditionalReferences = additionalReferences is null
-                    ? null
-                    : [.. additionalReferences],
-                ParseOptions = parseOptions,
-            }
-        );
-
-    /// <inheritdoc cref="AssertCacheable(IIncrementalGenerator, IEnumerable{string}, IEnumerable{string}, IEnumerable{MetadataReference}?, CSharpParseOptions?)"/>
-    public static GeneratorHarnessResult AssertCacheable(
-        IIncrementalGenerator generator,
-        IEnumerable<string> sources,
-        params string[] trackedStepNames
-    ) => AssertCacheable(generator, sources, (IEnumerable<string>)trackedStepNames);
+        params string[] sources
+    )
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        return Run(generator, new GeneratorHarnessInput { Sources = sources });
+    }
 
     /// <summary>
-    /// Runs <paramref name="generator"/>, then reruns it on a cloned compilation (run 1) and on a compilation whose
-    /// first source gained a trailing comment (run 2), and requires every output of the named steps to be cached or unchanged.
-    /// An output that holds a caching hazard (see <see cref="CachingHazardWalker.Find"/>) also fails.
+    /// Runs <paramref name="generator"/> over <paramref name="sources"/> with default references and parse options,
+    /// then reruns it as <see cref="AssertCacheable(IIncrementalGenerator, GeneratorHarnessInput, IEnumerable{string}, CacheabilityOptions?)"/> does.
     /// Every rerun uses a new options provider built from the same options, so a step that holds the provider by reference fails.
     /// </summary>
     /// <param name="generator">The generator under test.</param>
@@ -173,70 +161,18 @@ public static class GeneratorHarness
     /// Names given with <c>WithTrackingName</c>; at least one. Name model steps only: steps that combine with the
     /// compilation or output syntax nodes are legitimately modified by the trivia edit. A name that never ran is a failure.
     /// </param>
-    /// <param name="additionalReferences">Extra references; the running runtime's platform assemblies are always included.</param>
-    /// <param name="parseOptions">Parse options; defaults to the newest language version Roslyn knows.</param>
     /// <returns>The first run's result.</returns>
-    /// <exception cref="GeneratorTestException">
-    /// No sources or step names were given, a step is unknown, the generator threw on a rerun, a step has an output
-    /// that was recomputed to a different value, or a step output holds a caching hazard.
-    /// </exception>
+    /// <exception cref="GeneratorTestException">As <see cref="AssertCacheable(IIncrementalGenerator, GeneratorHarnessInput, IEnumerable{string}, CacheabilityOptions?)"/>.</exception>
     public static GeneratorHarnessResult AssertCacheable(
         IIncrementalGenerator generator,
         IEnumerable<string> sources,
-        IEnumerable<string> trackedStepNames,
-        IEnumerable<MetadataReference>? additionalReferences = null,
-        CSharpParseOptions? parseOptions = null
+        params string[] trackedStepNames
     ) =>
         AssertCacheable(
             generator,
-            sources,
-            trackedStepNames,
-            new CacheabilityOptions(),
-            additionalReferences,
-            parseOptions
+            new GeneratorHarnessInput { Sources = [.. sources] },
+            trackedStepNames
         );
-
-    /// <summary>
-    /// As the other overloads, with the extra scenarios and strictness of <paramref name="options"/>.
-    /// </summary>
-    /// <param name="generator">The generator under test.</param>
-    /// <param name="sources">C# source texts forming the input compilation; at least one.</param>
-    /// <param name="trackedStepNames">Names given with <c>WithTrackingName</c>; at least one.</param>
-    /// <param name="options">Extra scenarios and strictness.</param>
-    /// <param name="additionalReferences">Extra references; the running runtime's platform assemblies are always included.</param>
-    /// <param name="parseOptions">Parse options; defaults to the newest language version Roslyn knows.</param>
-    /// <returns>The first run's result.</returns>
-    /// <exception cref="GeneratorTestException">
-    /// As the other overloads; also <see cref="CacheabilityOptions.UnrelatedEditSourceIndex"/> is out of range, a step
-    /// output is <c>Modified</c> or <c>New</c> after the unrelated edit (run 3), or
-    /// <see cref="CacheabilityOptions.RequireRecomputationAfterTriviaEdit"/> finds no <c>Unchanged</c> output of a named step after the trivia edit.
-    /// </exception>
-    /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
-    public static GeneratorHarnessResult AssertCacheable(
-        IIncrementalGenerator generator,
-        IEnumerable<string> sources,
-        IEnumerable<string> trackedStepNames,
-        CacheabilityOptions options,
-        IEnumerable<MetadataReference>? additionalReferences = null,
-        CSharpParseOptions? parseOptions = null
-    )
-    {
-        ArgumentNullException.ThrowIfNull(options);
-
-        return AssertCacheable(
-            generator,
-            new GeneratorHarnessInput
-            {
-                Sources = [.. sources],
-                AdditionalReferences = additionalReferences is null
-                    ? null
-                    : [.. additionalReferences],
-                ParseOptions = parseOptions,
-            },
-            trackedStepNames,
-            options
-        );
-    }
 
     /// <summary>
     /// Runs <paramref name="generator"/> over <paramref name="input"/>, then reruns it on a cloned compilation (run 1)

@@ -130,6 +130,19 @@ public class CacheabilityTests
     }
 
     [Test]
+    public async Task Should_behave_like_default_options_when_input_overload_options_is_null()
+    {
+        var result = GeneratorHarness.AssertCacheable(
+            new NamesGenerator(false),
+            new GeneratorHarnessInput { Sources = [Input] },
+            ["model"],
+            options: null
+        );
+
+        await Assert.That(result.Sources.ContainsKey("A.g.cs")).IsTrue();
+    }
+
+    [Test]
     public async Task Should_pass_with_several_source_trees()
     {
         var result = GeneratorHarness.AssertCacheable(
@@ -157,10 +170,13 @@ public class CacheabilityTests
 
         var result = GeneratorHarness.AssertCacheable(
             new NamesGenerator(false),
-            ["#if FLAG\nclass Uses : LibType { }\n#endif\n"],
-            ["model"],
-            [libReference],
-            CSharpParseOptions.Default.WithPreprocessorSymbols("FLAG")
+            new GeneratorHarnessInput
+            {
+                Sources = ["#if FLAG\nclass Uses : LibType { }\n#endif\n"],
+                AdditionalReferences = [libReference],
+                ParseOptions = CSharpParseOptions.Default.WithPreprocessorSymbols("FLAG"),
+            },
+            ["model"]
         );
 
         await Assert.That(result.Sources.Keys).Contains("Uses.g.cs");
@@ -192,7 +208,7 @@ public class CacheabilityTests
     {
         var result = GeneratorHarness.AssertCacheable(
             new NamesGenerator(false),
-            ["class A { }\n", "class B { }\n"],
+            new GeneratorHarnessInput { Sources = ["class A { }\n", "class B { }\n"] },
             ["model"],
             UnrelatedEdit
         );
@@ -218,7 +234,7 @@ public class CacheabilityTests
         var ex = Assert.Throws<GeneratorTestException>(() =>
             GeneratorHarness.AssertCacheable(
                 new NamespaceCountGenerator(),
-                ["class A { }\n", "class B { }\n"],
+                new GeneratorHarnessInput { Sources = ["class A { }\n", "class B { }\n"] },
                 ["model"],
                 UnrelatedEdit
             )
@@ -237,7 +253,7 @@ public class CacheabilityTests
         var ex = Assert.Throws<GeneratorTestException>(() =>
             GeneratorHarness.AssertCacheable(
                 new NamesGenerator(false),
-                ["class A { }\n", "class B { }\n"],
+                new GeneratorHarnessInput { Sources = ["class A { }\n", "class B { }\n"] },
                 ["model"],
                 new CacheabilityOptions { UnrelatedEditSourceIndex = 0 }
             )
@@ -256,7 +272,7 @@ public class CacheabilityTests
         var ex = Assert.Throws<GeneratorTestException>(() =>
             GeneratorHarness.AssertCacheable(
                 new NamesGenerator(false),
-                ["class A { }\n", "class B { }\n"],
+                new GeneratorHarnessInput { Sources = ["class A { }\n", "class B { }\n"] },
                 ["model"],
                 new CacheabilityOptions { UnrelatedEditSourceIndex = 2 }
             )
@@ -275,7 +291,7 @@ public class CacheabilityTests
         var ex = Assert.Throws<GeneratorTestException>(() =>
             GeneratorHarness.AssertCacheable(
                 new NamesGenerator(false),
-                ["class A { }\n"],
+                new GeneratorHarnessInput { Sources = ["class A { }\n"] },
                 ["model"],
                 new CacheabilityOptions { UnrelatedEditSourceIndex = 1 }
             )
@@ -284,21 +300,6 @@ public class CacheabilityTests
         await Assert
             .That(ex.Message)
             .IsEqualTo("UnrelatedEditSourceIndex needs at least two sources");
-    }
-
-    [Test]
-    public async Task Should_throw_argument_null_when_options_is_null()
-    {
-        Assert.Throws<ArgumentNullException>(() =>
-            GeneratorHarness.AssertCacheable(
-                new NamesGenerator(false),
-                [Input],
-                ["model"],
-                options: null!
-            )
-        );
-
-        await Task.CompletedTask;
     }
 
     private static readonly CacheabilityOptions Strict = new()
@@ -311,7 +312,7 @@ public class CacheabilityTests
     {
         var result = GeneratorHarness.AssertCacheable(
             new NamesGenerator(false),
-            ["class A { }\n", "class B { }\n"],
+            new GeneratorHarnessInput { Sources = ["class A { }\n", "class B { }\n"] },
             ["model"],
             Strict
         );
@@ -343,7 +344,7 @@ public class CacheabilityTests
         var ex = Assert.Throws<GeneratorTestException>(() =>
             GeneratorHarness.AssertCacheable(
                 new DownstreamGenerator(),
-                ["class A { }\n"],
+                new GeneratorHarnessInput { Sources = ["class A { }\n"] },
                 ["model"],
                 Strict
             )
@@ -378,7 +379,7 @@ public class CacheabilityTests
     {
         var result = GeneratorHarness.AssertCacheable(
             new ConstantSelectGenerator(),
-            ["class A { }\n", "class B { }\n"],
+            new GeneratorHarnessInput { Sources = ["class A { }\n", "class B { }\n"] },
             ["model"],
             Strict
         );
@@ -407,7 +408,7 @@ public class CacheabilityTests
         var ex = Assert.Throws<GeneratorTestException>(() =>
             GeneratorHarness.AssertCacheable(
                 new CollectGenerator(),
-                ["class A { }\n"],
+                new GeneratorHarnessInput { Sources = ["class A { }\n"] },
                 ["model"],
                 Strict
             )

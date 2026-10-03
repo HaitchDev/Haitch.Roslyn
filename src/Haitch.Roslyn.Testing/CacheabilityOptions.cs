@@ -1,6 +1,6 @@
 namespace Haitch.Roslyn.Testing;
 
-/// <summary>Extra scenarios and strictness for <see cref="GeneratorHarness.AssertCacheable(Microsoft.CodeAnalysis.IIncrementalGenerator, IEnumerable{string}, IEnumerable{string}, CacheabilityOptions, IEnumerable{Microsoft.CodeAnalysis.MetadataReference}?, Microsoft.CodeAnalysis.CSharp.CSharpParseOptions?)"/>.</summary>
+/// <summary>Extra scenarios and strictness for <see cref="GeneratorHarness.AssertCacheable(Microsoft.CodeAnalysis.IIncrementalGenerator, GeneratorHarnessInput, IEnumerable{string}, CacheabilityOptions?)"/>.</summary>
 public sealed class CacheabilityOptions
 {
     /// <summary>

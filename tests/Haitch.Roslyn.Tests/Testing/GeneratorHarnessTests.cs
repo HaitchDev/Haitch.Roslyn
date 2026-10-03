@@ -216,31 +216,4 @@ public class GeneratorHarnessTests
 
         await Assert.That(result.RunResult.Results[0].TrackedSteps.ContainsKey("x")).IsTrue();
     }
-
-    [Test]
-    public async Task Should_apply_additional_references_and_parse_options()
-    {
-        var lib = CSharpCompilation.Create(
-            "Lib",
-            [CSharpSyntaxTree.ParseText("public class LibType { }")],
-            [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-        );
-        using var stream = new MemoryStream();
-        lib.Emit(stream);
-        stream.Position = 0;
-        var libReference = MetadataReference.CreateFromStream(stream);
-
-        const string input = "#if FLAG\nclass Uses : LibType { }\n#endif";
-        var options = CSharpParseOptions.Default.WithPreprocessorSymbols("FLAG");
-
-        var result = GeneratorHarness.Run(
-            new FixtureGenerator("Hello.g.cs", "class Hello { }"),
-            [input],
-            [libReference],
-            options
-        );
-
-        await Assert.That(result.InputCompilation.GetTypeByMetadataName("Uses")).IsNotNull();
-    }
 }

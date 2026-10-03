@@ -106,14 +106,18 @@ public class SyntaxValueProviderExtensionsTests
         // shift (and so change the cached value) if the edit were made above Widget in the same file.
         GeneratorHarness.AssertCacheable(
             new AttributeProviderTestGenerator(),
-            [
-                """
-                [Sample.Mark]
-                public partial class Widget { }
-                """,
-                MarkAttributeSource,
-                "public class Unrelated { }",
-            ],
+            new GeneratorHarnessInput
+            {
+                Sources =
+                [
+                    """
+                    [Sample.Mark]
+                    public partial class Widget { }
+                    """,
+                    MarkAttributeSource,
+                    "public class Unrelated { }",
+                ],
+            },
             [AttributeProviderTestGenerator.ValuesStepName],
             options: new CacheabilityOptions { UnrelatedEditSourceIndex = 2 }
         );

@@ -35,7 +35,7 @@ public class ResultPipelineExtensionsTests
         // Unchanged; OtherWidget (another tree) stays Cached, which the strict check accepts alongside it.
         GeneratorHarness.AssertCacheable(
             new TestGenerator(),
-            ["class Widget { }", "class OtherWidget { }"],
+            new GeneratorHarnessInput { Sources = ["class Widget { }", "class OtherWidget { }"] },
             [TestGenerator.ValuesStepName],
             options: new CacheabilityOptions { RequireRecomputationAfterTriviaEdit = true }
         );

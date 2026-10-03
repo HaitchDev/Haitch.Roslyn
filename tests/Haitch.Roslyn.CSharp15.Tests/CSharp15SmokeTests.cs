@@ -19,8 +19,11 @@ public class CSharp15SmokeTests
     {
         var result = GeneratorHarness.Run(
             new NoOpGenerator(),
-            [Sources, CSharp15Polyfills.Source],
-            parseOptions: CSharp15.ParseOptions
+            new GeneratorHarnessInput
+            {
+                Sources = [Sources, CSharp15Polyfills.Source],
+                ParseOptions = CSharp15.ParseOptions,
+            }
         );
 
         await Assert.That(result.Diagnostics).IsEmpty();
@@ -36,8 +39,11 @@ public class CSharp15SmokeTests
             .That(() =>
                 GeneratorHarness.Run(
                     new NoOpGenerator(),
-                    [Sources, CSharp15Polyfills.Source],
-                    parseOptions: csharp14
+                    new GeneratorHarnessInput
+                    {
+                        Sources = [Sources, CSharp15Polyfills.Source],
+                        ParseOptions = csharp14,
+                    }
                 )
             )
             .Throws<GeneratorTestException>();
