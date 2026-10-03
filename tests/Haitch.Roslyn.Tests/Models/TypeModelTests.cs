@@ -743,6 +743,88 @@ public class TypeModelTests
         await Assert.That(first.GetHashCode()).IsEqualTo(second.GetHashCode());
     }
 
+    [Test]
+    public async Task Should_list_every_member_name_sorted_and_distinct()
+    {
+        const string source = """
+            namespace Example;
+            public class Sample : System.IDisposable
+            {
+                public class Inner { }
+                public Sample() { }
+                public int this[int index] => index;
+                public static Sample operator +(Sample a, Sample b) => a;
+                void System.IDisposable.Dispose() { }
+                public void Run() { }
+                public void Run(int x) { }
+            }
+            """;
+
+        TypeModel model = TypeModel.From(
+            CompilationHelper.GetNamedTypeSymbol(source, "Example.Sample"),
+            includeMembers: true
+        );
+
+        await Assert
+            .That(string.Join("|", model.MemberNames.AsSpan().ToArray()))
+            .IsEqualTo(".ctor|Inner|Run|System.IDisposable.Dispose|get_Item|op_Addition|this[]");
+    }
+
+    [Test]
+    public async Task Should_list_the_synthesized_members_of_a_record()
+    {
+        const string source = "namespace Example; public record Sample(int Value);";
+
+        TypeModel model = TypeModel.From(
+            CompilationHelper.GetNamedTypeSymbol(source, "Example.Sample"),
+            includeMembers: true
+        );
+
+        string[] names = model.MemberNames.AsSpan().ToArray();
+
+        await Assert.That(names).Contains("ToString");
+        await Assert.That(names).Contains("GetHashCode");
+        await Assert.That(names).Contains("PrintMembers");
+        await Assert.That(names).Contains("EqualityContract");
+        await Assert.That(names).Contains("Value");
+    }
+
+    [Test]
+    public async Task Should_leave_member_names_empty_without_members()
+    {
+        const string source = "namespace Example; public class Sample { public void Run() { } }";
+
+        TypeModel model = TypeModel.From(
+            CompilationHelper.GetNamedTypeSymbol(source, "Example.Sample")
+        );
+
+        await Assert.That(model.MemberNames.IsEmpty).IsTrue();
+    }
+
+    [Test]
+    public async Task Should_compare_member_names_by_value()
+    {
+        const string source = "namespace Example; public class Sample { }";
+        const string withNested =
+            "namespace Example; public class Sample { public class Inner { } }";
+
+        TypeModel first = TypeModel.From(
+            CompilationHelper.GetNamedTypeSymbol(source, "Example.Sample"),
+            includeMembers: true
+        );
+        TypeModel second = TypeModel.From(
+            CompilationHelper.GetNamedTypeSymbol(source, "Example.Sample"),
+            includeMembers: true
+        );
+        TypeModel changed = TypeModel.From(
+            CompilationHelper.GetNamedTypeSymbol(withNested, "Example.Sample"),
+            includeMembers: true
+        );
+
+        await Assert.That(first).IsEqualTo(second);
+        await Assert.That(first).IsNotEqualTo(changed);
+    }
+
     // file-local types are mangled at the metadata level, so GetTypeByMetadataName can't find them;
     // resolve the declared symbol from the syntax tree instead.
     private static INamedTypeSymbol GetFileLocalType(string source, string typeName)

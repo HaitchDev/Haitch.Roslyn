@@ -33,8 +33,8 @@ internal static class SyntaxValueProviderExtensions
     // otherwise. No Collect() is involved, so unrelated edits still leave the step cached. The
     // attributes are the symbol's, i.e. those of every part.
     //
-    // includeMembers fills TypeModel's Fields, Properties and Methods from the symbol (every part
-    // contributes). It ties the item's equality to every member edit, so an edit to any member of
+    // includeMembers fills TypeModel's Fields, Properties, Methods, Events and MemberNames from the symbol
+    // (every part contributes). It ties the item's equality to every member edit, so an edit to any member of
     // the type recomputes downstream steps; leave it off unless the generator reads members.
     /// <summary>Finds types marked with the attribute.</summary>
     /// <param name="provider">The syntax provider.</param>
@@ -64,7 +64,8 @@ internal static class SyntaxValueProviderExtensions
 
     // Method counterpart of ForTypesWithAttribute. The predicate admits only method declarations, so
     // local functions, lambdas, accessors and constructors never reach the transform. The containing
-    // type is captured without members: it ties the item's equality to the method's own shape only.
+    // type is captured without members by default: that ties the item's equality to the method's own
+    // shape only. includeContainingTypeMembers fills its members as includeMembers does for types.
     //
     // A partial method yields one item, built from the definition part. When both parts carry the
     // attribute the transform runs for each; the implementation part's run drops out whenever another
@@ -78,6 +79,10 @@ internal static class SyntaxValueProviderExtensions
     /// <param name="provider">The syntax provider.</param>
     /// <param name="fullyQualifiedMetadataName">The attribute's fully qualified metadata name.</param>
     /// <param name="trackingName">The tracking name of the resulting step.</param>
+    /// <param name="includeContainingTypeMembers">
+    /// Whether to fill the containing type's fields, properties, methods, events and member names. It ties the step's equality
+    /// to every member edit of the containing type, so leave it off unless the generator reads sibling members.
+    /// </param>
     /// <param name="predicate">
     /// Optional extra filter. It runs in the syntax phase on every edit, after the built-in kind check,
     /// so it only receives method declarations. It must be cheap and syntax-only, and must not capture state.
@@ -87,6 +92,7 @@ internal static class SyntaxValueProviderExtensions
             this SyntaxValueProvider provider,
             string fullyQualifiedMetadataName,
             string trackingName,
+            bool includeContainingTypeMembers = false,
             Func<SyntaxNode, CancellationToken, bool>? predicate = null)
     {
         return ForMembersWithAttribute(
@@ -95,7 +101,8 @@ internal static class SyntaxValueProviderExtensions
             trackingName,
             static (node, _) => node is MethodDeclarationSyntax,
             predicate,
-            static (context, cancellationToken) =>
+            includeContainingTypeMembers,
+            static (context, includeContainingTypeMembers, cancellationToken) =>
             {
                 var method = (IMethodSymbol)context.TargetSymbol;
                 var definition = method.PartialDefinitionPart ?? method;
@@ -105,6 +112,7 @@ internal static class SyntaxValueProviderExtensions
                     definition,
                     isImplementationPart: method.PartialDefinitionPart is not null,
                     MethodModel.From(definition, cancellationToken),
+                    includeContainingTypeMembers,
                     cancellationToken);
             });
     }
@@ -117,6 +125,10 @@ internal static class SyntaxValueProviderExtensions
     /// <param name="provider">The syntax provider.</param>
     /// <param name="fullyQualifiedMetadataName">The attribute's fully qualified metadata name.</param>
     /// <param name="trackingName">The tracking name of the resulting step.</param>
+    /// <param name="includeContainingTypeMembers">
+    /// Whether to fill the containing type's fields, properties, methods, events and member names. It ties the step's equality
+    /// to every member edit of the containing type, so leave it off unless the generator reads sibling members.
+    /// </param>
     /// <param name="predicate">
     /// Optional extra filter. It runs in the syntax phase on every edit, after the built-in kind check,
     /// so it only receives property declarations. It must be cheap and syntax-only, and must not capture state.
@@ -126,6 +138,7 @@ internal static class SyntaxValueProviderExtensions
             this SyntaxValueProvider provider,
             string fullyQualifiedMetadataName,
             string trackingName,
+            bool includeContainingTypeMembers = false,
             Func<SyntaxNode, CancellationToken, bool>? predicate = null)
     {
         return ForMembersWithAttribute(
@@ -134,7 +147,8 @@ internal static class SyntaxValueProviderExtensions
             trackingName,
             static (node, _) => node is PropertyDeclarationSyntax,
             predicate,
-            static (context, cancellationToken) =>
+            includeContainingTypeMembers,
+            static (context, includeContainingTypeMembers, cancellationToken) =>
             {
                 var property = (IPropertySymbol)context.TargetSymbol;
                 var definition = property.PartialDefinitionPart ?? property;
@@ -144,6 +158,7 @@ internal static class SyntaxValueProviderExtensions
                     definition,
                     isImplementationPart: property.PartialDefinitionPart is not null,
                     PropertyModel.From(definition),
+                    includeContainingTypeMembers,
                     cancellationToken);
             });
     }
@@ -154,6 +169,10 @@ internal static class SyntaxValueProviderExtensions
     /// <param name="provider">The syntax provider.</param>
     /// <param name="fullyQualifiedMetadataName">The attribute's fully qualified metadata name.</param>
     /// <param name="trackingName">The tracking name of the resulting step.</param>
+    /// <param name="includeContainingTypeMembers">
+    /// Whether to fill the containing type's fields, properties, methods, events and member names. It ties the step's equality
+    /// to every member edit of the containing type, so leave it off unless the generator reads sibling members.
+    /// </param>
     /// <param name="predicate">
     /// Optional extra filter. It runs in the syntax phase on every edit, after the built-in kind check,
     /// so it only receives field variable declarators. It must be cheap and syntax-only, and must not capture state.
@@ -163,6 +182,7 @@ internal static class SyntaxValueProviderExtensions
             this SyntaxValueProvider provider,
             string fullyQualifiedMetadataName,
             string trackingName,
+            bool includeContainingTypeMembers = false,
             Func<SyntaxNode, CancellationToken, bool>? predicate = null)
     {
         return ForMembersWithAttribute(
@@ -171,7 +191,8 @@ internal static class SyntaxValueProviderExtensions
             trackingName,
             static (node, _) => node is VariableDeclaratorSyntax { Parent.Parent: FieldDeclarationSyntax },
             predicate,
-            static (context, cancellationToken) =>
+            includeContainingTypeMembers,
+            static (context, includeContainingTypeMembers, cancellationToken) =>
             {
                 var field = (IFieldSymbol)context.TargetSymbol;
 
@@ -180,6 +201,7 @@ internal static class SyntaxValueProviderExtensions
                     field,
                     isImplementationPart: false,
                     FieldModel.From(field),
+                    includeContainingTypeMembers,
                     cancellationToken);
             });
     }
@@ -206,12 +228,13 @@ internal static class SyntaxValueProviderExtensions
             string trackingName,
             Func<SyntaxNode, CancellationToken, bool> kindPredicate,
             Func<SyntaxNode, CancellationToken, bool>? userPredicate,
-            Func<GeneratorAttributeSyntaxContext, CancellationToken, (TModel Member, TypeModel ContainingType, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes)?> transform)
+            bool includeContainingTypeMembers,
+            Func<GeneratorAttributeSyntaxContext, bool, CancellationToken, (TModel Member, TypeModel ContainingType, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes)?> transform)
     {
         return provider.ForAttributeWithMetadataName(
                 fullyQualifiedMetadataName,
                 WithKindCheck(kindPredicate, userPredicate),
-                transform)
+                (context, cancellationToken) => transform(context, includeContainingTypeMembers, cancellationToken))
             .Where(static item => item is not null)
             .Select(static (item, _) => item!.Value)
             .WithTrackingName(trackingName);
@@ -226,6 +249,7 @@ internal static class SyntaxValueProviderExtensions
             ISymbol definition,
             bool isImplementationPart,
             TModel model,
+            bool includeContainingTypeMembers,
             CancellationToken cancellationToken)
     {
         var markedAttributes = GetMarkedAttributes(definition, context);
@@ -235,7 +259,7 @@ internal static class SyntaxValueProviderExtensions
             return null;
         }
 
-        var containingType = TypeModel.From(definition.ContainingType, includeMembers: false, cancellationToken);
+        var containingType = TypeModel.From(definition.ContainingType, includeContainingTypeMembers, cancellationToken);
         var syntaxInfo = SyntaxInfo.From(context.TargetNode);
 
         return (model, containingType, syntaxInfo, ToAttributeModels(markedAttributes));

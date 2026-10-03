@@ -7,7 +7,6 @@ public class NotifyGeneratorTests
     private static readonly string[] TrackedSteps =
     [
         "NotifyGenerator.Fields",
-        "NotifyGenerator.Owners",
         "NotifyGenerator.Types",
     ];
 
@@ -450,6 +449,49 @@ public class NotifyGeneratorTests
     }
 
     [Test]
+    public async Task Event_explicit_implementation_is_reported_as_not_declaring_an_event()
+    {
+        const string source = """
+            using System.ComponentModel;
+
+            namespace App;
+
+            public partial class Document : INotifyPropertyChanged
+            {
+                event PropertyChangedEventHandler? INotifyPropertyChanged.PropertyChanged { add { } remove { } }
+
+                [Notify.Notify]
+                private string _name = "";
+            }
+            """;
+
+        Run(source).AssertDiagnostic("NOTIFY003", messageContains: "without declaring");
+        await Task.CompletedTask;
+    }
+
+    [Test]
+    public async Task Positional_record_parameter_named_like_the_event_is_reported()
+    {
+        const string source = """
+            namespace App;
+
+            public partial record Row(int PropertyChanged)
+            {
+                [Notify.Notify]
+                private string _name = "";
+            }
+            """;
+
+        var result = GeneratorHarness.Run(
+            new NotifyGenerator(),
+            new GeneratorHarnessInput { Sources = [source], AllowInputErrors = true }
+        );
+
+        result.AssertDiagnostic("NOTIFY003", messageContains: "Row");
+        await Assert.That(result.Sources.Keys).DoesNotContain("App.Row.Notify.g.cs");
+    }
+
+    [Test]
     public async Task Static_event_is_reported_because_the_setter_cannot_raise_it()
     {
         const string source = """
@@ -613,4 +655,57 @@ public class NotifyGeneratorTests
             new NotifyGenerator(),
             new GeneratorHarnessInput { Sources = [source] }
         );
+
+    [Test]
+    public async Task Adding_an_unrelated_member_leaves_the_type_step_unchanged()
+    {
+        const string source = """
+            namespace App;
+
+            public partial class Person
+            {
+                [Notify.Notify]
+                private string _title = "";
+
+                public void Existing() { }
+            }
+            """;
+
+        var result = GeneratorHarness.Run(
+            new NotifyGenerator(),
+            new GeneratorHarnessInput { Sources = [source] }
+        );
+
+        var tree = result.InputCompilation.SyntaxTrees.First();
+        var edited = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+            tree.GetText()
+                .ToString()
+                .Replace(
+                    "public void Existing() { }",
+                    "public void Existing() { } public void Added() { }"
+                ),
+            (Microsoft.CodeAnalysis.CSharp.CSharpParseOptions)tree.Options,
+            tree.FilePath
+        );
+        var driver = result.Driver.RunGenerators(
+            result.InputCompilation.ReplaceSyntaxTree(tree, edited)
+        );
+        var outputs = driver
+            .GetRunResult()
+            .Results[0]
+            .TrackedSteps["NotifyGenerator.Types"]
+            .SelectMany(s => s.Outputs)
+            .ToList();
+
+        await Assert.That(outputs).IsNotEmpty();
+        await Assert
+            .That(
+                outputs.All(o =>
+                    o.Reason
+                        is Microsoft.CodeAnalysis.IncrementalStepRunReason.Cached
+                            or Microsoft.CodeAnalysis.IncrementalStepRunReason.Unchanged
+                )
+            )
+            .IsTrue();
+    }
 }

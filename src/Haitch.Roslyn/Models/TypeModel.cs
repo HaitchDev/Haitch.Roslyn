@@ -205,12 +205,22 @@ internal sealed record TypeModel(
     public EquatableArray<EventModel> Events { get; init; }
 
     /// <summary>
+    /// The distinct, ordinal-sorted name of every member the type declares; empty unless members were
+    /// included. Unlike the typed member arrays this lists nested types, indexers, constructors, operators
+    /// and compiler-made members too, because a generated member can clash with any of them (for example a
+    /// record's synthesized <c>ToString</c>). Accessor names such as <c>get_X</c> and <c>add_X</c> appear,
+    /// and an indexer appears as <c>this[]</c>. An explicit interface implementation appears under its
+    /// qualified name, such as <c>System.IDisposable.Dispose</c>.
+    /// </summary>
+    public EquatableArray<string> MemberNames { get; init; }
+
+    /// <summary>
     /// Builds a <see cref="TypeModel"/> from <paramref name="type"/>. Member arrays are left empty
     /// unless <paramref name="includeMembers"/> is true, since capturing every member ties the model's
     /// equality (and so incremental generator cache validity) to any edit of any member.
     /// </summary>
     /// <param name="type">The type to capture.</param>
-    /// <param name="includeMembers">True to also capture fields, properties, methods and events.</param>
+    /// <param name="includeMembers">True to also capture fields, properties, methods, events and member names.</param>
     /// <param name="cancellationToken">
     /// Checked per captured member; cancellation throws <see cref="OperationCanceledException"/>.
     /// </param>
@@ -304,6 +314,13 @@ internal sealed record TypeModel(
             IsClosed = ClosedTypeDetector.IsClosed(type),
             BaseType = GetBaseType(type),
             Events = events,
+            MemberNames = includeMembers
+                ? type.GetMembers()
+                    .Select(member => member.Name)
+                    .Distinct()
+                    .OrderBy(name => name, StringComparer.Ordinal)
+                    .ToEquatableArray()
+                : default,
             Interfaces = type.Interfaces.Select(TypeRef.From).ToEquatableArray(),
             AllInterfaces = type.AllInterfaces.Select(TypeRef.From).ToEquatableArray(),
         };

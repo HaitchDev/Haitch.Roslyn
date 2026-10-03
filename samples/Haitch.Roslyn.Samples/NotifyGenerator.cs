@@ -145,29 +145,14 @@ public sealed class NotifyGenerator : IIncrementalGenerator
         var fields = context.SyntaxProvider.ForFieldsWithAttribute(
             AttributeName,
             "NotifyGenerator.Fields",
-            static (node, _) => IsField(node)
+            includeContainingTypeMembers: true,
+            predicate: static (node, _) => IsField(node)
         );
-
-        // The ContainingType that field discovery returns is built without members, so it cannot show
-        // the type's events or names. This reads only what the checks need, straight from the symbol and
-        // without a full member model; NotifyOwner is value-equal, so an unchanged type is a cache hit.
-        var owners = context
-            .SyntaxProvider.ForAttributeWithMetadataName(
-                AttributeName,
-                static (node, _) => IsField(node),
-                static (ctx, cancellationToken) =>
-                    NotifyOwner.From(ctx.TargetSymbol.ContainingType, cancellationToken)
-            )
-            .WithTrackingName("NotifyGenerator.Owners");
 
         // One item per containing type, so editing one class regenerates only that class.
         var types = fields
             .Collect()
-            .Combine(owners.Collect())
-            .SelectMany(
-                static (pair, cancellationToken) =>
-                    GroupByType(pair.Left, pair.Right, cancellationToken)
-            );
+            .SelectMany(static (all, cancellationToken) => GroupByType(all, cancellationToken));
 
         var valid = types.ReportDiagnostics(context, "NotifyGenerator.Types");
 
@@ -179,27 +164,18 @@ public sealed class NotifyGenerator : IIncrementalGenerator
 
     private static List<Result<NotifyType>> GroupByType(
         System.Collections.Immutable.ImmutableArray<MarkedField> fields,
-        System.Collections.Immutable.ImmutableArray<NotifyOwner> owners,
         CancellationToken cancellationToken
     )
     {
         var results = new List<Result<NotifyType>>();
-        var ownersByKey = owners
-            .GroupBy(o => HintName.For(o.Type, HintSuffix))
-            .ToDictionary(g => g.Key, g => g.First());
 
         // GroupBy keeps first-seen order, so output does not depend on hashing.
         foreach (var group in fields.GroupBy(f => HintName.For(f.ContainingType, HintSuffix)))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Both providers match the same fields, so a missing owner cannot happen; skip rather than throw.
-            if (!ownersByKey.TryGetValue(group.Key, out var owner))
-            {
-                continue;
-            }
-
             var first = group.First();
+            var owner = first.ContainingType;
 
             results.Add(
                 Result
@@ -208,13 +184,21 @@ public sealed class NotifyGenerator : IIncrementalGenerator
                             first.ContainingType,
                             first.Syntax,
                             NotPartial,
-                            owner.Type.Name
+                            owner.Name
                         ),
                         CheckInterface(owner, first.Syntax),
                         CheckFields(group.ToList(), owner)
                     )
+                    // The checks read every member; the output must not, or any sibling edit rebuilds it.
                     .Map(c => new NotifyType(
-                        c.Item1,
+                        c.Item1 with
+                        {
+                            Fields = default,
+                            Properties = default,
+                            Methods = default,
+                            Events = default,
+                            MemberNames = default,
+                        },
                         c.Item3,
                         c.Item2.AddInterface,
                         c.Item2.AddEvent
@@ -232,17 +216,16 @@ public sealed class NotifyGenerator : IIncrementalGenerator
 
     // Decides whether the generated setters can raise a usable event, and what to add to the type.
     private static Result<(bool AddInterface, bool AddEvent)> CheckInterface(
-        NotifyOwner owner,
+        TypeModel owner,
         SyntaxInfo syntax
     )
     {
-        var declaresInterface = owner.Type.Interfaces.Any(IsNotifyInterface);
-        var inheritsInterface =
-            !declaresInterface && owner.Type.AllInterfaces.Any(IsNotifyInterface);
-        var named = owner.EventNameCount;
+        var declaresInterface = owner.Interfaces.Any(IsNotifyInterface);
+        var inheritsInterface = !declaresInterface && owner.AllInterfaces.Any(IsNotifyInterface);
+        var named = DeclaredEventNameCount(owner);
 
         var problem =
-            owner.Type.IsRefLikeType ? "is a ref struct, which cannot implement an interface"
+            owner.IsRefLikeType ? "is a ref struct, which cannot implement an interface"
             : inheritsInterface
                 ? "gets INotifyPropertyChanged from a base type, so it has no PropertyChanged event of its own to raise"
             : named == 0 && declaresInterface
@@ -253,7 +236,21 @@ public sealed class NotifyGenerator : IIncrementalGenerator
 
         return problem is null
             ? (!declaresInterface, named == 0)
-            : new DiagnosticInfo(InterfaceConflict, syntax.Location, owner.Type.Name, problem);
+            : new DiagnosticInfo(InterfaceConflict, syntax.Location, owner.Name, problem);
+    }
+
+    // Members declared under the PropertyChanged name. Explicit implementations are filtered out of the
+    // typed lists (they do not clash with a generated member); a kind the typed lists lack (a nested
+    // type) still shows in MemberNames and counts once.
+    private static int DeclaredEventNameCount(TypeModel owner)
+    {
+        var typed =
+            owner.Fields.Count(f => f.Name == EventName)
+            + owner.Properties.Count(p => p.Name == EventName && p.ExplicitInterface is null)
+            + owner.Methods.Count(m => m.Name == EventName && m.ExplicitInterface is null)
+            + owner.Events.Count(e => e.Name == EventName && e.ExplicitInterface is null);
+
+        return typed == 0 && owner.MemberNames.Contains(EventName) ? 1 : typed;
     }
 
     private static bool IsNotifyInterface(TypeRef type) =>
@@ -261,17 +258,15 @@ public sealed class NotifyGenerator : IIncrementalGenerator
 
     // A custom or abstract event has no accessors the generated code can invoke through, so only the
     // "public event Handler Name;" form qualifies, and it must be the only member with that name.
-    private static bool IsFieldLikeNotifyEvent(NotifyOwner owner) =>
-        owner
-            is {
-                EventNameCount: 1,
-                Event: { IsStatic: false, IsAbstract: false, IsFieldLike: true } notifyEvent,
-            }
+    private static bool IsFieldLikeNotifyEvent(TypeModel owner) =>
+        DeclaredEventNameCount(owner) == 1
+        && owner.Events.FirstOrDefault(e => e.Name == EventName && e.ExplicitInterface is null)
+            is { IsStatic: false, IsAbstract: false, IsFieldLike: true } notifyEvent
         && notifyEvent.Type.FullyQualifiedName.TrimEnd('?') == HandlerName;
 
     private static Result<EquatableArray<NotifyField>> CheckFields(
         List<MarkedField> items,
-        NotifyOwner owner
+        TypeModel owner
     )
     {
         var failures = new List<DiagnosticInfo>();
@@ -305,7 +300,7 @@ public sealed class NotifyGenerator : IIncrementalGenerator
             else if (
                 UnusableReason(
                     property,
-                    owner.Type.Name,
+                    owner.Name,
                     owner.MemberNames,
                     supported.Count(s => TargetName(s) == property)
                 ) is
@@ -521,39 +516,6 @@ public sealed class NotifyGenerator : IIncrementalGenerator
 }
 
 internal sealed record NotifyField(string Name, TypeRef Type, string PropertyName, bool Raise);
-
-// What the checks need to know about the type that owns [Notify] fields. MemberNames covers every
-// kind of member, nested types included; an explicit implementation is stored under its qualified
-// name, so it never counts as a clash.
-internal sealed record NotifyOwner(
-    TypeModel Type,
-    EquatableArray<string> MemberNames,
-    int EventNameCount,
-    EventModel? Event
-)
-{
-    public static NotifyOwner From(INamedTypeSymbol type, CancellationToken cancellationToken)
-    {
-        // The event's compiler-made backing field shares its name, so only declared members count.
-        var named = type.GetMembers(NotifyGenerator.EventName)
-            .Where(m => !m.IsImplicitlyDeclared)
-            .ToList();
-
-        return new NotifyOwner(
-            TypeModel.From(type, includeMembers: false, cancellationToken),
-            type.GetMembers()
-                .Select(m => m.Name)
-                .Distinct()
-                .OrderBy(n => n, StringComparer.Ordinal)
-                .ToEquatableArray(),
-            named.Count,
-            named
-                .OfType<IEventSymbol>()
-                .Select(e => EventModel.From(e, cancellationToken))
-                .FirstOrDefault()
-        );
-    }
-}
 
 internal sealed record NotifyType(
     TypeModel Type,

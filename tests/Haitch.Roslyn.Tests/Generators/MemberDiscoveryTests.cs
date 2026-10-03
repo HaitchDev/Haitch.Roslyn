@@ -717,7 +717,7 @@ public class MemberDiscoveryTests
                 context.SyntaxProvider.ForMethodsWithAttribute(
                     "Sample.MarkAttribute",
                     "Methods",
-                    Recording(SeenMethodNodes)
+                    predicate: Recording(SeenMethodNodes)
                 ),
                 (_, value) => Methods.Add(value.Method.Name)
             );
@@ -725,7 +725,7 @@ public class MemberDiscoveryTests
                 context.SyntaxProvider.ForPropertiesWithAttribute(
                     "Sample.MarkMemberAttribute",
                     "Properties",
-                    Recording(SeenPropertyNodes)
+                    predicate: Recording(SeenPropertyNodes)
                 ),
                 (_, value) => Properties.Add(value.Property.Name)
             );
@@ -733,7 +733,7 @@ public class MemberDiscoveryTests
                 context.SyntaxProvider.ForFieldsWithAttribute(
                     "Sample.MarkMemberAttribute",
                     "Fields",
-                    Recording(SeenFieldNodes)
+                    predicate: Recording(SeenFieldNodes)
                 ),
                 (_, value) => Fields.Add(value.Field.Name)
             );
@@ -750,6 +750,149 @@ public class MemberDiscoveryTests
 
                 return predicate(node, token);
             };
+        }
+    }
+
+    private const string SiblingSource = """
+        public class Widget
+        {
+            [Sample.Mark] public void Run() { }
+            [Sample.MarkMember] public int Marked { get; set; }
+            [Sample.MarkMember] public int MarkedField;
+            public string SiblingProperty { get; set; } = "";
+            public int SiblingField;
+            public void SiblingMethod() { }
+            public event System.Action? SiblingEvent;
+        }
+        """;
+
+    [Test]
+    public async Task Should_leave_the_containing_type_members_empty_by_default()
+    {
+        var generator = new ContainingTypeMembersGenerator(includeContainingTypeMembers: false);
+        GeneratorHarness.Run(
+            generator,
+            new GeneratorHarnessInput
+            {
+                Sources = [MarkAttributeSource, MarkMemberAttributeSource, SiblingSource],
+            }
+        );
+
+        await Assert.That(generator.Seen.Count).IsEqualTo(3);
+        foreach (var (_, type) in generator.Seen)
+        {
+            await Assert.That(type.Fields.Count).IsEqualTo(0);
+            await Assert.That(type.Properties.Count).IsEqualTo(0);
+            await Assert.That(type.Methods.Count).IsEqualTo(0);
+            await Assert.That(type.Events.Count).IsEqualTo(0);
+            await Assert.That(type.MemberNames.Count).IsEqualTo(0);
+        }
+    }
+
+    [Test]
+    [Arguments("Method")]
+    [Arguments("Property")]
+    [Arguments("Field")]
+    public async Task Should_fill_the_containing_type_members_when_requested(string kind)
+    {
+        var generator = new ContainingTypeMembersGenerator(includeContainingTypeMembers: true);
+        GeneratorHarness.Run(
+            generator,
+            new GeneratorHarnessInput
+            {
+                Sources = [MarkAttributeSource, MarkMemberAttributeSource, SiblingSource],
+            }
+        );
+
+        TypeModel type = generator.Seen.Single(item => item.Kind == kind).Type;
+
+        await Assert.That(type.Methods.Any(m => m.Name == "SiblingMethod")).IsTrue();
+        await Assert.That(type.Properties.Any(p => p.Name == "SiblingProperty")).IsTrue();
+        await Assert.That(type.Fields.Any(f => f.Name == "SiblingField")).IsTrue();
+        await Assert.That(type.Events.Any(e => e.Name == "SiblingEvent")).IsTrue();
+        await Assert.That(type.MemberNames.Contains("SiblingMethod")).IsTrue();
+    }
+
+    [Test]
+    public async Task Should_stay_cached_on_trivia_edits_and_rerun_when_a_sibling_member_is_added()
+    {
+        string[] steps =
+        [
+            ContainingTypeMembersGenerator.MethodStep,
+            ContainingTypeMembersGenerator.PropertyStep,
+            ContainingTypeMembersGenerator.FieldStep,
+        ];
+        var input = new GeneratorHarnessInput
+        {
+            Sources = [SiblingSource, MarkAttributeSource, MarkMemberAttributeSource],
+        };
+
+        GeneratorHarnessResult result = GeneratorHarness.AssertCacheable(
+            new ContainingTypeMembersGenerator(includeContainingTypeMembers: true),
+            input,
+            steps
+        );
+
+        SyntaxTree tree = result.InputCompilation.SyntaxTrees.First();
+        SyntaxTree edited = CSharpSyntaxTree.ParseText(
+            tree.GetText()
+                .ToString()
+                .Replace("public int SiblingField;", "public int SiblingField; public int Added;"),
+            (CSharpParseOptions)tree.Options,
+            tree.FilePath
+        );
+        GeneratorDriver driver = result.Driver.RunGenerators(
+            result.InputCompilation.ReplaceSyntaxTree(tree, edited)
+        );
+        var tracked = driver.GetRunResult().Results[0].TrackedSteps;
+
+        foreach (var step in steps)
+        {
+            await Assert
+                .That(
+                    tracked[step]
+                        .SelectMany(s => s.Outputs)
+                        .Any(output => output.Reason == IncrementalStepRunReason.Modified)
+                )
+                .IsTrue();
+        }
+    }
+
+    private sealed class ContainingTypeMembersGenerator(bool includeContainingTypeMembers)
+        : IIncrementalGenerator
+    {
+        public const string MethodStep = "ContainingTypeMembers.Methods";
+        public const string PropertyStep = "ContainingTypeMembers.Properties";
+        public const string FieldStep = "ContainingTypeMembers.Fields";
+
+        public List<(string Kind, TypeModel Type)> Seen { get; } = [];
+
+        public void Initialize(IncrementalGeneratorInitializationContext context)
+        {
+            context.RegisterSourceOutput(
+                context.SyntaxProvider.ForMethodsWithAttribute(
+                    "Sample.MarkAttribute",
+                    MethodStep,
+                    includeContainingTypeMembers
+                ),
+                (_, value) => Seen.Add(("Method", value.ContainingType))
+            );
+            context.RegisterSourceOutput(
+                context.SyntaxProvider.ForPropertiesWithAttribute(
+                    "Sample.MarkMemberAttribute",
+                    PropertyStep,
+                    includeContainingTypeMembers
+                ),
+                (_, value) => Seen.Add(("Property", value.ContainingType))
+            );
+            context.RegisterSourceOutput(
+                context.SyntaxProvider.ForFieldsWithAttribute(
+                    "Sample.MarkMemberAttribute",
+                    FieldStep,
+                    includeContainingTypeMembers
+                ),
+                (_, value) => Seen.Add(("Field", value.ContainingType))
+            );
         }
     }
 
