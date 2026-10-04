@@ -9,8 +9,9 @@ using Microsoft.CodeAnalysis;
 
 namespace Haitch.Roslyn.Diagnostics;
 
-// Generator configuration (hold in a static readonly field), never a pipeline value:
-// DiagnosticDescriptor has no value equality.
+// Generator configuration (hold in a static readonly field), never a pipeline value: descriptors
+// are not part of what the incremental pipeline should cache on, so they are passed alongside the
+// equatable model and attached to DiagnosticInfo only when reporting.
 internal sealed record PartialTypeDiagnostics(
     DiagnosticDescriptor NotPartial,
     DiagnosticDescriptor ContainingTypeNotPartial,
