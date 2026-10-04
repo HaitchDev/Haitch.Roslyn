@@ -95,3 +95,40 @@ Rules that apply to every issue:
 | | [20.2](20.2-explicit-interface-members.md) | Explicit interface members |
 | | [20.3](20.3-volatile-and-ref-properties.md) | Volatile fields and ref properties |
 | 21 Hint names | [21.1](21.1-hint-name-case.md) | Hint-name case disambiguation |
+| 22 Foundation | [22.1](22.1-csharpier-reformat.md) | csharpier tool and whole-repo reformat |
+| | [22.2](22.2-check-script-and-ci-format.md) | Check script and CI format step |
+| | [22.3](22.3-samples-scaffold.md) | Samples scaffold |
+| 23 Harness | [23.1](23.1-generator-harness-input.md) | GeneratorHarnessInput |
+| | [23.2](23.2-harness-additional-texts-and-options.md) | Harness additional texts and analyzer-config options |
+| | [23.3](23.3-allow-input-errors.md) | Allow input errors |
+| | [23.4](23.4-diagnostic-assertions.md) | Diagnostic assertions |
+| | [23.5](23.5-expected-output-assertions.md) | Expected-output assertions |
+| 24 Member discovery | [24.1](24.1-for-methods-with-attribute.md) | ForMethodsWithAttribute |
+| | [24.2](24.2-for-properties-and-fields-with-attribute.md) | ForPropertiesWithAttribute and ForFieldsWithAttribute |
+| | [24.3](24.3-discovery-predicate.md) | Discovery predicate |
+| | [24.4](24.4-notify-sample.md) | Notify sample |
+| 25 Typed attribute arguments | [25.1](25.1-constant-value-accessors.md) | ConstantValue typed accessors |
+| | [25.2](25.2-attribute-model-lookups.md) | AttributeModel lookups |
+| | [25.3](25.3-notify-sample-arguments.md) | Notify sample reads attribute arguments |
+| 26 Options and additional files | [26.1](26.1-build-property-providers.md) | Build-property providers |
+| | [26.2](26.2-additional-file-provider.md) | Additional-file provider |
+| | [26.3](26.3-text-constants-sample.md) | Text-constants sample |
+| 27 Generator gaps | [27.1](27.1-type-model-base-types.md) | TypeModel base types and interfaces |
+| | [27.2](27.2-event-model.md) | EventModel |
+| | [27.3](27.3-type-scope-event.md) | TypeScope.Event |
+| | [27.4](27.4-partial-declaration-base-list.md) | Base list on partial declarations |
+| | [27.5](27.5-member-partial-validation.md) | Member partial validation |
+| | [27.6](27.6-notify-sample-uses-gap-helpers.md) | Notify sample uses the new helpers |
+| 28 Raw lines on TypeScope | [28.1](28.1-type-scope-line.md) | TypeScope.Line |
+| | [28.2](28.2-notify-sample-uses-type-scope-line.md) | Notify sample uses TypeScope.Line |
+| 29 New provider on rerun | [29.1](29.1-rerun-with-new-options-provider.md) | AssertCacheable reruns with a new options provider |
+| 30 Any AdditionalText | [30.1](30.1-harness-takes-any-additional-text.md) | The harness takes any AdditionalText |
+| | [30.2](30.2-unreadable-additional-text.md) | UnreadableAdditionalText |
+| 31 Migration | [31.1](31.1-migrate-provider-tests-to-harness.md) | Migrate AdditionalFileTests and BuildPropertyTests to the harness |
+| | [31.2](31.2-migrate-text-constants-tests-to-harness.md) | Migrate TextConstantsGeneratorTests to the harness |
+| | [31.3](31.3-trim-harness-convenience-overloads.md) | Trim the harness convenience overloads |
+| 32 Explicit usings | [32.1](32.1-testing-explicit-usings.md) | Explicit usings in Haitch.Roslyn.Testing |
+| 33 Partial events | [33.1](33.1-partial-events.md) | Partial events become one EventModel |
+| 34 Members on containing types | [34.1](34.1-containing-type-members.md) | Member discovery can include containing-type members |
+| | [34.2](34.2-type-model-member-names.md) | TypeModel carries every member name |
+| | [34.3](34.3-notify-drops-owners-step.md) | The Notify sample drops its owners step |
