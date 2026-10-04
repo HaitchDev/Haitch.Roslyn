@@ -185,6 +185,10 @@ internal ref struct TypeScope
     /// <paramref name="method"/> is abstract (including interface members) or extern, so a body is illegal;
     /// write its signature with <see cref="SourceWriterExtensions.WriteMethodSignature"/> instead.
     /// </exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="method"/>'s kind is neither Ordinary nor ExplicitInterfaceImplementation
+    /// (for example a constructor, destructor, operator or conversion).
+    /// </exception>
     public BodyScope Method(MethodModel method)
     {
         try

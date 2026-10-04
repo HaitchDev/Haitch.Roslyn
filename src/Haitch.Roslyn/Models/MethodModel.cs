@@ -32,6 +32,7 @@ internal sealed record MethodModel(
     bool IsExtern,
     bool IsExtensionMethod,
     bool IsPartialDefinition,
+    bool IsPartial,
     bool IsReadOnly,
     TypeRef? ExplicitInterface,
     string? ExplicitInterfaceMemberName,
@@ -104,6 +105,7 @@ internal sealed record MethodModel(
             method.IsExtern,
             method.IsExtensionMethod,
             method.IsPartialDefinition,
+            IsPartialMethod(method),
             method.IsReadOnly,
             explicitInterfaceMethod is null ? null : TypeRef.From(explicitInterfaceMethod.ContainingType),
             explicitInterfaceMethod?.Name,
@@ -111,11 +113,12 @@ internal sealed record MethodModel(
             parameters,
             attributes)
         {
-            HasExplicitAccessibility = !IsPartial(method) || HasAccessModifier(method.PartialDefinitionPart ?? method),
+            HasExplicitAccessibility = !IsPartialMethod(method)
+                || HasAccessModifier(method.PartialDefinitionPart ?? method),
         };
     }
 
-    private static bool IsPartial(IMethodSymbol method)
+    private static bool IsPartialMethod(IMethodSymbol method)
     {
         return method.IsPartialDefinition || method.PartialDefinitionPart is not null;
     }

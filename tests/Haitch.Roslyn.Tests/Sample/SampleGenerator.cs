@@ -71,6 +71,7 @@ internal sealed class SampleGenerator : IIncrementalGenerator
         IsExtern: false,
         IsExtensionMethod: false,
         IsPartialDefinition: false,
+        IsPartial: false,
         IsReadOnly: false,
         ExplicitInterface: null,
         ExplicitInterfaceMemberName: null,

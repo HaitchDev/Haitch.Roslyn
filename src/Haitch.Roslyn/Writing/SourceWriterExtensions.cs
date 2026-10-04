@@ -363,6 +363,12 @@ internal static class SourceWriterExtensions
     /// writes a body: this is the shape a generator uses for the defining declaration of a partial
     /// method, an abstract member, or an interface member.
     /// </summary>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="method"/>'s <see cref="MethodModel.MethodKind"/> is neither
+    /// <see cref="Microsoft.CodeAnalysis.MethodKind.Ordinary"/> nor
+    /// <see cref="Microsoft.CodeAnalysis.MethodKind.ExplicitInterfaceImplementation"/>; constructors,
+    /// destructors, operators and conversions are not written as methods.
+    /// </exception>
     public static SourceWriter WriteMethodSignature(this SourceWriter writer, MethodModel method)
     {
         writer.WriteLine(RenderMethodHeader(method) + ";");
@@ -376,6 +382,13 @@ internal static class SourceWriterExtensions
     /// </summary>
     internal static string RenderMethodHeader(MethodModel method)
     {
+        if (method.MethodKind is not (MethodKind.Ordinary or MethodKind.ExplicitInterfaceImplementation))
+        {
+            throw new ArgumentException(
+                $"Method '{method.Name}' has kind {method.MethodKind}; only Ordinary and ExplicitInterfaceImplementation methods can be written.",
+                nameof(method));
+        }
+
         var builder = new StringBuilder();
         bool isExplicitInterfaceImplementation = method.ExplicitInterfaceMemberName is not null;
 
@@ -441,7 +454,7 @@ internal static class SourceWriterExtensions
             builder.Append("readonly ");
         }
 
-        if (method.IsPartialDefinition)
+        if (method.IsPartial)
         {
             builder.Append("partial ");
         }
