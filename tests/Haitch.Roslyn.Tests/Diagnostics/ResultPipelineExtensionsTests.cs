@@ -18,6 +18,18 @@ public class ResultPipelineExtensionsTests
     }
 
     [Test]
+    public async Task Should_suppress_a_pipeline_diagnostic_under_a_pragma_disable()
+    {
+        GeneratorDriverRunResult result = RunGenerator(
+            "#pragma warning disable TEST001\nclass BadWidget { }\n#pragma warning restore TEST001"
+        );
+
+        await Assert.That(result.Diagnostics.Length).IsEqualTo(1);
+        await Assert.That(result.Diagnostics[0].Id).IsEqualTo("TEST001");
+        await Assert.That(result.Diagnostics[0].IsSuppressed).IsTrue();
+    }
+
+    [Test]
     public async Task Should_generate_output_only_for_successful_inputs()
     {
         GeneratorDriverRunResult result = RunGenerator("class Widget { } class BadWidget { }");

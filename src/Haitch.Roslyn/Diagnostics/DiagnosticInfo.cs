@@ -26,8 +26,18 @@ internal sealed record DiagnosticInfo
         return new DiagnosticInfo(descriptor, location is null ? null : LocationInfo.From(location), messageArgs);
     }
 
+    // For diagnostics whose location lies outside the compilation (such as additional files).
     public Diagnostic ToDiagnostic()
     {
         return Diagnostic.Create(Descriptor, Location?.ToLocation() ?? Microsoft.CodeAnalysis.Location.None, MessageArgs.AsSpan().ToArray());
+    }
+
+    public Diagnostic ToDiagnostic(Compilation compilation)
+    {
+        return Diagnostic.Create(
+            Descriptor,
+            Location?.ToLocation(compilation) ?? Microsoft.CodeAnalysis.Location.None,
+            MessageArgs.AsSpan().ToArray()
+        );
     }
 }

@@ -21,6 +21,17 @@ internal static class ResultPipelineExtensions
         }
     }
 
+    public static void ReportDiagnostics(
+        this SourceProductionContext context,
+        EquatableArray<DiagnosticInfo> diagnostics,
+        Compilation compilation)
+    {
+        foreach (DiagnosticInfo diagnostic in diagnostics)
+        {
+            context.ReportDiagnostic(diagnostic.ToDiagnostic(compilation));
+        }
+    }
+
     public static IncrementalValuesProvider<T> ReportDiagnostics<T>(
         this IncrementalValuesProvider<Result<T>> results,
         IncrementalGeneratorInitializationContext context,
@@ -34,9 +45,10 @@ internal static class ResultPipelineExtensions
             .Select(static (result, _) => result.Diagnostics)
             .WithTrackingName($"{trackingName}.Diagnostics");
 
+        // Only this branch takes the compilation, so the value and source outputs stay cached across unrelated edits.
         context.RegisterSourceOutput(
-            diagnostics,
-            static (productionContext, diagnosticsForResult) => productionContext.ReportDiagnostics(diagnosticsForResult));
+            diagnostics.Combine(context.CompilationProvider),
+            static (productionContext, pair) => productionContext.ReportDiagnostics(pair.Left, pair.Right));
 
         return trackedResults
             .Where(static result => result.IsSuccess)

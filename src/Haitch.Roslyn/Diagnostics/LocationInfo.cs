@@ -22,8 +22,39 @@ internal sealed record LocationInfo(string FilePath, TextSpan Span, LinePosition
         return new LocationInfo(lineSpan.Path, location.SourceSpan, lineSpan.Span);
     }
 
+    // For locations outside the compilation's syntax trees (such as additional files), which have no tree to bind to.
     public Location ToLocation()
     {
         return Location.Create(FilePath, Span, LineSpan);
+    }
+
+    // Binding to the compilation's own tree is what lets #pragma warning disable suppress the diagnostic (and,
+    // in a compiler build, [SuppressMessage]); an ambiguous or stale path falls back to the unbound location
+    // rather than guessing.
+    public Location ToLocation(Compilation compilation)
+    {
+        SyntaxTree? match = null;
+
+        foreach (SyntaxTree tree in compilation.SyntaxTrees)
+        {
+            if (tree.FilePath != FilePath)
+            {
+                continue;
+            }
+
+            if (match is not null)
+            {
+                return ToLocation();
+            }
+
+            match = tree;
+        }
+
+        if (match is null)
+        {
+            return ToLocation();
+        }
+
+        return Span.End > match.GetText().Length ? ToLocation() : Location.Create(match, Span);
     }
 }
