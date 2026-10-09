@@ -778,6 +778,45 @@ public class SyntaxValueProviderExtensionsTests
         );
     }
 
+    [Test]
+    public async Task Should_modify_the_step_when_the_extra_value_changes()
+    {
+        const string template = """
+            [Sample.Mark]
+            public partial class Widget { public string Describe() => "{0}"; }
+            """;
+        CSharpCompilation compilation = CreateCompilation([
+            CSharpSyntaxTree.ParseText(MarkAttributeSource, path: "Source0.cs"),
+            CSharpSyntaxTree.ParseText(template.Replace("{0}", "hello"), path: "Source1.cs"),
+        ]);
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new ExtraTestGenerator().AsSourceGenerator()],
+            driverOptions: new GeneratorDriverOptions(
+                IncrementalGeneratorOutputKind.None,
+                trackIncrementalGeneratorSteps: true
+            )
+        );
+        driver = driver.RunGenerators(compilation);
+
+        SyntaxTree tree = compilation.SyntaxTrees.Single(tree => tree.FilePath == "Source1.cs");
+        driver = driver.RunGenerators(
+            compilation.ReplaceSyntaxTree(
+                tree,
+                CSharpSyntaxTree.ParseText(template.Replace("{0}", "goodbye"), path: "Source1.cs")
+            )
+        );
+
+        IncrementalStepRunReason[] reasons = driver
+            .GetRunResult()
+            .Results[0]
+            .TrackedSteps[ExtraTestGenerator.ValuesStepName]
+            .SelectMany(step => step.Outputs)
+            .Select(output => output.Reason)
+            .ToArray();
+
+        await Assert.That(reasons).Contains(IncrementalStepRunReason.Modified);
+    }
+
     // Extracts the first string literal of the marked declaration, standing in for a generator reading a method body.
     private sealed class ExtraTestGenerator : IIncrementalGenerator
     {
