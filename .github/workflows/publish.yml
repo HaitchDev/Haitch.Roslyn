@@ -2,30 +2,47 @@ name: Publish
 
 on:
   push:
-    tags:
-      - "v*.*.*"
+    branches:
+      - main
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
       - name: Determine version
         id: version
-        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        # A version tag already on HEAD wins (push one with the commit to bump minor/major); otherwise bump the latest tag's patch.
+        run: |
+          tag=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)
+          if [ -z "$tag" ]; then
+            latest=$(git tag | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)
+            IFS=. read -r major minor patch <<< "${latest:-v0.0.0}"
+            tag="${major}.${minor}.$((patch + 1))"
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "value=${tag#v}" >> "$GITHUB_OUTPUT"
 
       - name: Restore
         run: dotnet restore
@@ -50,3 +67,9 @@ jobs:
 
       - name: Push symbol packages
         run: dotnet nuget push "artifacts/*.snupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Tag release
+        if: steps.version.outputs.new == 'true'
+        run: |
+          git tag "${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
