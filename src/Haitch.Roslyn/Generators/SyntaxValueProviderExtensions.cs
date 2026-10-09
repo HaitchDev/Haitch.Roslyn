@@ -91,13 +91,15 @@ internal static class SyntaxValueProviderExtensions
                 predicate: WithKindCheck(static (node, _) => node is TypeDeclarationSyntax, predicate),
                 transform: (context, cancellationToken) =>
                 {
-                    var typeSymbol = (INamedTypeSymbol)context.TargetSymbol;
-                    var typeModel = TypeModel.From(typeSymbol, includeMembers, cancellationToken);
-                    var syntaxInfo = SyntaxInfo.From(context.TargetNode);
-                    var attributes = ToAttributeModels(GetMarkedAttributes(typeSymbol, context));
+                    var extra = transform(context, cancellationToken);
+                    var item = Transform(context, includeMembers, cancellationToken);
 
-                    return (typeModel, syntaxInfo, attributes, transform(context, cancellationToken));
+                    return item is { } kept
+                        ? (kept.Type, kept.Syntax, kept.Attributes, extra)
+                        : ((TypeModel, SyntaxInfo, EquatableArray<AttributeModel>, TExtra)?)null;
                 })
+            .Where(static item => item is not null)
+            .Select(static (item, _) => item!.Value)
             .WithTrackingName(trackingName);
     }
 
