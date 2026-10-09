@@ -733,6 +733,29 @@ public class SyntaxValueProviderExtensionsTests
         await Assert.That(generator.Items[0].Extra).IsEqualTo("first");
     }
 
+    [Test]
+    public async Task Should_not_call_the_extra_transform_for_the_dropped_declarations()
+    {
+        ExtraTestGenerator generator = new();
+
+        GeneratorHarness.Run(
+            generator,
+            new GeneratorHarnessInput
+            {
+                Sources =
+                [
+                    MarkAttributeSource,
+                    "[Sample.Mark] public partial class Widget { public string A() => \"first\"; }",
+                    "[Sample.Mark] public partial class Widget { public string B() => \"second\"; }",
+                ],
+            }
+        );
+
+        await Assert
+            .That(generator.TransformedFiles.ToArray())
+            .IsEquivalentTo(new[] { "Source1.cs" });
+    }
+
     // Extracts the first string literal of the marked declaration, standing in for a generator reading a method body.
     private sealed class ExtraTestGenerator : IIncrementalGenerator
     {
