@@ -62,6 +62,45 @@ internal static class SyntaxValueProviderExtensions
             .WithTrackingName(trackingName);
     }
 
+    /// <summary>Finds types marked with the attribute and carries an extra value computed from each match.</summary>
+    /// <typeparam name="TExtra">The extra value's type; it must be value-equal so the step stays cacheable.</typeparam>
+    /// <param name="provider">The syntax provider.</param>
+    /// <param name="fullyQualifiedMetadataName">The attribute's fully qualified metadata name.</param>
+    /// <param name="trackingName">The tracking name of the resulting step.</param>
+    /// <param name="transform">
+    /// Computes the extra value from the match, e.g. by reading a method body. Its result must be value-equal and hold no
+    /// <see cref="ISymbol"/>, <see cref="SyntaxNode"/>, <see cref="Location"/>, <see cref="Diagnostic"/> or <see cref="Compilation"/>.
+    /// </param>
+    /// <param name="includeMembers">Whether to fill the type model's members.</param>
+    /// <param name="predicate">
+    /// Optional extra filter. It runs in the syntax phase on every edit, after the built-in kind check,
+    /// so it only receives type declarations. It must be cheap and syntax-only, and must not capture state.
+    /// </param>
+    public static IncrementalValuesProvider<(TypeModel Type, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes, TExtra Extra)>
+        ForTypesWithAttribute<TExtra>(
+            this SyntaxValueProvider provider,
+            string fullyQualifiedMetadataName,
+            string trackingName,
+            Func<GeneratorAttributeSyntaxContext, CancellationToken, TExtra> transform,
+            bool includeMembers = false,
+            Func<SyntaxNode, CancellationToken, bool>? predicate = null)
+        where TExtra : IEquatable<TExtra>
+    {
+        return provider.ForAttributeWithMetadataName(
+                fullyQualifiedMetadataName,
+                predicate: WithKindCheck(static (node, _) => node is TypeDeclarationSyntax, predicate),
+                transform: (context, cancellationToken) =>
+                {
+                    var typeSymbol = (INamedTypeSymbol)context.TargetSymbol;
+                    var typeModel = TypeModel.From(typeSymbol, includeMembers, cancellationToken);
+                    var syntaxInfo = SyntaxInfo.From(context.TargetNode);
+                    var attributes = ToAttributeModels(GetMarkedAttributes(typeSymbol, context));
+
+                    return (typeModel, syntaxInfo, attributes, transform(context, cancellationToken));
+                })
+            .WithTrackingName(trackingName);
+    }
+
     // Method counterpart of ForTypesWithAttribute. The predicate admits only method declarations, so
     // local functions, lambdas, accessors and constructors never reach the transform. The containing
     // type is captured without members by default: that ties the item's equality to the method's own
