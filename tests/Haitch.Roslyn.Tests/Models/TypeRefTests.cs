@@ -226,6 +226,24 @@ public class TypeRefTests
         await Assert.That(typeParameterRef.TypeKind).IsEqualTo(TypeKind.TypeParameter);
     }
 
+    [Test]
+    public async Task Should_capture_the_type_arguments_of_a_generic_type()
+    {
+        const string source = """
+            using System.Collections.Generic;
+
+            class Sample { public Dictionary<string, int> Field; }
+            """;
+
+        ITypeSymbol type = GetFieldType(source, "Sample", "Field");
+
+        TypeRef typeRef = TypeRef.From(type);
+
+        await Assert.That(typeRef.TypeArguments.Count).IsEqualTo(2);
+        await Assert.That(typeRef.TypeArguments[0].FullyQualifiedName).IsEqualTo("string");
+        await Assert.That(typeRef.TypeArguments[1].FullyQualifiedName).IsEqualTo("int");
+    }
+
     private static ITypeSymbol GetFieldType(string source, string metadataName, string fieldName)
     {
         INamedTypeSymbol type = CompilationHelper.GetNamedTypeSymbol(source, metadataName);
