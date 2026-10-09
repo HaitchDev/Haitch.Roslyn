@@ -687,6 +687,69 @@ public class SyntaxValueProviderExtensionsTests
     }
 
     [Test]
+    public async Task Should_carry_the_extra_value_in_the_item()
+    {
+        ExtraTestGenerator generator = new();
+
+        GeneratorHarness.Run(
+            generator,
+            new GeneratorHarnessInput
+            {
+                Sources =
+                [
+                    MarkAttributeSource,
+                    """
+                    [Sample.Mark]
+                    public partial class Widget { public string Describe() => "hello"; }
+                    """,
+                ],
+            }
+        );
+
+        await Assert.That(generator.Items.Count).IsEqualTo(1);
+        await Assert.That(generator.Items[0].Type.Name).IsEqualTo("Widget");
+        await Assert.That(generator.Items[0].Extra).IsEqualTo("hello");
+    }
+
+    // Extracts the first string literal of the marked declaration, standing in for a generator reading a method body.
+    private sealed class ExtraTestGenerator : IIncrementalGenerator
+    {
+        public List<(TypeModel Type, string Extra)> Items { get; } = [];
+        public List<string> TransformedFiles { get; } = [];
+
+        public void Initialize(IncrementalGeneratorInitializationContext context)
+        {
+            context.RegisterSourceOutput(
+                context.SyntaxProvider.ForTypesWithAttribute(
+                    "Sample.MarkAttribute",
+                    ValuesStepName,
+                    (attributeContext, _) =>
+                    {
+                        lock (TransformedFiles)
+                        {
+                            TransformedFiles.Add(attributeContext.TargetNode.SyntaxTree.FilePath);
+                        }
+
+                        return attributeContext
+                            .TargetNode.DescendantTokens()
+                            .FirstOrDefault(token => token.IsKind(SyntaxKind.StringLiteralToken))
+                            .ValueText;
+                    }
+                ),
+                (_, value) =>
+                {
+                    lock (Items)
+                    {
+                        Items.Add((value.Type, value.Extra));
+                    }
+                }
+            );
+        }
+
+        public const string ValuesStepName = "ExtraTestGenerator.Values";
+    }
+
+    [Test]
     public void Should_stay_cacheable_with_members_included()
     {
         GeneratorHarness.AssertCacheable(
