@@ -756,6 +756,28 @@ public class SyntaxValueProviderExtensionsTests
             .IsEquivalentTo(new[] { "Source1.cs" });
     }
 
+    [Test]
+    public void Should_stay_cacheable_with_an_extra_transform_after_an_unrelated_edit()
+    {
+        GeneratorHarness.AssertCacheable(
+            new ExtraTestGenerator(),
+            new GeneratorHarnessInput
+            {
+                Sources =
+                [
+                    """
+                    [Sample.Mark]
+                    public partial class Widget { public string Describe() => "hello"; }
+                    """,
+                    MarkAttributeSource,
+                    "public class Unrelated { }",
+                ],
+            },
+            [ExtraTestGenerator.ValuesStepName],
+            options: new CacheabilityOptions { UnrelatedEditSourceIndex = 2 }
+        );
+    }
+
     // Extracts the first string literal of the marked declaration, standing in for a generator reading a method body.
     private sealed class ExtraTestGenerator : IIncrementalGenerator
     {
