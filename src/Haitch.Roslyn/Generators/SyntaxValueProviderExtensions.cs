@@ -91,11 +91,10 @@ internal static class SyntaxValueProviderExtensions
                 predicate: WithKindCheck(static (node, _) => node is TypeDeclarationSyntax, predicate),
                 transform: (context, cancellationToken) =>
                 {
-                    var extra = transform(context, cancellationToken);
                     var item = Transform(context, includeMembers, cancellationToken);
 
                     return item is { } kept
-                        ? (kept.Type, kept.Syntax, kept.Attributes, extra)
+                        ? (kept.Type, kept.Syntax, kept.Attributes, transform(context, cancellationToken))
                         : ((TypeModel, SyntaxInfo, EquatableArray<AttributeModel>, TExtra)?)null;
                 })
             .Where(static item => item is not null)
