@@ -593,6 +593,11 @@ public class TypeModelTests
             .That(model.BaseType!.FullyQualifiedName)
             .IsEqualTo("global::Example.Base<int>");
         await Assert.That(model.BaseType.TypeKind).IsEqualTo(TypeKind.Class);
+        await Assert.That(model.BaseType.TypeArguments.Count).IsEqualTo(1);
+        await Assert.That(model.BaseType.TypeArguments[0].FullyQualifiedName).IsEqualTo("int");
+        await Assert
+            .That(model.BaseType.TypeArguments[0].SpecialType)
+            .IsEqualTo(SpecialType.System_Int32);
     }
 
     [Test]
