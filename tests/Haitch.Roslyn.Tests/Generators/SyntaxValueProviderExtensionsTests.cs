@@ -711,6 +711,28 @@ public class SyntaxValueProviderExtensionsTests
         await Assert.That(generator.Items[0].Extra).IsEqualTo("hello");
     }
 
+    [Test]
+    public async Task Should_return_one_item_with_the_first_declarations_extra_when_a_type_is_marked_on_two_parts()
+    {
+        ExtraTestGenerator generator = new();
+
+        GeneratorHarness.Run(
+            generator,
+            new GeneratorHarnessInput
+            {
+                Sources =
+                [
+                    MarkAttributeSource,
+                    "[Sample.Mark] public partial class Widget { public string A() => \"first\"; }",
+                    "[Sample.Mark] public partial class Widget { public string B() => \"second\"; }",
+                ],
+            }
+        );
+
+        await Assert.That(generator.Items.Count).IsEqualTo(1);
+        await Assert.That(generator.Items[0].Extra).IsEqualTo("first");
+    }
+
     // Extracts the first string literal of the marked declaration, standing in for a generator reading a method body.
     private sealed class ExtraTestGenerator : IIncrementalGenerator
     {
