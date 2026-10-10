@@ -130,6 +130,39 @@ public class LabeledJumpTests
     }
 
     [Test]
+    public async Task Return_InsideIf_WritesPlainReturn()
+    {
+        var output = Render(body =>
+        {
+            using var branch = body.If("n > 0");
+            branch.Return();
+        });
+
+        await Assert
+            .That(output)
+            .IsEqualTo(
+                Prefix
+                    + "        if (n > 0)\n"
+                    + "        {\n"
+                    + "            return;\n"
+                    + "        }\n"
+                    + Suffix
+            );
+    }
+
+    [Test]
+    public async Task Return_InsideIfWithExpression_WritesReturnOfExpression()
+    {
+        var output = Render(body =>
+        {
+            using var branch = body.If("n > 0");
+            branch.Return("true");
+        });
+
+        await Assert.That(output).Contains("            return true;\n");
+    }
+
+    [Test]
     public async Task Jumps_FromInsideTryAndIf_CompileAgainstOuterLabel()
     {
         var output = Render(body =>
