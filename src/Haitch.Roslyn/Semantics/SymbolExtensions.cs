@@ -5,8 +5,18 @@ using Microsoft.CodeAnalysis;
 
 namespace Haitch.Roslyn.Semantics;
 
+/// <summary>
+/// Reads what any symbol carries, so a generator does not compare attribute display strings by hand.
+/// </summary>
 internal static class SymbolExtensions
 {
+    /// <summary>
+    /// Tells whether <paramref name="symbol"/> carries an attribute whose class is named
+    /// <paramref name="metadataName"/>, matching a constructed generic attribute by its definition.
+    /// </summary>
+    /// <param name="symbol">The type, method, property or other symbol to read.</param>
+    /// <param name="metadataName">The attribute class's metadata name, such as <c>System.FlagsAttribute</c> or <c>Ns.MarkAttribute`1</c>.</param>
+    /// <returns>True when the symbol carries the attribute.</returns>
     public static bool HasAttribute(this ISymbol symbol, string metadataName)
     {
         return false;
