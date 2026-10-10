@@ -15,7 +15,9 @@ internal static class InvocationExtensions
         string parameter,
         CancellationToken cancellationToken)
     {
-        var argument = NamedArgument(invocation, parameter);
+        var argument =
+            NamedArgument(invocation, parameter)
+            ?? PositionalArgument(invocation, model, parameter, cancellationToken);
 
         return argument is null ? null : model.GetOperation(argument.Expression, cancellationToken);
     }
@@ -27,6 +29,28 @@ internal static class InvocationExtensions
             if (argument.NameColon?.Name.Identifier.Text == parameter)
             {
                 return argument;
+            }
+        }
+
+        return null;
+    }
+
+    private static ArgumentSyntax? PositionalArgument(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        string parameter,
+        CancellationToken cancellationToken)
+    {
+        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method)
+        {
+            return null;
+        }
+
+        foreach (var candidate in method.Parameters)
+        {
+            if (candidate.Name == parameter && candidate.Ordinal < invocation.ArgumentList.Arguments.Count)
+            {
+                return invocation.ArgumentList.Arguments[candidate.Ordinal];
             }
         }
 
