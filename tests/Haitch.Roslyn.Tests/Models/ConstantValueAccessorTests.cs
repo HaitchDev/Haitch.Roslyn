@@ -219,6 +219,7 @@ public class ConstantValueAccessorTests
     [Arguments(true, SpecialType.System_Boolean, "true")]
     [Arguments('\'', SpecialType.System_Char, "'\\''")]
     [Arguments(1.5d, SpecialType.System_Double, "1.5d")]
+    [Arguments(1.5f, SpecialType.System_Single, "1.5f")]
     public async Task Should_render_a_primitive_read_from_a_symbol_as_its_literal(
         object value,
         SpecialType type,
