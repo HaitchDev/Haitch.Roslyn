@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Linq;
 using Haitch.Roslyn.Types;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 
 namespace Haitch.Roslyn.Models;
 
@@ -225,6 +226,7 @@ internal sealed record ConstantValue
         return Value switch
         {
             bool boolValue => boolValue ? "true" : "false",
+            char charValue => SymbolDisplay.FormatLiteral(charValue, quote: true),
             _ => Convert.ToString(Value, CultureInfo.InvariantCulture)!,
         };
     }
