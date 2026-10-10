@@ -15,11 +15,18 @@ internal static class InvocationExtensions
         string parameter,
         CancellationToken cancellationToken)
     {
+        var argument = NamedArgument(invocation, parameter);
+
+        return argument is null ? null : model.GetOperation(argument.Expression, cancellationToken);
+    }
+
+    private static ArgumentSyntax? NamedArgument(InvocationExpressionSyntax invocation, string parameter)
+    {
         foreach (var argument in invocation.ArgumentList.Arguments)
         {
             if (argument.NameColon?.Name.Identifier.Text == parameter)
             {
-                return model.GetOperation(argument.Expression, cancellationToken);
+                return argument;
             }
         }
 
