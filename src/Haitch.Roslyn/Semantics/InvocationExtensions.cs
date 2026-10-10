@@ -46,11 +46,13 @@ internal static class InvocationExtensions
             return null;
         }
 
+        var arguments = invocation.ArgumentList.Arguments;
+
         foreach (var candidate in method.Parameters)
         {
-            if (candidate.Name == parameter && candidate.Ordinal < invocation.ArgumentList.Arguments.Count)
+            if (candidate.Name == parameter && candidate.Ordinal < arguments.Count)
             {
-                return invocation.ArgumentList.Arguments[candidate.Ordinal];
+                return arguments[candidate.Ordinal];
             }
         }
 
