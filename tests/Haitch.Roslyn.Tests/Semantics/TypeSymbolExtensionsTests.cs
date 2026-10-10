@@ -57,7 +57,7 @@ public class TypeSymbolExtensionsTests
     [Test]
     public async Task Should_find_a_constructed_interface_as_itself()
     {
-        bool found = TypeOf("Ns.IShape<int>").IsOrImplements("Ns.IShape`1");
+        bool found = IsOrImplementsShape("Ns.IShape<int>");
 
         await Assert.That(found).IsTrue();
     }
@@ -65,10 +65,13 @@ public class TypeSymbolExtensionsTests
     [Test]
     public async Task Should_not_find_an_interface_a_type_does_not_implement()
     {
-        bool found = TypeOf("Ns.Plain").IsOrImplements("Ns.IShape`1");
+        bool found = IsOrImplementsShape("Ns.Plain");
 
         await Assert.That(found).IsFalse();
     }
+
+    private static bool IsOrImplementsShape(string type) =>
+        TypeOf(type).IsOrImplements("Ns.IShape`1");
 
     private static string? UnderlyingOf(string type) =>
         TypeOf(type).NullableUnderlying()?.ToDisplayString();
