@@ -61,6 +61,13 @@ public class InvocationExtensionsTests
 
     private static IOperation? ArgumentFor(string call, string parameter)
     {
+        (InvocationExpressionSyntax invocation, SemanticModel model) = Bind(call);
+
+        return invocation.ArgumentFor(model, parameter, CancellationToken.None);
+    }
+
+    private static (InvocationExpressionSyntax Invocation, SemanticModel Model) Bind(string call)
+    {
         CSharpCompilation compilation = CompilationHelper.Compile(
             $$"""
             static class Rules
@@ -86,10 +93,6 @@ public class InvocationExtensionsTests
             .OfType<InvocationExpressionSyntax>()
             .Single();
 
-        return invocation.ArgumentFor(
-            compilation.GetSemanticModel(tree),
-            parameter,
-            CancellationToken.None
-        );
+        return (invocation, compilation.GetSemanticModel(tree));
     }
 }
