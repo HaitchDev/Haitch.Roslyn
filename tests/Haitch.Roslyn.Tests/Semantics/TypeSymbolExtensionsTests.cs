@@ -22,6 +22,14 @@ public class TypeSymbolExtensionsTests
         await Assert.That(underlying).IsNull();
     }
 
+    [Test]
+    public async Task Should_not_unwrap_the_unconstructed_nullable_definition()
+    {
+        ITypeSymbol? underlying = TypeOf("int?").OriginalDefinition.NullableUnderlying();
+
+        await Assert.That(underlying).IsNull();
+    }
+
     private static string? UnderlyingOf(string type) =>
         TypeOf(type).NullableUnderlying()?.ToDisplayString();
 
