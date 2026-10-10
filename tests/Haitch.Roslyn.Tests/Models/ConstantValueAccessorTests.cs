@@ -226,6 +226,12 @@ public class ConstantValueAccessorTests
         await Assert.That(LiteralOf(true, SpecialType.System_Boolean)).IsEqualTo("true");
     }
 
+    [Test]
+    public async Task Should_render_a_char_read_from_a_symbol_as_a_quoted_escaped_literal()
+    {
+        await Assert.That(LiteralOf('\'', SpecialType.System_Char)).IsEqualTo("'\\''");
+    }
+
     private static string LiteralOf(object? value, SpecialType type) =>
         ConstantValue.From(value, LiteralCompilation.GetSpecialType(type)).ToLiteral();
 
