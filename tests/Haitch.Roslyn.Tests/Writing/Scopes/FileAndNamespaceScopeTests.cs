@@ -6,6 +6,11 @@ namespace Haitch.Roslyn.Tests.Writing.Scopes;
 
 public class FileAndNamespaceScopeTests
 {
+    private static TypeModel ModelOf(string source, string metadataName)
+    {
+        return TypeModel.From(CompilationHelper.GetNamedTypeSymbol(source, metadataName));
+    }
+
     [Test]
     public async Task Should_render_header_and_a_namespace_block()
     {
@@ -128,11 +133,6 @@ public class FileAndNamespaceScopeTests
                 file.Namespace(name!);
             })
             .Throws<ArgumentException>();
-    }
-
-    private static TypeModel ModelOf(string source, string metadataName)
-    {
-        return TypeModel.From(CompilationHelper.GetNamedTypeSymbol(source, metadataName));
     }
 
     [Test]
