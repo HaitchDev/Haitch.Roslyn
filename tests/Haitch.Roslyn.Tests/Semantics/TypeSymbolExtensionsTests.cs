@@ -112,6 +112,14 @@ public class TypeSymbolExtensionsTests
     }
 
     [Test]
+    public async Task Should_find_a_base_two_levels_up()
+    {
+        string? found = BaseOf("Ns.Mosaic", "Ns.Square");
+
+        await Assert.That(found).IsEqualTo("Ns.Square");
+    }
+
+    [Test]
     public async Task Should_not_find_a_base_a_type_does_not_derive_from()
     {
         string? found = BaseOf("Ns.Plain", "Ns.Square");
@@ -151,6 +159,8 @@ public class TypeSymbolExtensionsTests
                 class Square : IShape<int> { }
 
                 class Tile : Square { }
+
+                class Mosaic : Tile { }
 
                 interface ISolid<T> : IShape<T> { }
 
