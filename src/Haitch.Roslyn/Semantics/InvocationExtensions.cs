@@ -46,6 +46,15 @@ internal static class InvocationExtensions
         return null;
     }
 
+    public static IMethodSymbol? ResolveMethodIn(
+        this InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        string containingType,
+        CancellationToken cancellationToken)
+    {
+        return model.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
+    }
+
     // The compiler fills an omitted optional parameter with its default; the caller wrote nothing.
     private static IOperation? WrittenValue(IArgumentOperation argument)
     {
