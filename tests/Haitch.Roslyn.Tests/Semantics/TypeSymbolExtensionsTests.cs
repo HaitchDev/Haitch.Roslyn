@@ -162,6 +162,14 @@ public class TypeSymbolExtensionsTests
         await Assert.That(members).IsEmpty();
     }
 
+    [Test]
+    public async Task Should_list_no_enum_members_of_a_class()
+    {
+        string members = EnumMembersOf("Ns.Limits");
+
+        await Assert.That(members).IsEmpty();
+    }
+
     private static string EnumMembersOf(string type) =>
         string.Join(", ", NamedTypeOf(type).EnumMembers().Select(member => member.Name));
 
@@ -210,6 +218,11 @@ public class TypeSymbolExtensionsTests
                 class Plain { }
 
                 enum Empty { }
+
+                class Limits
+                {
+                    public const int Max = 10;
+                }
 
                 enum Size
                 {
