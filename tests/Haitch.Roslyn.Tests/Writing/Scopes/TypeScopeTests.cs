@@ -398,6 +398,22 @@ public class TypeScopeTests
     }
 
     [Test]
+    public async Task Should_reject_a_second_summary_before_a_member()
+    {
+        SourceWriter writer = new();
+
+        await Assert
+            .That(() =>
+            {
+                using var file = writer.File();
+                using var type = file.Type(Plain("A"));
+                type.Summary("First.");
+                type.Summary("Second.");
+            })
+            .Throws<InvalidOperationException>();
+    }
+
+    [Test]
     public async Task Should_reject_a_file_local_type()
     {
         TypeModel model = Plain("A") with { IsFileLocal = true };
