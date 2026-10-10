@@ -353,6 +353,37 @@ public class TypeScopeTests
     }
 
     [Test]
+    public async Task Should_write_a_summary_above_pending_attributes()
+    {
+        SourceWriter writer = new();
+
+        using (var file = writer.File())
+        {
+            using var type = file.Type(Plain("A"));
+
+            type.Attribute(WellKnownAttributes.EditorBrowsableNever);
+            type.Summary("Does M.");
+
+            using (type.Block("public void M()")) { }
+        }
+
+        await Assert
+            .That(writer.ToString())
+            .EndsWith(
+                """
+                {
+                    /// <summary>Does M.</summary>
+                    [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
+                    public void M()
+                    {
+                    }
+                }
+
+                """
+            );
+    }
+
+    [Test]
     public async Task Should_reject_a_file_local_type()
     {
         TypeModel model = Plain("A") with { IsFileLocal = true };
