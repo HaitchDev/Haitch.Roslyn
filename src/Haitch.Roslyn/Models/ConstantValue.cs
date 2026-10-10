@@ -214,12 +214,17 @@ internal sealed record ConstantValue
     /// <returns>The constant's model.</returns>
     public static ConstantValue From(object? value, ITypeSymbol type)
     {
+        if (value is null)
+        {
+            return ForNull(TypeRef.From(type));
+        }
+
         if (value is string stringValue)
         {
             return ForString(stringValue);
         }
 
-        return ForPrimitive(value!);
+        return ForPrimitive(value);
     }
 
     /// <summary>
@@ -230,6 +235,7 @@ internal sealed record ConstantValue
     {
         return Kind switch
         {
+            ConstantValueKind.Null => "null",
             ConstantValueKind.String => SymbolDisplay.FormatLiteral((string)Value!, quote: true),
             _ => RenderPrimitive(Value!),
         };
