@@ -56,6 +56,21 @@ public class InvocationExtensionsTests
         await Assert.That(argument).IsNull();
     }
 
+    [Test]
+    public async Task Should_resolve_a_method_on_a_non_generic_type()
+    {
+        IMethodSymbol? method = ResolveMethodIn("Rules.Length(1)", "Rules");
+
+        await Assert.That(method?.Name).IsEqualTo("Length");
+    }
+
+    private static IMethodSymbol? ResolveMethodIn(string call, string containingType)
+    {
+        (InvocationExpressionSyntax invocation, SemanticModel model) = Bind(call);
+
+        return invocation.ResolveMethodIn(model, containingType, CancellationToken.None);
+    }
+
     private static object? ConstantArgumentFor(string call, string parameter) =>
         ArgumentFor(call, parameter)?.ConstantValue.Value;
 
