@@ -155,6 +155,14 @@ public class TypeSymbolExtensionsTests
     }
 
     [Test]
+    public async Task Should_list_both_names_of_an_enum_alias_in_declaration_order()
+    {
+        string members = EnumMembersOf("Ns.Level");
+
+        await Assert.That(members).IsEqualTo("Low, Minimum, High");
+    }
+
+    [Test]
     public async Task Should_list_no_members_of_an_empty_enum()
     {
         string members = EnumMembersOf("Ns.Empty");
@@ -218,6 +226,13 @@ public class TypeSymbolExtensionsTests
                 class Plain { }
 
                 enum Empty { }
+
+                enum Level
+                {
+                    Low = 0,
+                    Minimum = Low,
+                    High = 1,
+                }
 
                 class Limits
                 {
