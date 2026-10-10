@@ -156,4 +156,54 @@ public class FileAndNamespaceScopeTests
 
         await Assert.That(actual.ToString()).IsEqualTo(expected.ToString());
     }
+
+    [Test]
+    public async Task Should_write_a_namespaced_type_in_its_namespace_block()
+    {
+        TypeModel model = ModelOf("namespace A.B { public class Plain { } }", "A.B.Plain");
+
+        await Assert.That(WrittenIn(model)).IsEqualTo(WrittenInNamespace(model));
+    }
+
+    [Test]
+    public async Task Should_write_a_containing_type_in_its_namespace_block()
+    {
+        TypeModel model = ModelOf(
+            "namespace A { public class Outer<T> { public class Inner { } } }",
+            "A.Outer`1+Inner"
+        );
+
+        await Assert.That(WrittenIn(model)).IsEqualTo(WrittenInNamespace(model));
+    }
+
+    private static string WrittenIn(TypeModel model)
+    {
+        SourceWriter writer = new();
+
+        using (var file = writer.File())
+        {
+            file.Using("System");
+
+            using (file.TypeIn(model)) { }
+        }
+
+        return writer.ToString();
+    }
+
+    private static string WrittenInNamespace(TypeModel model)
+    {
+        SourceWriter writer = new();
+
+        using (var file = writer.File())
+        {
+            file.Using("System");
+
+            using (var ns = file.Namespace(model.Namespace!))
+            {
+                using (ns.Type(model)) { }
+            }
+        }
+
+        return writer.ToString();
+    }
 }
