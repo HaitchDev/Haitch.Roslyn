@@ -2,6 +2,7 @@
 #nullable enable
 
 using System;
+using System.Globalization;
 using System.Linq;
 using Haitch.Roslyn.Types;
 using Microsoft.CodeAnalysis;
@@ -201,6 +202,16 @@ internal sealed record ConstantValue
     public static ConstantValue ForArray(TypeRef? type, EquatableArray<ConstantValue> elements)
     {
         return new ConstantValue(ConstantValueKind.Array, null, type, elements, null);
+    }
+
+    public static ConstantValue From(object? value, ITypeSymbol type)
+    {
+        return ForPrimitive(value!);
+    }
+
+    public string ToLiteral()
+    {
+        return Convert.ToString(Value, CultureInfo.InvariantCulture)!;
     }
 
     public static ConstantValue From(TypedConstant constant)
