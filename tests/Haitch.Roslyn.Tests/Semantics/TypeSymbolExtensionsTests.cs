@@ -163,10 +163,9 @@ public class TypeSymbolExtensionsTests
     }
 
     private static string EnumMembersOf(string type) =>
-        string.Join(
-            ", ",
-            ((INamedTypeSymbol)TypeOf(type)).EnumMembers().Select(member => member.Name)
-        );
+        string.Join(", ", NamedTypeOf(type).EnumMembers().Select(member => member.Name));
+
+    private static INamedTypeSymbol NamedTypeOf(string type) => (INamedTypeSymbol)TypeOf(type);
 
     private static bool IsOrImplementsShape(string type) =>
         TypeOf(type).IsOrImplements("Ns.IShape`1");
