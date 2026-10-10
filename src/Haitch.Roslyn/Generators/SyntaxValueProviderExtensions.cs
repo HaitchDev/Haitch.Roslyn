@@ -62,8 +62,7 @@ internal static class SyntaxValueProviderExtensions
                 predicate: WithKindCheck(static (node, _) => node is TypeDeclarationSyntax, predicate),
                 transform: (context, cancellationToken) => Transform(context, includeMembers, cancellationToken))
             .WithTrackingName(trackingName)
-            .Where(static item => item is not null)
-            .Select(static (item, _) => item!.Value);
+            .WhereKept();
     }
 
     /// <summary>Finds types marked with the attribute and carries an extra value computed from each match.</summary>
@@ -101,8 +100,7 @@ internal static class SyntaxValueProviderExtensions
                         ? (kept.Type, kept.Syntax, kept.Attributes, transform(context, cancellationToken))
                         : ((TypeModel, SyntaxInfo, EquatableArray<AttributeModel>, TExtra)?)null;
                 })
-            .Where(static item => item is not null)
-            .Select(static (item, _) => item!.Value)
+            .WhereKept()
             .WithTrackingName(trackingName);
     }
 
@@ -250,6 +248,15 @@ internal static class SyntaxValueProviderExtensions
             });
     }
 
+    // Transforms return null for the declarations they drop.
+    private static IncrementalValuesProvider<T> WhereKept<T>(this IncrementalValuesProvider<T?> provider)
+        where T : struct
+    {
+        return provider
+            .Where(static item => item is not null)
+            .Select(static (item, _) => item!.Value);
+    }
+
     // The kind check goes first so a caller's predicate only ever sees nodes of the discovery kind
     // and can cast without testing. Null returns the kind check itself, keeping the unfiltered
     // path allocation-free.
@@ -279,8 +286,7 @@ internal static class SyntaxValueProviderExtensions
                 fullyQualifiedMetadataName,
                 WithKindCheck(kindPredicate, userPredicate),
                 (context, cancellationToken) => transform(context, includeContainingTypeMembers, cancellationToken))
-            .Where(static item => item is not null)
-            .Select(static (item, _) => item!.Value)
+            .WhereKept()
             .WithTrackingName(trackingName);
     }
 
