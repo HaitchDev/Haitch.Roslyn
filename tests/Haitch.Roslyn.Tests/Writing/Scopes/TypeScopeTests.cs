@@ -384,6 +384,20 @@ public class TypeScopeTests
     }
 
     [Test]
+    public async Task Should_not_throw_on_dispose_but_throw_from_to_string_when_a_summary_is_pending()
+    {
+        SourceWriter writer = new();
+
+        using (var file = writer.File())
+        {
+            using var type = file.Type(Plain("A"));
+            type.Summary("Dangling.");
+        }
+
+        await Assert.That(() => writer.ToString()).Throws<InvalidOperationException>();
+    }
+
+    [Test]
     public async Task Should_reject_a_file_local_type()
     {
         TypeModel model = Plain("A") with { IsFileLocal = true };
