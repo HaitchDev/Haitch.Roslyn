@@ -15,6 +15,14 @@ public class SymbolExtensionsTests
     }
 
     [Test]
+    public async Task Should_find_a_generic_attribute_by_its_definitions_metadata_name()
+    {
+        bool found = Type("Ns.Marked").HasAttribute("Ns.MarkAttribute`1");
+
+        await Assert.That(found).IsTrue();
+    }
+
+    [Test]
     public async Task Should_not_find_an_attribute_the_symbol_does_not_carry()
     {
         bool found = Type("Ns.Plain").HasAttribute("System.FlagsAttribute");
@@ -32,6 +40,11 @@ public class SymbolExtensionsTests
                 {
                     None = 0,
                 }
+
+                class MarkAttribute<T> : System.Attribute { }
+
+                [Mark<int>]
+                class Marked { }
 
                 class Plain { }
             }
