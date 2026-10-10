@@ -303,8 +303,8 @@ internal static class SyntaxValueProviderExtensions
                 fullyQualifiedMetadataName,
                 WithKindCheck(kindPredicate, userPredicate),
                 (context, cancellationToken) => transform(context, includeContainingTypeMembers, cancellationToken))
-            .WhereKept()
-            .WithTrackingName(trackingName);
+            .WithTrackingName(trackingName)
+            .WhereKept();
     }
 
     // definition is the symbol the model and attributes come from: the definition part for a partial
