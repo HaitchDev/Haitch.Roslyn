@@ -479,6 +479,12 @@ internal ref struct TypeScope
             _writer.RecordError($"An attribute was written on TypeScope '{_model.Name}' with no member after it.");
         }
 
+        if (_state.Summary is not null)
+        {
+            _state.Summary = null;
+            _writer.RecordError($"A summary was written on TypeScope '{_model.Name}' with no member after it.");
+        }
+
         _declaration.Dispose();
         _namespace.Dispose();
     }
