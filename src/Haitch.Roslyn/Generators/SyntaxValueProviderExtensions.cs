@@ -57,12 +57,12 @@ internal static class SyntaxValueProviderExtensions
             bool includeMembers = false,
             Func<SyntaxNode, CancellationToken, bool>? predicate = null)
     {
-        return provider.ForAttributeWithMetadataName(
-                fullyQualifiedMetadataName,
-                predicate: WithKindCheck(static (node, _) => node is TypeDeclarationSyntax, predicate),
-                transform: (context, cancellationToken) => Transform(context, includeMembers, cancellationToken))
-            .WithTrackingName(trackingName)
-            .WhereKept();
+        return ForTypes(
+            provider,
+            fullyQualifiedMetadataName,
+            trackingName,
+            predicate,
+            (context, cancellationToken) => Transform(context, includeMembers, cancellationToken));
     }
 
     /// <summary>Finds types marked with the attribute and carries an extra value computed from each match.</summary>
@@ -89,17 +89,34 @@ internal static class SyntaxValueProviderExtensions
             Func<SyntaxNode, CancellationToken, bool>? predicate = null)
         where TExtra : IEquatable<TExtra>
     {
+        return ForTypes(
+            provider,
+            fullyQualifiedMetadataName,
+            trackingName,
+            predicate,
+            (context, cancellationToken) =>
+            {
+                var item = Transform(context, includeMembers, cancellationToken);
+
+                return item is { } kept
+                    ? (kept.Type, kept.Syntax, kept.Attributes, transform(context, cancellationToken))
+                    : ((TypeModel, SyntaxInfo, EquatableArray<AttributeModel>, TExtra)?)null;
+            });
+    }
+
+    // The tracking name goes on the transform's step, ahead of WhereKept; see ForTypesWithAttribute.
+    private static IncrementalValuesProvider<T> ForTypes<T>(
+        SyntaxValueProvider provider,
+        string fullyQualifiedMetadataName,
+        string trackingName,
+        Func<SyntaxNode, CancellationToken, bool>? predicate,
+        Func<GeneratorAttributeSyntaxContext, CancellationToken, T?> transform)
+        where T : struct
+    {
         return provider.ForAttributeWithMetadataName(
                 fullyQualifiedMetadataName,
                 predicate: WithKindCheck(static (node, _) => node is TypeDeclarationSyntax, predicate),
-                transform: (context, cancellationToken) =>
-                {
-                    var item = Transform(context, includeMembers, cancellationToken);
-
-                    return item is { } kept
-                        ? (kept.Type, kept.Syntax, kept.Attributes, transform(context, cancellationToken))
-                        : ((TypeModel, SyntaxInfo, EquatableArray<AttributeModel>, TExtra)?)null;
-                })
+                transform: transform)
             .WithTrackingName(trackingName)
             .WhereKept();
     }
