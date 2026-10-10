@@ -59,17 +59,17 @@ public class InvocationExtensionsTests
     [Test]
     public async Task Should_resolve_a_method_on_a_non_generic_type()
     {
-        IMethodSymbol? method = ResolveMethodIn("Rules.Length(1)", "Rules");
+        string? name = ResolvedNameIn("Rules.Length(1)", "Rules");
 
-        await Assert.That(method?.Name).IsEqualTo("Length");
+        await Assert.That(name).IsEqualTo("Length");
     }
 
     [Test]
     public async Task Should_resolve_a_method_on_a_constructed_generic_type_by_its_definition()
     {
-        IMethodSymbol? method = ResolveMethodIn("new Ns.Box<int>().Put(1)", "Ns.Box`1");
+        string? name = ResolvedNameIn("new Ns.Box<int>().Put(1)", "Ns.Box`1");
 
-        await Assert.That(method?.Name).IsEqualTo("Put");
+        await Assert.That(name).IsEqualTo("Put");
     }
 
     [Test]
@@ -79,6 +79,9 @@ public class InvocationExtensionsTests
 
         await Assert.That(method).IsNull();
     }
+
+    private static string? ResolvedNameIn(string call, string containingType) =>
+        ResolveMethodIn(call, containingType)?.Name;
 
     private static IMethodSymbol? ResolveMethodIn(string call, string containingType)
     {
