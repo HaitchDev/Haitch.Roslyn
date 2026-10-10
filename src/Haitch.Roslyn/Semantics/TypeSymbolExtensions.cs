@@ -13,6 +13,8 @@ internal static class TypeSymbolExtensions
 {
     public static ITypeSymbol? NullableUnderlying(this ITypeSymbol type)
     {
-        return ((INamedTypeSymbol)type).TypeArguments[0];
+        return type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
+            ? nullable.TypeArguments[0]
+            : null;
     }
 }
