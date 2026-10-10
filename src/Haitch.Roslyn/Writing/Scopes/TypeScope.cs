@@ -458,6 +458,12 @@ internal ref struct TypeScope
         return this;
     }
 
+    /// <summary>
+    /// Buffers <c>/// &lt;summary&gt;text&lt;/summary&gt;</c> to be written directly above the next type or
+    /// member this scope writes, after a blank line when one is due and above its pending attributes. Returns
+    /// this scope for chaining. <paramref name="text"/> is written verbatim, so the caller escapes XML.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">A summary is already pending.</exception>
     public TypeScope Summary(string text)
     {
         RequireInnermost();
@@ -475,7 +481,7 @@ internal ref struct TypeScope
 
     /// <summary>
     /// Closes the type's block, and those of its containing types and namespace when it opened them,
-    /// recording a still-buffered attribute as an error.
+    /// recording a still-buffered attribute or summary as an error.
     /// </summary>
     public void Dispose()
     {
