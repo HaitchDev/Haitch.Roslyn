@@ -2,6 +2,7 @@
 #nullable enable
 
 using System.Linq;
+using Haitch.Roslyn.Semantics;
 using Haitch.Roslyn.Types;
 using Microsoft.CodeAnalysis;
 
@@ -51,10 +52,7 @@ internal sealed record ParameterModel(
 
         // `null` is not valid syntax for a non-nullable value type, so an explicit null
         // default value for one can only have come from `default`.
-        isDefaultLiteral =
-            value is null
-            && type is { IsValueType: true }
-                and not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T };
+        isDefaultLiteral = value is null && type.IsValueType && type.NullableUnderlying() is null;
 
         return ConstantValue.From(value, type);
     }
