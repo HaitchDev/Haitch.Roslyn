@@ -51,7 +51,15 @@ internal static class TypeSymbolExtensions
     /// <returns>The base class as the type declares it, so a generic base's type arguments are readable.</returns>
     public static INamedTypeSymbol? FindBase(this ITypeSymbol type, string metadataName)
     {
-        return type.BaseType is { } baseType && IsNamed(baseType, metadataName) ? baseType : null;
+        for (var baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
+        {
+            if (IsNamed(baseType, metadataName))
+            {
+                return baseType;
+            }
+        }
+
+        return null;
     }
 
     private static bool IsNamed(INamedTypeSymbol type, string metadataName)
