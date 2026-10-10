@@ -232,6 +232,12 @@ public class ConstantValueAccessorTests
         await Assert.That(LiteralOf('\'', SpecialType.System_Char)).IsEqualTo("'\\''");
     }
 
+    [Test]
+    public async Task Should_render_a_decimal_read_from_a_symbol_with_its_suffix()
+    {
+        await Assert.That(LiteralOf(1.5m, SpecialType.System_Decimal)).IsEqualTo("1.5m");
+    }
+
     private static string LiteralOf(object? value, SpecialType type) =>
         ConstantValue.From(value, LiteralCompilation.GetSpecialType(type)).ToLiteral();
 
