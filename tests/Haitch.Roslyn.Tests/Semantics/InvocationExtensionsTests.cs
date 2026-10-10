@@ -73,6 +73,14 @@ public class InvocationExtensionsTests
     }
 
     [Test]
+    public async Task Should_resolve_an_extension_method_on_a_receiver_to_its_declaration()
+    {
+        IMethodSymbol? method = ResolveMethodIn("\"abc\".Matches(\"a+\")", "Rules");
+
+        await Assert.That(method?.MethodKind).IsEqualTo(MethodKind.Ordinary);
+    }
+
+    [Test]
     public async Task Should_not_resolve_a_method_on_another_type()
     {
         IMethodSymbol? method = ResolveMethodIn("Rules.Length(1)", "Caller");
