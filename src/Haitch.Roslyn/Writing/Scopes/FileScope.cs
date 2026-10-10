@@ -89,16 +89,7 @@ internal readonly ref struct FileScope
     {
         try
         {
-            RequireInnermost();
-
-            if (_state.Pending.Count > 0 && type.ContainingTypes.Count > 0)
-            {
-                throw new ArgumentException(
-                    $"A pending attribute would land on the outermost containing type of '{type.Name}'.",
-                    nameof(type));
-            }
-
-            TypeScope.ThrowIfFileLocal(type);
+            ValidateType(type);
             BeginMember();
 
             return new TypeScope(_writer, type, _writer.WriteTypeDeclaration(type, baseTypes));
@@ -190,6 +181,20 @@ internal readonly ref struct FileScope
         {
             throw new InvalidOperationException($"Cannot write {what} while an attribute is waiting for its type.");
         }
+    }
+
+    private readonly void ValidateType(TypeModel type)
+    {
+        RequireInnermost();
+
+        if (_state.Pending.Count > 0 && type.ContainingTypes.Count > 0)
+        {
+            throw new ArgumentException(
+                $"A pending attribute would land on the outermost containing type of '{type.Name}'.",
+                nameof(type));
+        }
+
+        TypeScope.ThrowIfFileLocal(type);
     }
 
     private readonly SourceWriter.BlockScope OpenNamespace(string name)
