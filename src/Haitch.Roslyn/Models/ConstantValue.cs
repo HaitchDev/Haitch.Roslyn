@@ -218,6 +218,7 @@ internal sealed record ConstantValue
         {
             null => ForNull(TypeRef.From(type)),
             string stringValue => ForString(stringValue),
+            _ when type.TypeKind == TypeKind.Enum => ForEnum(TypeRef.From(type), value),
             _ => ForPrimitive(value),
         };
     }
@@ -231,6 +232,7 @@ internal sealed record ConstantValue
         return Kind switch
         {
             ConstantValueKind.Null => "null",
+            ConstantValueKind.Enum => $"({Type!.FullyQualifiedName}){RenderPrimitive(Value!)}",
             ConstantValueKind.String => SymbolDisplay.FormatLiteral((string)Value!, quote: true),
             _ => RenderPrimitive(Value!),
         };
