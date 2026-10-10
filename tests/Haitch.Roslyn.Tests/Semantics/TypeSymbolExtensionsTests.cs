@@ -54,6 +54,14 @@ public class TypeSymbolExtensionsTests
         await Assert.That(underlying).IsNull();
     }
 
+    [Test]
+    public async Task Should_not_find_an_interface_a_type_does_not_implement()
+    {
+        bool found = TypeOf("Ns.Plain").IsOrImplements("Ns.IShape`1");
+
+        await Assert.That(found).IsFalse();
+    }
+
     private static string? UnderlyingOf(string type) =>
         TypeOf(type).NullableUnderlying()?.ToDisplayString();
 
@@ -71,6 +79,13 @@ public class TypeSymbolExtensionsTests
             class Holder
             {
                 public {{type}} Value = default!;
+            }
+
+            namespace Ns
+            {
+                interface IShape<T> { }
+
+                class Plain { }
             }
             """,
             "Holder"
