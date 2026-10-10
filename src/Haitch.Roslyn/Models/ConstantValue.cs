@@ -234,6 +234,7 @@ internal sealed record ConstantValue
             char charValue => SymbolDisplay.FormatLiteral(charValue, quote: true),
             decimal => Invariant(value) + "m",
             double => Invariant(value) + "d",
+            float => Invariant(value) + "f",
             _ => Invariant(value),
         };
     }
