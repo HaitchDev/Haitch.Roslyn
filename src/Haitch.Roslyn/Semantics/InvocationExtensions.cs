@@ -46,6 +46,16 @@ internal static class InvocationExtensions
         return null;
     }
 
+    /// <summary>
+    /// Finds the method <paramref name="invocation"/> calls when it is declared in
+    /// <paramref name="containingType"/>, matching a constructed generic type by its definition;
+    /// null when the method is declared elsewhere or the call does not bind.
+    /// </summary>
+    /// <param name="invocation">The invocation to read.</param>
+    /// <param name="model">The semantic model of the invocation's syntax tree.</param>
+    /// <param name="containingType">The containing type's metadata name, such as <c>Ns.Outer+Inner</c> or <c>Ns.Type`1</c>.</param>
+    /// <param name="cancellationToken">Cancels binding the invocation.</param>
+    /// <returns>The called method, an extension method as its declaration rather than its reduced form.</returns>
     public static IMethodSymbol? ResolveMethodIn(
         this InvocationExpressionSyntax invocation,
         SemanticModel model,
