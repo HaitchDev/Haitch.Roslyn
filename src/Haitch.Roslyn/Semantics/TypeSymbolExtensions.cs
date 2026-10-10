@@ -26,6 +26,11 @@ internal static class TypeSymbolExtensions
             : null;
     }
 
+    public static bool IsOrImplements(this ITypeSymbol type, string metadataName)
+    {
+        return false;
+    }
+
     // A definition's type arguments are its own type parameters, which no value is declared with.
     private static bool IsConstructed(INamedTypeSymbol type)
     {
