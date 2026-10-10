@@ -100,8 +100,8 @@ internal static class SyntaxValueProviderExtensions
                         ? (kept.Type, kept.Syntax, kept.Attributes, transform(context, cancellationToken))
                         : ((TypeModel, SyntaxInfo, EquatableArray<AttributeModel>, TExtra)?)null;
                 })
-            .WhereKept()
-            .WithTrackingName(trackingName);
+            .WithTrackingName(trackingName)
+            .WhereKept();
     }
 
     // Method counterpart of ForTypesWithAttribute. The predicate admits only method declarations, so
