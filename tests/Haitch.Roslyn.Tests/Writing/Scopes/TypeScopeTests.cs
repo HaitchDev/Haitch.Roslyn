@@ -224,6 +224,41 @@ public class TypeScopeTests
     }
 
     [Test]
+    public async Task Should_write_a_header_and_an_indented_body_that_disposal_closes()
+    {
+        SourceWriter writer = new();
+
+        using (var file = writer.File())
+        {
+            using var type = file.Type(Plain("A"));
+
+            using (var body = type.Block("public void M()"))
+            {
+                body.Line("return;");
+            }
+
+            type.Line("// after");
+        }
+
+        await Assert
+            .That(writer.ToString())
+            .EndsWith(
+                """
+                partial class A
+                    {
+                        public void M()
+                        {
+                            return;
+                        }
+                        // after
+                    }
+                }
+
+                """
+            );
+    }
+
+    [Test]
     public async Task Should_reject_a_file_local_type()
     {
         TypeModel model = Plain("A") with { IsFileLocal = true };
