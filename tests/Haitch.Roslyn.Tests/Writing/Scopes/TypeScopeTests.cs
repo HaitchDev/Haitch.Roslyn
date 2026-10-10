@@ -321,6 +321,38 @@ public class TypeScopeTests
     }
 
     [Test]
+    public async Task Should_write_a_summary_after_the_blank_separator_directly_above_the_header()
+    {
+        SourceWriter writer = new();
+
+        using (var file = writer.File())
+        {
+            using var type = file.Type(Plain("A"));
+
+            using (type.Block("public void M()")) { }
+
+            type.Summary("Does N.");
+
+            using (type.Block("public void N()")) { }
+        }
+
+        await Assert
+            .That(writer.ToString())
+            .EndsWith(
+                """
+                    }
+
+                    /// <summary>Does N.</summary>
+                    public void N()
+                    {
+                    }
+                }
+
+                """
+            );
+    }
+
+    [Test]
     public async Task Should_reject_a_file_local_type()
     {
         TypeModel model = Plain("A") with { IsFileLocal = true };
