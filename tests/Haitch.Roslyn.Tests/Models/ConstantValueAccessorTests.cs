@@ -238,6 +238,12 @@ public class ConstantValueAccessorTests
         await Assert.That(LiteralOf(1.5m, SpecialType.System_Decimal)).IsEqualTo("1.5m");
     }
 
+    [Test]
+    public async Task Should_render_a_double_read_from_a_symbol_with_its_suffix()
+    {
+        await Assert.That(LiteralOf(1.5d, SpecialType.System_Double)).IsEqualTo("1.5d");
+    }
+
     private static string LiteralOf(object? value, SpecialType type) =>
         ConstantValue.From(value, LiteralCompilation.GetSpecialType(type)).ToLiteral();
 
