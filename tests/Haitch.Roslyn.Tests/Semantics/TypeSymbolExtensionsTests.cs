@@ -147,6 +147,14 @@ public class TypeSymbolExtensionsTests
         TypeOf(type).FindBase(metadataName)?.ToDisplayString();
 
     [Test]
+    public async Task Should_list_an_enums_members_in_declaration_order()
+    {
+        string members = EnumMembersOf("Ns.Size");
+
+        await Assert.That(members).IsEqualTo("Small, Large, Medium");
+    }
+
+    [Test]
     public async Task Should_list_no_members_of_an_empty_enum()
     {
         string members = EnumMembersOf("Ns.Empty");
@@ -203,6 +211,13 @@ public class TypeSymbolExtensionsTests
                 class Plain { }
 
                 enum Empty { }
+
+                enum Size
+                {
+                    Small = 1,
+                    Large = 3,
+                    Medium = 2,
+                }
             }
             """,
             "Holder"
