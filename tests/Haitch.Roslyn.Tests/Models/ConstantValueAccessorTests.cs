@@ -215,33 +215,24 @@ public class ConstantValueAccessorTests
     }
 
     [Test]
-    public async Task Should_render_an_int_read_from_a_symbol_as_its_literal()
+    [Arguments(42, SpecialType.System_Int32, "42")]
+    [Arguments(true, SpecialType.System_Boolean, "true")]
+    [Arguments('\'', SpecialType.System_Char, "'\\''")]
+    [Arguments(1.5d, SpecialType.System_Double, "1.5d")]
+    public async Task Should_render_a_primitive_read_from_a_symbol_as_its_literal(
+        object value,
+        SpecialType type,
+        string literal
+    )
     {
-        await Assert.That(LiteralOf(42, SpecialType.System_Int32)).IsEqualTo("42");
+        await Assert.That(LiteralOf(value, type)).IsEqualTo(literal);
     }
 
-    [Test]
-    public async Task Should_render_a_bool_read_from_a_symbol_as_a_keyword()
-    {
-        await Assert.That(LiteralOf(true, SpecialType.System_Boolean)).IsEqualTo("true");
-    }
-
-    [Test]
-    public async Task Should_render_a_char_read_from_a_symbol_as_a_quoted_escaped_literal()
-    {
-        await Assert.That(LiteralOf('\'', SpecialType.System_Char)).IsEqualTo("'\\''");
-    }
-
+    // A decimal is not an attribute constant, so it cannot join the primitive arguments above.
     [Test]
     public async Task Should_render_a_decimal_read_from_a_symbol_with_its_suffix()
     {
         await Assert.That(LiteralOf(1.5m, SpecialType.System_Decimal)).IsEqualTo("1.5m");
-    }
-
-    [Test]
-    public async Task Should_render_a_double_read_from_a_symbol_with_its_suffix()
-    {
-        await Assert.That(LiteralOf(1.5d, SpecialType.System_Double)).IsEqualTo("1.5d");
     }
 
     private static string LiteralOf(object? value, SpecialType type) =>
