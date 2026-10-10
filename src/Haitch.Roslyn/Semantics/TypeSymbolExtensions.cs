@@ -11,6 +11,13 @@ namespace Haitch.Roslyn.Semantics;
 /// </summary>
 internal static class TypeSymbolExtensions
 {
+    /// <summary>
+    /// Finds the <c>T</c> of a <see cref="System.Nullable{T}"/>, whether written as <c>Nullable&lt;T&gt;</c>
+    /// or <c>T?</c>; null for any other type, including a reference type annotated with <c>?</c> and
+    /// the unconstructed <see cref="System.Nullable{T}"/> definition.
+    /// </summary>
+    /// <param name="type">The type to read.</param>
+    /// <returns>The underlying value type, such as the enum of a nullable enum.</returns>
     public static ITypeSymbol? NullableUnderlying(this ITypeSymbol type)
     {
         return type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
