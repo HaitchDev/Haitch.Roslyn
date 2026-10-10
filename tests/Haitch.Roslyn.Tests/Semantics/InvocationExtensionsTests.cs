@@ -73,6 +73,14 @@ public class InvocationExtensionsTests
     }
 
     [Test]
+    public async Task Should_resolve_a_method_on_a_nested_type_by_its_metadata_name()
+    {
+        string? name = ResolvedNameIn("Ns.Outer.Inner.Check(1)", "Ns.Outer+Inner");
+
+        await Assert.That(name).IsEqualTo("Check");
+    }
+
+    [Test]
     public async Task Should_resolve_an_extension_method_on_a_receiver_to_its_declaration()
     {
         IMethodSymbol? method = ResolveMethodIn("\"abc\".Matches(\"a+\")", "Rules");
@@ -132,6 +140,14 @@ public class InvocationExtensionsTests
                 class Box<T>
                 {
                     public void Put(T item) { }
+                }
+
+                class Outer
+                {
+                    public static class Inner
+                    {
+                        public static void Check(int value) { }
+                    }
                 }
             }
 
