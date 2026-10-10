@@ -100,6 +100,7 @@ internal ref struct IfScope
         return this;
     }
 
+    /// <summary>Writes <c>return;</c>, or <c>return expression;</c> when <paramref name="expression"/> is given.</summary>
     public readonly IfScope Return(string? expression = null)
     {
         RequireInnermost();
