@@ -4,6 +4,7 @@
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace Haitch.Roslyn.Semantics;
 
@@ -15,44 +16,16 @@ internal static class InvocationExtensions
         string parameter,
         CancellationToken cancellationToken)
     {
-        var argument =
-            NamedArgument(invocation, parameter)
-            ?? PositionalArgument(invocation, model, parameter, cancellationToken);
-
-        return argument is null ? null : model.GetOperation(argument.Expression, cancellationToken);
-    }
-
-    private static ArgumentSyntax? NamedArgument(InvocationExpressionSyntax invocation, string parameter)
-    {
-        foreach (var argument in invocation.ArgumentList.Arguments)
-        {
-            if (argument.NameColon?.Name.Identifier.Text == parameter)
-            {
-                return argument;
-            }
-        }
-
-        return null;
-    }
-
-    private static ArgumentSyntax? PositionalArgument(
-        InvocationExpressionSyntax invocation,
-        SemanticModel model,
-        string parameter,
-        CancellationToken cancellationToken)
-    {
-        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method)
+        if (model.GetOperation(invocation, cancellationToken) is not IInvocationOperation operation)
         {
             return null;
         }
 
-        var arguments = invocation.ArgumentList.Arguments;
-
-        foreach (var candidate in method.Parameters)
+        foreach (var argument in operation.Arguments)
         {
-            if (candidate.Name == parameter && candidate.Ordinal < arguments.Count)
+            if (argument.Parameter?.Name == parameter)
             {
-                return arguments[candidate.Ordinal];
+                return argument.Value;
             }
         }
 
