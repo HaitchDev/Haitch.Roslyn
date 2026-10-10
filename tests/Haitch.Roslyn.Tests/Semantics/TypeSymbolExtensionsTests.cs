@@ -39,6 +39,14 @@ public class TypeSymbolExtensionsTests
     }
 
     [Test]
+    public async Task Should_not_unwrap_a_nullable_annotated_reference_type()
+    {
+        string? underlying = UnderlyingOf("string?");
+
+        await Assert.That(underlying).IsNull();
+    }
+
+    [Test]
     public async Task Should_not_unwrap_the_unconstructed_nullable_definition()
     {
         ITypeSymbol? underlying = TypeOf("int?").OriginalDefinition.NullableUnderlying();
