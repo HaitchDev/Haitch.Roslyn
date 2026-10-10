@@ -227,7 +227,8 @@ internal ref struct TypeScope
 
     /// <summary>
     /// Writes <paramref name="header"/> as a line, opens a braced block under it, and returns the
-    /// block's scope; disposing that scope closes the brace.
+    /// block's scope; disposing that scope closes the brace. The block is a member: a blank line separates it
+    /// from a preceding sibling, and buffered attributes are written above the header.
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="header"/> is null, empty or whitespace.</exception>
     public readonly BodyScope Block(string header)
