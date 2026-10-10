@@ -220,6 +220,12 @@ public class ConstantValueAccessorTests
         await Assert.That(LiteralOf(42, SpecialType.System_Int32)).IsEqualTo("42");
     }
 
+    [Test]
+    public async Task Should_render_a_bool_read_from_a_symbol_as_a_keyword()
+    {
+        await Assert.That(LiteralOf(true, SpecialType.System_Boolean)).IsEqualTo("true");
+    }
+
     private static string LiteralOf(object? value, SpecialType type) =>
         ConstantValue.From(value, LiteralCompilation.GetSpecialType(type)).ToLiteral();
 
