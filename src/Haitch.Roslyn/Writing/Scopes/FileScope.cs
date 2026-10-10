@@ -113,7 +113,14 @@ internal readonly ref struct FileScope
 
     public TypeScope TypeIn(TypeModel type, EquatableArray<TypeRef> baseTypes = default)
     {
-        return Type(type, baseTypes);
+        if (type.Namespace is null)
+        {
+            return Type(type, baseTypes);
+        }
+
+        SourceWriter.BlockScope namespaceBlock = OpenNamespace(type.Namespace);
+
+        return new TypeScope(_writer, type, _writer.WriteTypeDeclaration(type, baseTypes), namespaceBlock);
     }
 
     /// <summary>

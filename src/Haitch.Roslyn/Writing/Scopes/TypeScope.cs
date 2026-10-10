@@ -21,15 +21,23 @@ internal ref struct TypeScope
     private readonly TypeModel _model;
     private SourceWriterExtensions.TypeDeclarationScope _declaration;
 
+    // Default (a no-op to dispose) unless this scope opened the namespace block around its type.
+    private SourceWriter.BlockScope _namespace;
+
     // Shared across copies; see FileScope.
     private readonly State _state;
 
-    internal TypeScope(SourceWriter writer, TypeModel model, SourceWriterExtensions.TypeDeclarationScope declaration)
+    internal TypeScope(
+        SourceWriter writer,
+        TypeModel model,
+        SourceWriterExtensions.TypeDeclarationScope declaration,
+        SourceWriter.BlockScope namespaceBlock = default)
     {
         _writer = writer;
         _blockId = writer.InnermostBlockId;
         _model = model;
         _declaration = declaration;
+        _namespace = namespaceBlock;
         _state = new State();
     }
 
@@ -432,8 +440,8 @@ internal ref struct TypeScope
     }
 
     /// <summary>
-    /// Closes the type's block, and those of its containing types when it opened them, recording a
-    /// still-buffered attribute as an error.
+    /// Closes the type's block, and those of its containing types and namespace when it opened them,
+    /// recording a still-buffered attribute as an error.
     /// </summary>
     public void Dispose()
     {
@@ -444,6 +452,7 @@ internal ref struct TypeScope
         }
 
         _declaration.Dispose();
+        _namespace.Dispose();
     }
 
     private bool IsThisType(ContainingTypeModel containingType)
