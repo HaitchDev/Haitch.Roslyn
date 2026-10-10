@@ -52,7 +52,8 @@ internal static class InvocationExtensions
         string containingType,
         CancellationToken cancellationToken)
     {
-        var method = model.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
+        var bound = model.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
+        var method = bound?.ReducedFrom ?? bound;
 
         return method is not null && IsIn(method, containingType) ? method : null;
     }
