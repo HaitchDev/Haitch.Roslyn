@@ -232,9 +232,15 @@ internal sealed record ConstantValue
         {
             bool boolValue => boolValue ? "true" : "false",
             char charValue => SymbolDisplay.FormatLiteral(charValue, quote: true),
-            decimal decimalValue => decimalValue.ToString(CultureInfo.InvariantCulture) + "m",
-            _ => Convert.ToString(value, CultureInfo.InvariantCulture)!,
+            decimal => Invariant(value) + "m",
+            _ => Invariant(value),
         };
+    }
+
+    // Generated source must not depend on the build machine's culture, e.g. a comma decimal separator.
+    private static string Invariant(object value)
+    {
+        return Convert.ToString(value, CultureInfo.InvariantCulture)!;
     }
 
     public static ConstantValue From(TypedConstant constant)
