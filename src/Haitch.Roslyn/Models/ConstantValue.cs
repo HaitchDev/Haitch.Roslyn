@@ -204,11 +204,22 @@ internal sealed record ConstantValue
         return new ConstantValue(ConstantValueKind.Array, null, type, elements, null);
     }
 
+    /// <summary>
+    /// Builds the model for a compile-time constant Roslyn exposes as a raw CLR value, such as an
+    /// operation's <see cref="IOperation.ConstantValue"/>, a const field or a parameter's default.
+    /// </summary>
+    /// <param name="value">The raw constant value, <see langword="null"/> for a null constant.</param>
+    /// <param name="type">The type the constant is declared or converted to.</param>
+    /// <returns>The constant's model.</returns>
     public static ConstantValue From(object? value, ITypeSymbol type)
     {
         return ForPrimitive(value!);
     }
 
+    /// <summary>
+    /// Renders the constant as the C# literal a field initializer or parameter default is written with.
+    /// </summary>
+    /// <returns>The literal source text.</returns>
     public string ToLiteral()
     {
         return Convert.ToString(Value, CultureInfo.InvariantCulture)!;
