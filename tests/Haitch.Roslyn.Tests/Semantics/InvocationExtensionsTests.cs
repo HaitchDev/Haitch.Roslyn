@@ -48,6 +48,14 @@ public class InvocationExtensionsTests
         await Assert.That(argument).IsNull();
     }
 
+    [Test]
+    public async Task Should_not_find_an_argument_of_a_call_that_does_not_bind()
+    {
+        IOperation? argument = ArgumentFor("Rules.Missing(max: 2)", "max");
+
+        await Assert.That(argument).IsNull();
+    }
+
     private static object? ConstantArgumentFor(string call, string parameter) =>
         ArgumentFor(call, parameter)?.ConstantValue.Value;
 
@@ -69,7 +77,8 @@ public class InvocationExtensionsTests
                     {{call}};
                 }
             }
-            """
+            """,
+            allowErrors: true
         );
         SyntaxTree tree = compilation.SyntaxTrees.Single();
         InvocationExpressionSyntax invocation = tree.GetRoot()
