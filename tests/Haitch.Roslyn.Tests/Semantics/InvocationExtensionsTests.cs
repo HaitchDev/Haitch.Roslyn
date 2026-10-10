@@ -88,6 +88,14 @@ public class InvocationExtensionsTests
         await Assert.That(method).IsNull();
     }
 
+    [Test]
+    public async Task Should_not_resolve_a_call_that_does_not_bind()
+    {
+        IMethodSymbol? method = ResolveMethodIn("Rules.Missing(1)", "Rules");
+
+        await Assert.That(method).IsNull();
+    }
+
     private static string? ResolvedNameIn(string call, string containingType) =>
         ResolveMethodIn(call, containingType)?.Name;
 
