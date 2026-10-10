@@ -90,6 +90,23 @@ internal readonly ref struct FileScope
         return OpenType(type, baseTypes, namespaceName: null);
     }
 
+    /// <summary>
+    /// Writes <paramref name="type"/>'s partial declaration (containing types included) inside its own
+    /// namespace and returns the scope of its innermost block. When <see cref="TypeModel.Namespace"/> is
+    /// set, <c>namespace</c> and its block are written first, exactly as <see cref="Namespace"/> then
+    /// <see cref="NamespaceScope.Type"/> would, and disposing the returned scope closes the namespace
+    /// block too; when it is null (the global namespace), this is <see cref="Type"/>. A pending
+    /// <see cref="Attribute"/> is written inside the namespace, directly above the type.
+    /// </summary>
+    /// <param name="type">The type to declare.</param>
+    /// <param name="baseTypes">
+    /// Extra base types written on the innermost declaration only, never on its containing types, and
+    /// not validated: the compiler reports conflicts with the other declarations of the type.
+    /// </param>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="type"/> is file-local, or has containing types while an <see cref="Attribute"/> is
+    /// pending (it would land on the outermost containing type). Nothing is written, not even the namespace.
+    /// </exception>
     public TypeScope TypeIn(TypeModel type, EquatableArray<TypeRef> baseTypes = default)
     {
         return OpenType(type, baseTypes, type.Namespace);
