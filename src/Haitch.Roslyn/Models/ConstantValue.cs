@@ -232,6 +232,7 @@ internal sealed record ConstantValue
         {
             bool boolValue => boolValue ? "true" : "false",
             char charValue => SymbolDisplay.FormatLiteral(charValue, quote: true),
+            decimal decimalValue => decimalValue.ToString(CultureInfo.InvariantCulture) + "m",
             _ => Convert.ToString(value, CultureInfo.InvariantCulture)!,
         };
     }
