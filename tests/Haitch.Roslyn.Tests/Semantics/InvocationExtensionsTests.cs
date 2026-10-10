@@ -11,34 +11,37 @@ public class InvocationExtensionsTests
     [Test]
     public async Task Should_find_a_named_argument()
     {
-        IOperation? argument = ArgumentFor("Rules.Length(min: 1, max: 2)", "max");
+        object? value = ConstantArgumentFor("Rules.Length(min: 1, max: 2)", "max");
 
-        await Assert.That(argument?.ConstantValue.Value).IsEqualTo(2);
+        await Assert.That(value).IsEqualTo(2);
     }
 
     [Test]
     public async Task Should_find_a_positional_argument()
     {
-        IOperation? argument = ArgumentFor("Rules.Length(1, 2)", "max");
+        object? value = ConstantArgumentFor("Rules.Length(1, 2)", "max");
 
-        await Assert.That(argument?.ConstantValue.Value).IsEqualTo(2);
+        await Assert.That(value).IsEqualTo(2);
     }
 
     [Test]
     public async Task Should_find_a_named_argument_written_out_of_order()
     {
-        IOperation? argument = ArgumentFor("Rules.Length(max: 2, min: 1)", "min");
+        object? value = ConstantArgumentFor("Rules.Length(max: 2, min: 1)", "min");
 
-        await Assert.That(argument?.ConstantValue.Value).IsEqualTo(1);
+        await Assert.That(value).IsEqualTo(1);
     }
 
     [Test]
     public async Task Should_find_an_extension_methods_receiver_by_its_this_parameter()
     {
-        IOperation? argument = ArgumentFor("\"abc\".Matches(\"a+\")", "text");
+        object? value = ConstantArgumentFor("\"abc\".Matches(\"a+\")", "text");
 
-        await Assert.That(argument?.ConstantValue.Value).IsEqualTo("abc");
+        await Assert.That(value).IsEqualTo("abc");
     }
+
+    private static object? ConstantArgumentFor(string call, string parameter) =>
+        ArgumentFor(call, parameter)?.ConstantValue.Value;
 
     private static IOperation? ArgumentFor(string call, string parameter)
     {
