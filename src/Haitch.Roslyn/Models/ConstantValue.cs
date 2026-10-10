@@ -4,6 +4,7 @@
 using System;
 using System.Globalization;
 using System.Linq;
+using Haitch.Roslyn.Semantics;
 using Haitch.Roslyn.Types;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -361,10 +362,9 @@ internal sealed record ConstantValue
 
         string? name = null;
 
-        foreach (ISymbol member in enumType.GetMembers())
+        foreach (IFieldSymbol field in enumType.EnumMembers())
         {
-            if (member is not IFieldSymbol { IsConst: true, HasConstantValue: true } field
-                || !Equals(field.ConstantValue, constant.Value))
+            if (!Equals(field.ConstantValue, constant.Value))
             {
                 continue;
             }
