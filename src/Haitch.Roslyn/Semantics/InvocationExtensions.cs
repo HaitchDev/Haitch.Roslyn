@@ -25,11 +25,16 @@ internal static class InvocationExtensions
         {
             if (argument.Parameter?.Name == parameter)
             {
-                // The compiler fills an omitted optional parameter with its default; the caller wrote nothing.
-                return argument.ArgumentKind == ArgumentKind.DefaultValue ? null : argument.Value;
+                return WrittenValue(argument);
             }
         }
 
         return null;
+    }
+
+    // The compiler fills an omitted optional parameter with its default; the caller wrote nothing.
+    private static IOperation? WrittenValue(IArgumentOperation argument)
+    {
+        return argument.ArgumentKind == ArgumentKind.DefaultValue ? null : argument.Value;
     }
 }
