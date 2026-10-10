@@ -14,6 +14,14 @@ public class TypeSymbolExtensionsTests
         await Assert.That(underlying?.SpecialType).IsEqualTo(SpecialType.System_Int32);
     }
 
+    [Test]
+    public async Task Should_not_unwrap_a_non_nullable_struct()
+    {
+        ITypeSymbol? underlying = TypeOf("int").NullableUnderlying();
+
+        await Assert.That(underlying).IsNull();
+    }
+
     private static ITypeSymbol TypeOf(string type)
     {
         INamedTypeSymbol holder = CompilationHelper.GetNamedTypeSymbol(
