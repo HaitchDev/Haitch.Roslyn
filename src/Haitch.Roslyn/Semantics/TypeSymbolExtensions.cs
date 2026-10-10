@@ -77,7 +77,7 @@ internal static class TypeSymbolExtensions
     /// <returns>The enum's members, each with its name and constant value.</returns>
     public static ImmutableArray<IFieldSymbol> EnumMembers(this INamedTypeSymbol type)
     {
-        return ImmutableArray<IFieldSymbol>.Empty;
+        return type.GetMembers().OfType<IFieldSymbol>().ToImmutableArray();
     }
 
     private static bool IsNamed(INamedTypeSymbol type, string metadataName)
