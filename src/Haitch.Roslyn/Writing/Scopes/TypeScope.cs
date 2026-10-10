@@ -232,7 +232,7 @@ internal ref struct TypeScope
     /// <exception cref="ArgumentException"><paramref name="header"/> is null, empty or whitespace.</exception>
     public readonly BodyScope Block(string header)
     {
-        RequireInnermost();
+        BeginMember();
 
         return BodyScope.OpenBlock(_writer, header);
     }
