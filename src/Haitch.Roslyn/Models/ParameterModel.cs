@@ -37,8 +37,6 @@ internal sealed record ParameterModel(
             attributes);
     }
 
-    // Parameter defaults are exposed as a raw CLR value (ExplicitDefaultValue), not a
-    // TypedConstant, so they are converted by hand instead of via ConstantValue.From.
     private static ConstantValue? GetDefaultValue(IParameterSymbol parameter, out bool isDefaultLiteral)
     {
         isDefaultLiteral = false;
@@ -50,35 +48,14 @@ internal sealed record ParameterModel(
 
         var value = parameter.ExplicitDefaultValue;
         var type = parameter.Type;
-        var underlyingType = type;
-        var isNullableValueType = false;
 
-        // Nullable<T> is unwrapped before the enum check, so `E? e = E.A` becomes an enum
-        // constant instead of falling through to the underlying primitive value.
-        if (type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullableType)
-        {
-            underlyingType = nullableType.TypeArguments[0];
-            isNullableValueType = true;
-        }
+        // `null` is not valid syntax for a non-nullable value type, so an explicit null
+        // default value for one can only have come from `default`.
+        isDefaultLiteral =
+            value is null
+            && type is { IsValueType: true }
+                and not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T };
 
-        if (value is null)
-        {
-            // `null` is not valid syntax for a non-nullable value type, so an explicit null
-            // default value for one can only have come from `default`.
-            isDefaultLiteral = type.IsValueType && !isNullableValueType;
-            return ConstantValue.ForNull(TypeRef.From(type));
-        }
-
-        if (underlyingType.TypeKind == TypeKind.Enum)
-        {
-            return ConstantValue.ForEnum(TypeRef.From(underlyingType), value);
-        }
-
-        if (value is string stringValue)
-        {
-            return ConstantValue.ForString(stringValue);
-        }
-
-        return ConstantValue.ForPrimitive(value);
+        return ConstantValue.From(value, type);
     }
 }
