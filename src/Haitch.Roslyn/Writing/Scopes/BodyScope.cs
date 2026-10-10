@@ -7,7 +7,7 @@ namespace Haitch.Roslyn.Writing;
 
 /// <summary>
 /// An open braced body: a method body, or a nested block inside one. It exposes only
-/// <see cref="Line"/> and <see cref="Block"/>, so a member or type inside a body does not compile.
+/// <see cref="Line"/> and <see cref="Block(string)"/>, so a member or type inside a body does not compile.
 /// Every member throws before writing when a nested block opened from this body is still open, or when this
 /// body was already closed through a disposed copy.
 /// Disposing the same instance twice is a no-op.
@@ -59,6 +59,16 @@ internal ref struct BodyScope
         RequireInnermost();
 
         BodyScope scope = OpenBlock(_writer, header);
+        Wrote(false);
+
+        return scope;
+    }
+
+    public readonly BodyScope Block()
+    {
+        RequireInnermost();
+
+        BodyScope scope = new(_writer, _writer.Block());
         Wrote(false);
 
         return scope;
