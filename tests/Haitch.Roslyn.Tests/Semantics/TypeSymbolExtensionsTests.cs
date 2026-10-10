@@ -146,6 +146,20 @@ public class TypeSymbolExtensionsTests
     private static string? BaseOf(string type, string metadataName) =>
         TypeOf(type).FindBase(metadataName)?.ToDisplayString();
 
+    [Test]
+    public async Task Should_list_no_members_of_an_empty_enum()
+    {
+        string members = EnumMembersOf("Ns.Empty");
+
+        await Assert.That(members).IsEmpty();
+    }
+
+    private static string EnumMembersOf(string type) =>
+        string.Join(
+            ", ",
+            ((INamedTypeSymbol)TypeOf(type)).EnumMembers().Select(member => member.Name)
+        );
+
     private static bool IsOrImplementsShape(string type) =>
         TypeOf(type).IsOrImplements("Ns.IShape`1");
 
@@ -187,6 +201,8 @@ public class TypeSymbolExtensionsTests
                 class Cube : ISolid<int> { }
 
                 class Plain { }
+
+                enum Empty { }
             }
             """,
             "Holder"
