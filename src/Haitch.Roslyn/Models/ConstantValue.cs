@@ -223,7 +223,10 @@ internal sealed record ConstantValue
     /// <returns>The literal source text.</returns>
     public string ToLiteral()
     {
-        return RenderPrimitive(Value!);
+        return Kind switch
+        {
+            _ => RenderPrimitive(Value!),
+        };
     }
 
     private static string RenderPrimitive(object value)
