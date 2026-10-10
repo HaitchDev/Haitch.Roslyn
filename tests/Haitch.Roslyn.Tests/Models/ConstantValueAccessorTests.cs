@@ -241,17 +241,20 @@ public class ConstantValueAccessorTests
     [Test]
     public async Task Should_render_an_enum_read_from_a_symbol_as_a_cast_to_its_qualified_type()
     {
-        ITypeSymbol color = LiteralCompilation.GetTypeByMetadataName("Color")!;
-
-        await Assert.That(ConstantValue.From(1, color).ToLiteral()).IsEqualTo("(global::Color)1");
+        await Assert.That(LiteralOf(1, Color)).IsEqualTo("(global::Color)1");
     }
 
     private static string LiteralOf(object? value, SpecialType type) =>
-        ConstantValue.From(value, LiteralCompilation.GetSpecialType(type)).ToLiteral();
+        LiteralOf(value, LiteralCompilation.GetSpecialType(type));
+
+    private static string LiteralOf(object? value, ITypeSymbol type) =>
+        ConstantValue.From(value, type).ToLiteral();
 
     private static readonly Compilation LiteralCompilation = CompilationHelper.Compile(
         "public enum Color { Red = 1 }"
     );
+
+    private static readonly ITypeSymbol Color = LiteralCompilation.GetTypeByMetadataName("Color")!;
 
     private static async Task AssertEveryAccessorMisses(ConstantValue value)
     {
