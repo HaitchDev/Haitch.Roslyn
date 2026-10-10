@@ -80,20 +80,7 @@ internal static class InvocationExtensions
 
     private static bool IsIn(IMethodSymbol method, string containingType)
     {
-        return FullMetadataName(method.ContainingType.OriginalDefinition) == containingType;
-    }
-
-    // Metadata joins a nested type to its outer type with '+', so only the outermost type carries the namespace.
-    private static string FullMetadataName(INamedTypeSymbol type)
-    {
-        return type switch
-        {
-            { ContainingType: { } outer } => FullMetadataName(outer) + "+" + type.MetadataName,
-            { ContainingNamespace.IsGlobalNamespace: false } => type.ContainingNamespace.ToDisplayString()
-                + "."
-                + type.MetadataName,
-            _ => type.MetadataName,
-        };
+        return method.ContainingType.OriginalDefinition.FullMetadataName() == containingType;
     }
 
     // The compiler fills an omitted optional parameter with its default; the caller wrote nothing.
