@@ -33,6 +33,10 @@ internal static class SyntaxValueProviderExtensions
     // otherwise. No Collect() is involved, so unrelated edits still leave the step cached. The
     // attributes are the symbol's, i.e. those of every part.
     //
+    // The tracking name sits on the transform's own step, ahead of that filter: a step after it sees
+    // a cached input after a trivia edit and reports Cached, so a consumer could not tell its model
+    // was recomputed to an equal value (Unchanged).
+    //
     // includeMembers fills TypeModel's Fields, Properties, Methods, Events and MemberNames from the symbol
     // (every part contributes). It ties the item's equality to every member edit, so an edit to any member of
     // the type recomputes downstream steps; leave it off unless the generator reads members.
@@ -57,9 +61,9 @@ internal static class SyntaxValueProviderExtensions
                 fullyQualifiedMetadataName,
                 predicate: WithKindCheck(static (node, _) => node is TypeDeclarationSyntax, predicate),
                 transform: (context, cancellationToken) => Transform(context, includeMembers, cancellationToken))
+            .WithTrackingName(trackingName)
             .Where(static item => item is not null)
-            .Select(static (item, _) => item!.Value)
-            .WithTrackingName(trackingName);
+            .Select(static (item, _) => item!.Value);
     }
 
     /// <summary>Finds types marked with the attribute and carries an extra value computed from each match.</summary>
