@@ -223,11 +223,16 @@ internal sealed record ConstantValue
     /// <returns>The literal source text.</returns>
     public string ToLiteral()
     {
-        return Value switch
+        return RenderPrimitive(Value!);
+    }
+
+    private static string RenderPrimitive(object value)
+    {
+        return value switch
         {
             bool boolValue => boolValue ? "true" : "false",
             char charValue => SymbolDisplay.FormatLiteral(charValue, quote: true),
-            _ => Convert.ToString(Value, CultureInfo.InvariantCulture)!,
+            _ => Convert.ToString(value, CultureInfo.InvariantCulture)!,
         };
     }
 
