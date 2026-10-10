@@ -222,12 +222,11 @@ internal sealed record ConstantValue
     /// <returns>The literal source text.</returns>
     public string ToLiteral()
     {
-        if (Value is bool boolValue)
+        return Value switch
         {
-            return boolValue ? "true" : "false";
-        }
-
-        return Convert.ToString(Value, CultureInfo.InvariantCulture)!;
+            bool boolValue => boolValue ? "true" : "false",
+            _ => Convert.ToString(Value, CultureInfo.InvariantCulture)!,
+        };
     }
 
     public static ConstantValue From(TypedConstant constant)
