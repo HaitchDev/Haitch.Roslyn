@@ -119,6 +119,11 @@ internal readonly ref struct FileScope
         }
     }
 
+    public TypeScope TypeIn(TypeModel type, EquatableArray<TypeRef> baseTypes = default)
+    {
+        return Type(type, baseTypes);
+    }
+
     /// <summary>
     /// Writes a brand-new, non-partial top-level type and opens its block; the returned scope takes members
     /// like any <see cref="TypeScope"/>. A blank line separates it from preceding usings, namespaces or
