@@ -778,6 +778,27 @@ public class SyntaxValueProviderExtensionsTests
     }
 
     [Test]
+    public void Should_report_the_extra_value_step_as_unchanged_after_a_trivia_edit_in_the_marked_file()
+    {
+        GeneratorHarness.AssertCacheable(
+            new ExtraTestGenerator(),
+            new GeneratorHarnessInput
+            {
+                Sources =
+                [
+                    """
+                    [Sample.Mark]
+                    public partial class Widget { public string Describe() => "hello"; }
+                    """,
+                    MarkAttributeSource,
+                ],
+            },
+            [ExtraTestGenerator.ValuesStepName],
+            options: new CacheabilityOptions { RequireRecomputationAfterTriviaEdit = true }
+        );
+    }
+
+    [Test]
     public void Should_stay_cacheable_with_an_extra_transform_after_an_unrelated_edit()
     {
         GeneratorHarness.AssertCacheable(
