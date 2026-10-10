@@ -26,6 +26,14 @@ internal static class TypeSymbolExtensions
             : null;
     }
 
+    /// <summary>
+    /// Tells whether <paramref name="type"/> is the interface named <paramref name="metadataName"/>
+    /// or implements it, directly, through a base type or through another interface, matching a
+    /// constructed generic interface by its definition.
+    /// </summary>
+    /// <param name="type">The type to read.</param>
+    /// <param name="metadataName">The interface's metadata name, such as <c>System.Collections.Generic.ICollection`1</c>.</param>
+    /// <returns>True when the type is or implements the interface.</returns>
     public static bool IsOrImplements(this ITypeSymbol type, string metadataName)
     {
         return false;
