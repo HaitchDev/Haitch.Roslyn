@@ -2,6 +2,7 @@
 #nullable enable
 
 using System.Linq;
+using Haitch.Roslyn.Semantics;
 using Haitch.Roslyn.Types;
 using Microsoft.CodeAnalysis;
 
@@ -81,21 +82,6 @@ internal sealed record AttributeModel(
     // ForAttributeWithMetadataName expects has to be rebuilt from the original definition.
     internal static string GetMetadataName(INamedTypeSymbol type)
     {
-        var name = type.MetadataName;
-
-        for (INamedTypeSymbol? outer = type.ContainingType; outer is not null; outer = outer.ContainingType)
-        {
-            name = outer.MetadataName + "+" + name;
-        }
-
-        INamespaceSymbol? container = type.ContainingNamespace;
-
-        while (container is not null && !container.IsGlobalNamespace)
-        {
-            name = container.Name + "." + name;
-            container = container.ContainingNamespace;
-        }
-
-        return name;
+        return type.FullMetadataName();
     }
 }

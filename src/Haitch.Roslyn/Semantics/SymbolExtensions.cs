@@ -31,4 +31,26 @@ internal static class SymbolExtensions
         return attribute.AttributeClass is { } attributeClass
             && AttributeModel.GetMetadataName(attributeClass.OriginalDefinition) == metadataName;
     }
+
+    // Metadata joins a nested type to its outer type with '+' and keeps a generic's arity suffix,
+    // which a display name drops, so the form ForAttributeWithMetadataName expects is built here.
+    internal static string FullMetadataName(this ISymbol symbol)
+    {
+        var name = symbol.MetadataName;
+
+        for (INamedTypeSymbol? outer = symbol.ContainingType; outer is not null; outer = outer.ContainingType)
+        {
+            name = outer.MetadataName + "+" + name;
+        }
+
+        INamespaceSymbol? container = symbol.ContainingNamespace;
+
+        while (container is not null && !container.IsGlobalNamespace)
+        {
+            name = container.Name + "." + name;
+            container = container.ContainingNamespace;
+        }
+
+        return name;
+    }
 }
