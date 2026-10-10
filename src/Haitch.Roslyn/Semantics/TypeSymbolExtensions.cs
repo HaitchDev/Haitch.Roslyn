@@ -28,6 +28,12 @@ internal static class TypeSymbolExtensions
             : null;
     }
 
+    // A definition's type arguments are its own type parameters, which no value is declared with.
+    private static bool IsConstructed(INamedTypeSymbol type)
+    {
+        return !SymbolEqualityComparer.Default.Equals(type, type.OriginalDefinition);
+    }
+
     /// <summary>
     /// Tells whether <paramref name="type"/> is the interface named <paramref name="metadataName"/>
     /// or implements it, directly, through a base type or through another interface, matching a
@@ -65,11 +71,5 @@ internal static class TypeSymbolExtensions
     private static bool IsNamed(INamedTypeSymbol type, string metadataName)
     {
         return AttributeModel.GetMetadataName(type.OriginalDefinition) == metadataName;
-    }
-
-    // A definition's type arguments are its own type parameters, which no value is declared with.
-    private static bool IsConstructed(INamedTypeSymbol type)
-    {
-        return !SymbolEqualityComparer.Default.Equals(type, type.OriginalDefinition);
     }
 }
