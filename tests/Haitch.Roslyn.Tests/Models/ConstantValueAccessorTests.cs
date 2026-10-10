@@ -238,6 +238,14 @@ public class ConstantValueAccessorTests
         await Assert.That(LiteralOf(1.5m, SpecialType.System_Decimal)).IsEqualTo("1.5m");
     }
 
+    [Test]
+    public async Task Should_render_an_enum_read_from_a_symbol_as_a_cast_to_its_qualified_type()
+    {
+        ITypeSymbol color = LiteralCompilation.GetTypeByMetadataName("Color")!;
+
+        await Assert.That(ConstantValue.From(1, color).ToLiteral()).IsEqualTo("(global::Color)1");
+    }
+
     private static string LiteralOf(object? value, SpecialType type) =>
         ConstantValue.From(value, LiteralCompilation.GetSpecialType(type)).ToLiteral();
 
