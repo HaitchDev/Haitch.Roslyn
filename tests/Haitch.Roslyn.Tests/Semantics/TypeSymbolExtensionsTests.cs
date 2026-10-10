@@ -120,6 +120,14 @@ public class TypeSymbolExtensionsTests
     }
 
     [Test]
+    public async Task Should_find_a_generic_base_constructed_as_declared()
+    {
+        string? found = BaseOf("Ns.OrderValidator", "Ns.Validator`1");
+
+        await Assert.That(found).IsEqualTo("Ns.Validator<int>");
+    }
+
+    [Test]
     public async Task Should_not_find_a_base_a_type_does_not_derive_from()
     {
         string? found = BaseOf("Ns.Plain", "Ns.Square");
@@ -161,6 +169,10 @@ public class TypeSymbolExtensionsTests
                 class Tile : Square { }
 
                 class Mosaic : Tile { }
+
+                class Validator<T> { }
+
+                class OrderValidator : Validator<int> { }
 
                 interface ISolid<T> : IShape<T> { }
 
