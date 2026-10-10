@@ -214,6 +214,19 @@ public class ConstantValueAccessorTests
         await AssertEveryAccessorMisses(value);
     }
 
+    [Test]
+    public async Task Should_render_an_int_read_from_a_symbol_as_its_literal()
+    {
+        await Assert.That(LiteralOf(42, SpecialType.System_Int32)).IsEqualTo("42");
+    }
+
+    private static string LiteralOf(object? value, SpecialType type) =>
+        ConstantValue.From(value, LiteralCompilation.GetSpecialType(type)).ToLiteral();
+
+    private static readonly Compilation LiteralCompilation = CompilationHelper.Compile(
+        "public enum Color { Red = 1 }"
+    );
+
     private static async Task AssertEveryAccessorMisses(ConstantValue value)
     {
         await Assert.That(value.TryGetString(out _)).IsFalse();
