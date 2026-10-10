@@ -52,10 +52,20 @@ internal static class InvocationExtensions
         string containingType,
         CancellationToken cancellationToken)
     {
-        var bound = model.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
-        var method = bound?.ReducedFrom ?? bound;
+        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol bound)
+        {
+            return null;
+        }
 
-        return method is not null && IsIn(method, containingType) ? method : null;
+        var method = Declaration(bound);
+
+        return IsIn(method, containingType) ? method : null;
+    }
+
+    // An extension method called on its receiver binds to a reduced copy without the this parameter.
+    private static IMethodSymbol Declaration(IMethodSymbol method)
+    {
+        return method.ReducedFrom ?? method;
     }
 
     private static bool IsIn(IMethodSymbol method, string containingType)
