@@ -103,6 +103,14 @@ public class TypeSymbolExtensionsTests
         await Assert.That(found).IsFalse();
     }
 
+    [Test]
+    public async Task Should_not_find_a_base_a_type_does_not_derive_from()
+    {
+        INamedTypeSymbol? found = TypeOf("Ns.Plain").FindBase("Ns.Square");
+
+        await Assert.That(found).IsNull();
+    }
+
     private static bool IsOrImplementsShape(string type) =>
         TypeOf(type).IsOrImplements("Ns.IShape`1");
 
