@@ -45,32 +45,8 @@ internal sealed record FieldModel(
         };
     }
 
-    // Field constants are exposed as a raw CLR value (ConstantValue), not a TypedConstant,
-    // so they are converted by hand instead of via Models.ConstantValue.From.
     private static Models.ConstantValue? GetConstantValue(IFieldSymbol field)
     {
-        if (!field.HasConstantValue)
-        {
-            return null;
-        }
-
-        var value = field.ConstantValue;
-
-        if (value is null)
-        {
-            return Models.ConstantValue.ForNull(TypeRef.From(field.Type));
-        }
-
-        if (field.Type.TypeKind == TypeKind.Enum)
-        {
-            return Models.ConstantValue.ForEnum(TypeRef.From(field.Type), value);
-        }
-
-        if (value is string stringValue)
-        {
-            return Models.ConstantValue.ForString(stringValue);
-        }
-
-        return Models.ConstantValue.ForPrimitive(value);
+        return field.HasConstantValue ? Models.ConstantValue.From(field.ConstantValue, field.Type) : null;
     }
 }
