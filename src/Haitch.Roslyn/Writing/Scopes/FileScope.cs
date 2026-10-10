@@ -66,15 +66,7 @@ internal readonly ref struct FileScope
             throw new ArgumentException("A namespace name is required.", nameof(name));
         }
 
-        if (_state.NeedsBlankLine)
-        {
-            _writer.WriteLine();
-        }
-
-        _state.NeedsBlankLine = true;
-        _writer.WriteLine($"namespace {name}");
-
-        return new NamespaceScope(_writer, _writer.Block());
+        return new NamespaceScope(_writer, OpenNamespace(name));
     }
 
     /// <summary>
@@ -191,6 +183,19 @@ internal readonly ref struct FileScope
         {
             throw new InvalidOperationException($"Cannot write {what} while an attribute is waiting for its type.");
         }
+    }
+
+    private readonly SourceWriter.BlockScope OpenNamespace(string name)
+    {
+        if (_state.NeedsBlankLine)
+        {
+            _writer.WriteLine();
+        }
+
+        _state.NeedsBlankLine = true;
+        _writer.WriteLine($"namespace {name}");
+
+        return _writer.Block();
     }
 
     // Called only after the member passed validation, so buffered attributes never precede a rejected write.
