@@ -111,6 +111,7 @@ internal readonly ref struct FileScope
 
         ValidateType(type);
         SourceWriter.BlockScope namespaceBlock = OpenNamespace(type.Namespace);
+        WritePending();
 
         return new TypeScope(_writer, type, _writer.WriteTypeDeclaration(type, baseTypes), namespaceBlock);
     }
