@@ -16,6 +16,14 @@ public class InvocationExtensionsTests
         await Assert.That(argument?.ConstantValue.Value).IsEqualTo(2);
     }
 
+    [Test]
+    public async Task Should_find_a_positional_argument()
+    {
+        IOperation? argument = ArgumentFor("Rules.Length(1, 2)", "max");
+
+        await Assert.That(argument?.ConstantValue.Value).IsEqualTo(2);
+    }
+
     private static IOperation? ArgumentFor(string call, string parameter)
     {
         CSharpCompilation compilation = CompilationHelper.Compile(
