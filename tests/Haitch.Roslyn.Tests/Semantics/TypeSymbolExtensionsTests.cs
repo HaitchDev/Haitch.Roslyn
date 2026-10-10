@@ -71,6 +71,14 @@ public class TypeSymbolExtensionsTests
     }
 
     [Test]
+    public async Task Should_find_an_interface_a_class_implements_through_its_base_class()
+    {
+        bool found = IsOrImplementsShape("Ns.Tile");
+
+        await Assert.That(found).IsTrue();
+    }
+
+    [Test]
     public async Task Should_not_find_an_interface_a_type_does_not_implement()
     {
         bool found = IsOrImplementsShape("Ns.Plain");
@@ -105,6 +113,8 @@ public class TypeSymbolExtensionsTests
                 interface IShape<T> { }
 
                 class Square : IShape<int> { }
+
+                class Tile : Square { }
 
                 class Plain { }
             }
