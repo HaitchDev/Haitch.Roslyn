@@ -424,6 +424,12 @@ internal ref struct TypeScope
             _writer.WriteLine();
         }
 
+        if (_state.Summary is not null)
+        {
+            _writer.WriteLine(_state.Summary);
+            _state.Summary = null;
+        }
+
         for (var i = 0; i < _state.Pending.Count; i++)
         {
             _writer.WriteLine(_state.Pending[i]);
@@ -448,6 +454,15 @@ internal ref struct TypeScope
 
         var line = SourceWriterExtensions.RenderAttribute(attribute);
         _state.Pending.Add(line);
+
+        return this;
+    }
+
+    public TypeScope Summary(string text)
+    {
+        RequireInnermost();
+
+        _state.Summary = $"/// <summary>{text}</summary>";
 
         return this;
     }
@@ -495,6 +510,7 @@ internal ref struct TypeScope
     private sealed class State
     {
         public bool NeedsBlankLine;
+        public string? Summary;
         public readonly List<string> Pending = new();
     }
 }
