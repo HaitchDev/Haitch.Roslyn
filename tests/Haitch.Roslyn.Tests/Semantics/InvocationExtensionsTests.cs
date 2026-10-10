@@ -65,6 +65,14 @@ public class InvocationExtensionsTests
     }
 
     [Test]
+    public async Task Should_resolve_a_method_on_a_constructed_generic_type_by_its_definition()
+    {
+        IMethodSymbol? method = ResolveMethodIn("new Ns.Box<int>().Put(1)", "Ns.Box`1");
+
+        await Assert.That(method?.Name).IsEqualTo("Put");
+    }
+
+    [Test]
     public async Task Should_not_resolve_a_method_on_another_type()
     {
         IMethodSymbol? method = ResolveMethodIn("Rules.Length(1)", "Caller");
@@ -98,6 +106,14 @@ public class InvocationExtensionsTests
                 public static void Length(int min, int max = 10) { }
 
                 public static void Matches(this string text, string pattern) { }
+            }
+
+            namespace Ns
+            {
+                class Box<T>
+                {
+                    public void Put(T item) { }
+                }
             }
 
             class Caller
