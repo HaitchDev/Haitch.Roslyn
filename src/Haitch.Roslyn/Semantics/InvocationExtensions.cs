@@ -9,8 +9,8 @@ using Microsoft.CodeAnalysis.Operations;
 namespace Haitch.Roslyn.Semantics;
 
 /// <summary>
-/// Reads an invocation's arguments by the parameters they bind to, so a generator does not walk
-/// <see cref="IInvocationOperation"/> by hand.
+/// Reads an invocation's method and its arguments by the parameters they bind to, so a generator
+/// does not walk <see cref="IInvocationOperation"/> or compare display strings by hand.
 /// </summary>
 internal static class InvocationExtensions
 {
