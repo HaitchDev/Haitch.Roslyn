@@ -38,8 +38,13 @@ internal static class TypeSymbolExtensions
     /// <returns>True when the type is or implements the interface.</returns>
     public static bool IsOrImplements(this ITypeSymbol type, string metadataName)
     {
-        return type is INamedTypeSymbol named && AttributeModel.GetMetadataName(named.OriginalDefinition) == metadataName
-            || type.Interfaces.Any(@interface => AttributeModel.GetMetadataName(@interface.OriginalDefinition) == metadataName);
+        return type is INamedTypeSymbol named && IsNamed(named, metadataName)
+            || type.Interfaces.Any(@interface => IsNamed(@interface, metadataName));
+    }
+
+    private static bool IsNamed(INamedTypeSymbol type, string metadataName)
+    {
+        return AttributeModel.GetMetadataName(type.OriginalDefinition) == metadataName;
     }
 
     // A definition's type arguments are its own type parameters, which no value is declared with.
