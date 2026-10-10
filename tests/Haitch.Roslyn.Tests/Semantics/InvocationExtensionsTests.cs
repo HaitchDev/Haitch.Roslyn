@@ -40,6 +40,14 @@ public class InvocationExtensionsTests
         await Assert.That(value).IsEqualTo("abc");
     }
 
+    [Test]
+    public async Task Should_not_find_an_omitted_optional_argument()
+    {
+        IOperation? argument = ArgumentFor("Rules.Length(1)", "max");
+
+        await Assert.That(argument).IsNull();
+    }
+
     private static object? ConstantArgumentFor(string call, string parameter) =>
         ArgumentFor(call, parameter)?.ConstantValue.Value;
 
