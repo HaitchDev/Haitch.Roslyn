@@ -232,10 +232,19 @@ internal sealed record ConstantValue
         {
             bool boolValue => boolValue ? "true" : "false",
             char charValue => SymbolDisplay.FormatLiteral(charValue, quote: true),
-            decimal => Invariant(value) + "m",
-            double => Invariant(value) + "d",
-            float => Invariant(value) + "f",
-            _ => Invariant(value),
+            _ => Invariant(value) + Suffix(value),
+        };
+    }
+
+    // Without its suffix a real literal is read back as a double, and a decimal or float initializer would not compile.
+    private static string Suffix(object value)
+    {
+        return value switch
+        {
+            decimal => "m",
+            double => "d",
+            float => "f",
+            _ => "",
         };
     }
 
