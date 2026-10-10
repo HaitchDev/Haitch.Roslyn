@@ -3,7 +3,6 @@
 
 using System.Collections.Immutable;
 using System.Linq;
-using Haitch.Roslyn.Models;
 using Microsoft.CodeAnalysis;
 
 namespace Haitch.Roslyn.Semantics;
@@ -84,6 +83,6 @@ internal static class TypeSymbolExtensions
 
     private static bool IsNamed(INamedTypeSymbol type, string metadataName)
     {
-        return AttributeModel.GetMetadataName(type.OriginalDefinition) == metadataName;
+        return type.OriginalDefinition.FullMetadataName() == metadataName;
     }
 }
