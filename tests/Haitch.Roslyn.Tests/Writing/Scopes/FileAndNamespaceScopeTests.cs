@@ -1,3 +1,5 @@
+using Haitch.Roslyn.Models;
+using Haitch.Roslyn.Tests.Models;
 using Haitch.Roslyn.Writing;
 
 namespace Haitch.Roslyn.Tests.Writing.Scopes;
@@ -126,5 +128,32 @@ public class FileAndNamespaceScopeTests
                 file.Namespace(name!);
             })
             .Throws<ArgumentException>();
+    }
+
+    private static TypeModel ModelOf(string source, string metadataName)
+    {
+        return TypeModel.From(CompilationHelper.GetNamedTypeSymbol(source, metadataName));
+    }
+
+    [Test]
+    public async Task Should_write_a_global_namespace_type_in_at_file_level()
+    {
+        TypeModel model = ModelOf("public class Global { }", "Global");
+
+        SourceWriter actual = new();
+
+        using (var file = actual.File())
+        {
+            using (file.TypeIn(model)) { }
+        }
+
+        SourceWriter expected = new();
+
+        using (var file = expected.File())
+        {
+            using (file.Type(model)) { }
+        }
+
+        await Assert.That(actual.ToString()).IsEqualTo(expected.ToString());
     }
 }
