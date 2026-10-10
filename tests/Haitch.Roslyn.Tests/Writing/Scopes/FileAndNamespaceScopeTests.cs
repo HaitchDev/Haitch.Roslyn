@@ -197,6 +197,31 @@ public class FileAndNamespaceScopeTests
         await Assert.That(writer.ToString()).DoesNotContain("namespace");
     }
 
+    [Test]
+    public async Task Should_write_a_pending_attribute_on_a_namespaced_type_in_inside_its_namespace()
+    {
+        TypeModel model = ModelOf("namespace A { public class Plain { } }", "A.Plain");
+
+        SourceWriter actual = new();
+
+        using (var file = actual.File())
+        {
+            using (file.Attribute(WellKnownAttributes.EditorBrowsableNever).TypeIn(model)) { }
+        }
+
+        SourceWriter expected = new();
+
+        using (var file = expected.File())
+        {
+            using (var ns = file.Namespace("A"))
+            {
+                using (ns.Attribute(WellKnownAttributes.EditorBrowsableNever).Type(model)) { }
+            }
+        }
+
+        await Assert.That(actual.ToString()).IsEqualTo(expected.ToString());
+    }
+
     private static string WrittenIn(TypeModel model)
     {
         SourceWriter writer = new();
