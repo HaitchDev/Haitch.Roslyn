@@ -124,6 +124,27 @@ public class SyntaxValueProviderExtensionsTests
     }
 
     [Test]
+    public void Should_report_the_value_step_as_unchanged_after_a_trivia_edit_in_the_marked_file()
+    {
+        GeneratorHarness.AssertCacheable(
+            new AttributeProviderTestGenerator(),
+            new GeneratorHarnessInput
+            {
+                Sources =
+                [
+                    """
+                    [Sample.Mark]
+                    public partial class Widget { }
+                    """,
+                    MarkAttributeSource,
+                ],
+            },
+            [AttributeProviderTestGenerator.ValuesStepName],
+            options: new CacheabilityOptions { RequireRecomputationAfterTriviaEdit = true }
+        );
+    }
+
+    [Test]
     public void Should_stay_cacheable_when_a_type_is_marked_on_two_parts()
     {
         GeneratorHarness.AssertCacheable(
