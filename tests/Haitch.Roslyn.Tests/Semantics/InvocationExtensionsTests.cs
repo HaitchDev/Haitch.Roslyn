@@ -64,6 +64,14 @@ public class InvocationExtensionsTests
         await Assert.That(method?.Name).IsEqualTo("Length");
     }
 
+    [Test]
+    public async Task Should_not_resolve_a_method_on_another_type()
+    {
+        IMethodSymbol? method = ResolveMethodIn("Rules.Length(1)", "Caller");
+
+        await Assert.That(method).IsNull();
+    }
+
     private static IMethodSymbol? ResolveMethodIn(string call, string containingType)
     {
         (InvocationExpressionSyntax invocation, SemanticModel model) = Bind(call);
