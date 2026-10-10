@@ -72,16 +72,11 @@ internal sealed record AttributeModel(
             .Select(pair => new NamedArgument(pair.Key, ConstantValue.From(pair.Value)))
             .ToEquatableArray();
 
+        // The constructed type's display name carries type arguments, so the form
+        // ForAttributeWithMetadataName expects has to be rebuilt from the original definition.
         return new AttributeModel(attributeType, constructorArguments, namedArguments)
         {
-            MetadataName = GetMetadataName(attributeClass.OriginalDefinition),
+            MetadataName = attributeClass.OriginalDefinition.FullMetadataName(),
         };
-    }
-
-    // The constructed type's display name carries type arguments, so the form
-    // ForAttributeWithMetadataName expects has to be rebuilt from the original definition.
-    internal static string GetMetadataName(INamedTypeSymbol type)
-    {
-        return type.FullMetadataName();
     }
 }
