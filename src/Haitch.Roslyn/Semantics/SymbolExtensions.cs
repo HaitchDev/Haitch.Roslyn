@@ -24,6 +24,8 @@ internal static class SymbolExtensions
         return symbol.GetAttributes().Any(attribute => IsOfClass(attribute, metadataName));
     }
 
+    // A constructed attribute's display name carries its type arguments and a nested one's uses '.',
+    // so the class is compared by its definition's metadata name instead.
     private static bool IsOfClass(AttributeData attribute, string metadataName)
     {
         return attribute.AttributeClass is { } attributeClass
