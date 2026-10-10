@@ -261,6 +261,37 @@ public class TypeScopeTests
     }
 
     [Test]
+    public async Task Should_separate_a_block_from_an_earlier_member_with_a_blank_line()
+    {
+        SourceWriter writer = new();
+
+        using (var file = writer.File())
+        {
+            using var type = file.Type(Plain("A"));
+
+            using (type.Block("public void M()")) { }
+
+            using (type.Block("public void N()")) { }
+        }
+
+        await Assert
+            .That(writer.ToString())
+            .EndsWith(
+                """
+                    public void M()
+                    {
+                    }
+
+                    public void N()
+                    {
+                    }
+                }
+
+                """
+            );
+    }
+
+    [Test]
     public async Task Should_reject_a_file_local_type()
     {
         TypeModel model = Plain("A") with { IsFileLocal = true };
