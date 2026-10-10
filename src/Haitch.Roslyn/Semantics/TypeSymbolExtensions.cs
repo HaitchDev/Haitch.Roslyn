@@ -14,8 +14,14 @@ internal static class TypeSymbolExtensions
     public static ITypeSymbol? NullableUnderlying(this ITypeSymbol type)
     {
         return type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
-            && !SymbolEqualityComparer.Default.Equals(nullable, nullable.OriginalDefinition)
+            && IsConstructed(nullable)
             ? nullable.TypeArguments[0]
             : null;
+    }
+
+    // A definition's type arguments are its own type parameters, which no value is declared with.
+    private static bool IsConstructed(INamedTypeSymbol type)
+    {
+        return !SymbolEqualityComparer.Default.Equals(type, type.OriginalDefinition);
     }
 }
