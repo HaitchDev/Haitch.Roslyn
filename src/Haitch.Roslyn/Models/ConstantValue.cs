@@ -218,9 +218,17 @@ internal sealed record ConstantValue
         {
             null => ForNull(TypeRef.From(type)),
             string stringValue => ForString(stringValue),
-            _ when type.TypeKind == TypeKind.Enum => ForEnum(TypeRef.From(type), value),
+            _ when WithoutNullable(type) is { TypeKind: TypeKind.Enum } enumType => ForEnum(TypeRef.From(enumType), value),
             _ => ForPrimitive(value),
         };
+    }
+
+    // `E? e = E.A` holds the enum's underlying value, so the enum is found inside Nullable<T>.
+    private static ITypeSymbol WithoutNullable(ITypeSymbol type)
+    {
+        return type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
+            ? nullable.TypeArguments[0]
+            : type;
     }
 
     /// <summary>
