@@ -39,7 +39,8 @@ internal static class TypeSymbolExtensions
     public static bool IsOrImplements(this ITypeSymbol type, string metadataName)
     {
         return type is INamedTypeSymbol named && IsNamed(named, metadataName)
-            || type.Interfaces.Any(@interface => IsNamed(@interface, metadataName));
+            || type.Interfaces.Any(@interface => IsNamed(@interface, metadataName))
+            || type.BaseType?.IsOrImplements(metadataName) == true;
     }
 
     private static bool IsNamed(INamedTypeSymbol type, string metadataName)
