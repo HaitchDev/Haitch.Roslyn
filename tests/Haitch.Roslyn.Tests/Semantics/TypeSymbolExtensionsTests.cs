@@ -128,6 +128,14 @@ public class TypeSymbolExtensionsTests
     }
 
     [Test]
+    public async Task Should_not_find_a_type_as_its_own_base()
+    {
+        string? found = BaseOf("Ns.Square", "Ns.Square");
+
+        await Assert.That(found).IsNull();
+    }
+
+    [Test]
     public async Task Should_not_find_a_base_a_type_does_not_derive_from()
     {
         string? found = BaseOf("Ns.Plain", "Ns.Square");
