@@ -32,6 +32,14 @@ public class InvocationExtensionsTests
         await Assert.That(argument?.ConstantValue.Value).IsEqualTo(1);
     }
 
+    [Test]
+    public async Task Should_find_an_extension_methods_receiver_by_its_this_parameter()
+    {
+        IOperation? argument = ArgumentFor("\"abc\".Matches(\"a+\")", "text");
+
+        await Assert.That(argument?.ConstantValue.Value).IsEqualTo("abc");
+    }
+
     private static IOperation? ArgumentFor(string call, string parameter)
     {
         CSharpCompilation compilation = CompilationHelper.Compile(
@@ -39,6 +47,8 @@ public class InvocationExtensionsTests
             static class Rules
             {
                 public static void Length(int min, int max = 10) { }
+
+                public static void Matches(this string text, string pattern) { }
             }
 
             class Caller
