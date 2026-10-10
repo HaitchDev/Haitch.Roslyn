@@ -31,6 +31,14 @@ public class SymbolExtensionsTests
     }
 
     [Test]
+    public async Task Should_find_an_attribute_on_a_property()
+    {
+        bool found = Member("Property").HasAttribute("System.ObsoleteAttribute");
+
+        await Assert.That(found).IsTrue();
+    }
+
+    [Test]
     public async Task Should_not_find_an_attribute_the_symbol_does_not_carry()
     {
         bool found = Type("Ns.Plain").HasAttribute("System.FlagsAttribute");
@@ -60,6 +68,9 @@ public class SymbolExtensionsTests
                 {
                     [System.Obsolete]
                     public void Method() { }
+
+                    [System.Obsolete]
+                    public int Property { get; set; }
                 }
             }
             """,
