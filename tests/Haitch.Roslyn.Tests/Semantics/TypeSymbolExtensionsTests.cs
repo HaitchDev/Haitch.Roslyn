@@ -87,6 +87,15 @@ public class TypeSymbolExtensionsTests
     }
 
     [Test]
+    public async Task Should_find_a_read_only_collection_an_array_implements()
+    {
+        bool found = TypeOf("int[]")
+            .IsOrImplements("System.Collections.Generic.IReadOnlyCollection`1");
+
+        await Assert.That(found).IsTrue();
+    }
+
+    [Test]
     public async Task Should_not_find_an_interface_a_type_does_not_implement()
     {
         bool found = IsOrImplementsShape("Ns.Plain");
