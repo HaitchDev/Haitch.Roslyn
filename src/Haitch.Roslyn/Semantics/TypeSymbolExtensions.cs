@@ -42,6 +42,13 @@ internal static class TypeSymbolExtensions
             || type.AllInterfaces.Any(@interface => IsNamed(@interface, metadataName));
     }
 
+    /// <summary>
+    /// Finds the first base class of <paramref name="type"/>, the type itself excluded, whose
+    /// definition is named <paramref name="metadataName"/>; null when the type does not derive from it.
+    /// </summary>
+    /// <param name="type">The type to read.</param>
+    /// <param name="metadataName">The base class's metadata name, such as <c>Ns.Validator`1</c>.</param>
+    /// <returns>The base class as the type declares it, so a generic base's type arguments are readable.</returns>
     public static INamedTypeSymbol? FindBase(this ITypeSymbol type, string metadataName)
     {
         return null;
