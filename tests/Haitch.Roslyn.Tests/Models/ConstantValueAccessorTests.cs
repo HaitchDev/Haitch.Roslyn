@@ -244,6 +244,16 @@ public class ConstantValueAccessorTests
         await Assert.That(LiteralOf(1, Color)).IsEqualTo("(global::Color)1");
     }
 
+    [Test]
+    public async Task Should_render_a_nullable_enum_read_from_a_symbol_as_a_cast_to_the_enum()
+    {
+        ITypeSymbol nullableColor = LiteralCompilation
+            .GetSpecialType(SpecialType.System_Nullable_T)
+            .Construct(Color);
+
+        await Assert.That(LiteralOf(1, nullableColor)).IsEqualTo("(global::Color)1");
+    }
+
     private static string LiteralOf(object? value, SpecialType type) =>
         LiteralOf(value, LiteralCompilation.GetSpecialType(type));
 
