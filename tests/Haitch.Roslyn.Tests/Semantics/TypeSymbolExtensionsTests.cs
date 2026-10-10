@@ -15,6 +15,14 @@ public class TypeSymbolExtensionsTests
     }
 
     [Test]
+    public async Task Should_unwrap_a_nullable_written_with_a_question_mark()
+    {
+        string? underlying = UnderlyingOf("int?");
+
+        await Assert.That(underlying).IsEqualTo("int");
+    }
+
+    [Test]
     public async Task Should_not_unwrap_a_non_nullable_struct()
     {
         string? underlying = UnderlyingOf("int");
