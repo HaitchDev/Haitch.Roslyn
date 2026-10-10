@@ -42,6 +42,11 @@ internal static class TypeSymbolExtensions
             || type.AllInterfaces.Any(@interface => IsNamed(@interface, metadataName));
     }
 
+    public static INamedTypeSymbol? FindBase(this ITypeSymbol type, string metadataName)
+    {
+        return null;
+    }
+
     private static bool IsNamed(INamedTypeSymbol type, string metadataName)
     {
         return AttributeModel.GetMetadataName(type.OriginalDefinition) == metadataName;
