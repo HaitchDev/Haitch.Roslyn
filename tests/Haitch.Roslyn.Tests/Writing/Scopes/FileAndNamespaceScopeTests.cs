@@ -202,27 +202,14 @@ public class FileAndNamespaceScopeTests
     {
         TypeModel model = ModelOf("namespace A { public class Plain { } }", "A.Plain");
 
-        SourceWriter actual = new();
+        AttributeModel attribute = WellKnownAttributes.EditorBrowsableNever;
 
-        using (var file = actual.File())
-        {
-            using (file.Attribute(WellKnownAttributes.EditorBrowsableNever).TypeIn(model)) { }
-        }
-
-        SourceWriter expected = new();
-
-        using (var file = expected.File())
-        {
-            using (var ns = file.Namespace("A"))
-            {
-                using (ns.Attribute(WellKnownAttributes.EditorBrowsableNever).Type(model)) { }
-            }
-        }
-
-        await Assert.That(actual.ToString()).IsEqualTo(expected.ToString());
+        await Assert
+            .That(WrittenIn(model, attribute))
+            .IsEqualTo(WrittenInNamespace(model, attribute));
     }
 
-    private static string WrittenIn(TypeModel model)
+    private static string WrittenIn(TypeModel model, AttributeModel? attribute = null)
     {
         SourceWriter writer = new();
 
@@ -230,13 +217,18 @@ public class FileAndNamespaceScopeTests
         {
             file.Using("System");
 
+            if (attribute is not null)
+            {
+                file.Attribute(attribute);
+            }
+
             using (file.TypeIn(model)) { }
         }
 
         return writer.ToString();
     }
 
-    private static string WrittenInNamespace(TypeModel model)
+    private static string WrittenInNamespace(TypeModel model, AttributeModel? attribute = null)
     {
         SourceWriter writer = new();
 
@@ -246,6 +238,11 @@ public class FileAndNamespaceScopeTests
 
             using (var ns = file.Namespace(model.Namespace!))
             {
+                if (attribute is not null)
+                {
+                    ns.Attribute(attribute);
+                }
+
                 using (ns.Type(model)) { }
             }
         }
