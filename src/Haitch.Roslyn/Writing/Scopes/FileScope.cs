@@ -219,13 +219,18 @@ internal readonly ref struct FileScope
             _writer.WriteLine();
         }
 
+        WritePending();
+        _state.NeedsBlankLine = true;
+    }
+
+    private readonly void WritePending()
+    {
         for (var i = 0; i < _state.Pending.Count; i++)
         {
             _writer.WriteLine(_state.Pending[i]);
         }
 
         _state.Pending.Clear();
-        _state.NeedsBlankLine = true;
     }
 
     private readonly void RequireInnermost()
