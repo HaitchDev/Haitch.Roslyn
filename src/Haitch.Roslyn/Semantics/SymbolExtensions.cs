@@ -2,6 +2,7 @@
 #nullable enable
 
 using System.Linq;
+using Haitch.Roslyn.Models;
 using Microsoft.CodeAnalysis;
 
 namespace Haitch.Roslyn.Semantics;
@@ -25,6 +26,7 @@ internal static class SymbolExtensions
 
     private static bool IsOfClass(AttributeData attribute, string metadataName)
     {
-        return attribute.AttributeClass?.ToDisplayString() == metadataName;
+        return attribute.AttributeClass is { } attributeClass
+            && AttributeModel.GetMetadataName(attributeClass.OriginalDefinition) == metadataName;
     }
 }
