@@ -59,7 +59,20 @@ internal static class InvocationExtensions
 
     private static bool IsIn(IMethodSymbol method, string containingType)
     {
-        return method.ContainingType.MetadataName == containingType;
+        return FullMetadataName(method.ContainingType.OriginalDefinition) == containingType;
+    }
+
+    private static string FullMetadataName(INamedTypeSymbol type)
+    {
+        var name = type.MetadataName;
+        for (var outer = type.ContainingType; outer is not null; outer = outer.ContainingType)
+        {
+            name = outer.MetadataName + "+" + name;
+        }
+
+        return type.ContainingNamespace is { IsGlobalNamespace: false } ns
+            ? ns.ToDisplayString() + "." + name
+            : name;
     }
 
     // The compiler fills an omitted optional parameter with its default; the caller wrote nothing.
