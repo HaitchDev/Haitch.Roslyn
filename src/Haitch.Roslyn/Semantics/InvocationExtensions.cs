@@ -8,8 +8,22 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace Haitch.Roslyn.Semantics;
 
+/// <summary>
+/// Reads an invocation's arguments by the parameters they bind to, so a generator does not walk
+/// <see cref="IInvocationOperation"/> by hand.
+/// </summary>
 internal static class InvocationExtensions
 {
+    /// <summary>
+    /// Finds the value bound to <paramref name="parameter"/>, whether the caller wrote it
+    /// positionally, by name in any order, or as an extension method's receiver; null when the
+    /// argument is omitted or the call does not bind.
+    /// </summary>
+    /// <param name="invocation">The invocation to read.</param>
+    /// <param name="model">The semantic model of the invocation's syntax tree.</param>
+    /// <param name="parameter">The parameter name, including an extension method's <c>this</c> parameter.</param>
+    /// <param name="cancellationToken">Cancels binding the invocation.</param>
+    /// <returns>The argument's value operation, so its constant, <c>typeof</c> or lambda is reachable.</returns>
     public static IOperation? ArgumentFor(
         this InvocationExpressionSyntax invocation,
         SemanticModel model,
