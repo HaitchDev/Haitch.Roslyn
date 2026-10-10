@@ -24,6 +24,14 @@ public class InvocationExtensionsTests
         await Assert.That(argument?.ConstantValue.Value).IsEqualTo(2);
     }
 
+    [Test]
+    public async Task Should_find_a_named_argument_written_out_of_order()
+    {
+        IOperation? argument = ArgumentFor("Rules.Length(max: 2, min: 1)", "min");
+
+        await Assert.That(argument?.ConstantValue.Value).IsEqualTo(1);
+    }
+
     private static IOperation? ArgumentFor(string call, string parameter)
     {
         CSharpCompilation compilation = CompilationHelper.Compile(
