@@ -233,6 +233,7 @@ internal sealed record ConstantValue
             bool boolValue => boolValue ? "true" : "false",
             char charValue => SymbolDisplay.FormatLiteral(charValue, quote: true),
             decimal => Invariant(value) + "m",
+            double => Invariant(value) + "d",
             _ => Invariant(value),
         };
     }
