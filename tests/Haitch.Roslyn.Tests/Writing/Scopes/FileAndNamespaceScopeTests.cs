@@ -176,6 +176,27 @@ public class FileAndNamespaceScopeTests
         await Assert.That(WrittenIn(model)).IsEqualTo(WrittenInNamespace(model));
     }
 
+    [Test]
+    public async Task Should_reject_a_file_local_type_in_before_writing_its_namespace()
+    {
+        TypeModel model = ModelOf("namespace A { public class Plain { } }", "A.Plain") with
+        {
+            IsFileLocal = true,
+        };
+
+        SourceWriter writer = new();
+
+        await Assert
+            .That(() =>
+            {
+                using var file = writer.File();
+                file.TypeIn(model);
+            })
+            .Throws<ArgumentException>();
+
+        await Assert.That(writer.ToString()).DoesNotContain("namespace");
+    }
+
     private static string WrittenIn(TypeModel model)
     {
         SourceWriter writer = new();
