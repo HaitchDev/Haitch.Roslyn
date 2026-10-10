@@ -221,8 +221,9 @@ public class ConstantValueAccessorTests
     [Arguments(1.5d, SpecialType.System_Double, "1.5d")]
     [Arguments(1.5f, SpecialType.System_Single, "1.5f")]
     [Arguments("a\"b\n", SpecialType.System_String, "\"a\\\"b\\n\"")]
+    [Arguments(null, SpecialType.System_String, "null")]
     public async Task Should_render_a_constant_read_from_a_symbol_as_its_literal(
-        object value,
+        object? value,
         SpecialType type,
         string literal
     )
