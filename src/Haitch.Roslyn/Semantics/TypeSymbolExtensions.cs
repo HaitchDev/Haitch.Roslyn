@@ -69,6 +69,12 @@ internal static class TypeSymbolExtensions
         return null;
     }
 
+    /// <summary>
+    /// Lists the constant fields <paramref name="type"/> declares when it is an enum, in declaration
+    /// order and including aliases that share a value; empty for any other type.
+    /// </summary>
+    /// <param name="type">The type to read.</param>
+    /// <returns>The enum's members, each with its name and constant value.</returns>
     public static ImmutableArray<IFieldSymbol> EnumMembers(this INamedTypeSymbol type)
     {
         return ImmutableArray<IFieldSymbol>.Empty;
