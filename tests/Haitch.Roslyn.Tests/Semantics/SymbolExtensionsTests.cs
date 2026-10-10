@@ -23,12 +23,22 @@ public class SymbolExtensionsTests
     }
 
     [Test]
+    public async Task Should_find_an_attribute_on_a_method()
+    {
+        bool found = Member("Method").HasAttribute("System.ObsoleteAttribute");
+
+        await Assert.That(found).IsTrue();
+    }
+
+    [Test]
     public async Task Should_not_find_an_attribute_the_symbol_does_not_carry()
     {
         bool found = Type("Ns.Plain").HasAttribute("System.FlagsAttribute");
 
         await Assert.That(found).IsFalse();
     }
+
+    private static ISymbol Member(string name) => Type("Ns.Plain").GetMembers(name).Single();
 
     private static INamedTypeSymbol Type(string metadataName) =>
         CompilationHelper.GetNamedTypeSymbol(
@@ -46,7 +56,11 @@ public class SymbolExtensionsTests
                 [Mark<int>]
                 class Marked { }
 
-                class Plain { }
+                class Plain
+                {
+                    [System.Obsolete]
+                    public void Method() { }
+                }
             }
             """,
             metadataName
