@@ -226,6 +226,18 @@ internal ref struct TypeScope
     }
 
     /// <summary>
+    /// Writes <paramref name="header"/> as a line, opens a braced block under it, and returns the
+    /// block's scope; disposing that scope closes the brace.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="header"/> is null, empty or whitespace.</exception>
+    public readonly BodyScope Block(string header)
+    {
+        RequireInnermost();
+
+        return BodyScope.OpenBlock(_writer, header);
+    }
+
+    /// <summary>
     /// Writes one field declaration line. A blank line separates it from a preceding sibling.
     /// </summary>
     /// <param name="field">The field to declare; a const field is written from its constant value.</param>

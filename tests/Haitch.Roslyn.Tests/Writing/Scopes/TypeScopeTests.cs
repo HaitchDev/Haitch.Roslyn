@@ -245,13 +245,12 @@ public class TypeScopeTests
             .EndsWith(
                 """
                 partial class A
+                {
+                    public void M()
                     {
-                        public void M()
-                        {
-                            return;
-                        }
-                        // after
+                        return;
                     }
+                    // after
                 }
 
                 """
