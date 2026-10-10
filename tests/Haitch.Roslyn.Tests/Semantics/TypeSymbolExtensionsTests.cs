@@ -9,18 +9,21 @@ public class TypeSymbolExtensionsTests
     [Test]
     public async Task Should_unwrap_a_nullable_written_as_nullable_of_t()
     {
-        ITypeSymbol? underlying = TypeOf("Nullable<int>").NullableUnderlying();
+        string? underlying = UnderlyingOf("Nullable<int>");
 
-        await Assert.That(underlying?.SpecialType).IsEqualTo(SpecialType.System_Int32);
+        await Assert.That(underlying).IsEqualTo("int");
     }
 
     [Test]
     public async Task Should_not_unwrap_a_non_nullable_struct()
     {
-        ITypeSymbol? underlying = TypeOf("int").NullableUnderlying();
+        string? underlying = UnderlyingOf("int");
 
         await Assert.That(underlying).IsNull();
     }
+
+    private static string? UnderlyingOf(string type) =>
+        TypeOf(type).NullableUnderlying()?.ToDisplayString();
 
     private static ITypeSymbol TypeOf(string type)
     {
