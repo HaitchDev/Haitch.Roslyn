@@ -462,6 +462,12 @@ internal ref struct TypeScope
     {
         RequireInnermost();
 
+        if (_state.Summary is not null)
+        {
+            throw new InvalidOperationException(
+                $"A summary is already pending on TypeScope '{_model.Name}'; write a member before the next summary.");
+        }
+
         _state.Summary = $"/// <summary>{text}</summary>";
 
         return this;
