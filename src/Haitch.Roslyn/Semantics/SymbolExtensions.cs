@@ -20,6 +20,11 @@ internal static class SymbolExtensions
     /// <returns>True when the symbol carries the attribute.</returns>
     public static bool HasAttribute(this ISymbol symbol, string metadataName)
     {
-        return symbol.GetAttributes().Any(attribute => attribute.AttributeClass?.ToDisplayString() == metadataName);
+        return symbol.GetAttributes().Any(attribute => IsOfClass(attribute, metadataName));
+    }
+
+    private static bool IsOfClass(AttributeData attribute, string metadataName)
+    {
+        return attribute.AttributeClass?.ToDisplayString() == metadataName;
     }
 }
