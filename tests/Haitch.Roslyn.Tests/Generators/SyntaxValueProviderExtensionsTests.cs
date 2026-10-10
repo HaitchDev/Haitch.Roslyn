@@ -912,4 +912,84 @@ public class SyntaxValueProviderExtensionsTests
             AttributeProviderTestGenerator.ValuesStepName
         );
     }
+
+    private const string MemberMarkAttributeSource = """
+        namespace Sample;
+
+        public class MemberMarkAttribute : System.Attribute { }
+        """;
+
+    [Test]
+    public void Should_report_the_method_step_as_unchanged_after_a_trivia_edit_in_the_marked_file()
+    {
+        AssertMemberStepUnchangedAfterTriviaEdit(
+            new MemberProviderTestGenerator(provider =>
+                provider
+                    .ForMethodsWithAttribute(
+                        "Sample.MemberMarkAttribute",
+                        MemberProviderTestGenerator.ValuesStepName
+                    )
+                    .Select(static (item, _) => item.Method.Name)
+            ),
+            "public class Widget { [Sample.MemberMark] public void Run() { } }"
+        );
+    }
+
+    [Test]
+    public void Should_report_the_property_step_as_unchanged_after_a_trivia_edit_in_the_marked_file()
+    {
+        AssertMemberStepUnchangedAfterTriviaEdit(
+            new MemberProviderTestGenerator(provider =>
+                provider
+                    .ForPropertiesWithAttribute(
+                        "Sample.MemberMarkAttribute",
+                        MemberProviderTestGenerator.ValuesStepName
+                    )
+                    .Select(static (item, _) => item.Property.Name)
+            ),
+            "public class Widget { [Sample.MemberMark] public int Value { get; set; } }"
+        );
+    }
+
+    [Test]
+    public void Should_report_the_field_step_as_unchanged_after_a_trivia_edit_in_the_marked_file()
+    {
+        AssertMemberStepUnchangedAfterTriviaEdit(
+            new MemberProviderTestGenerator(provider =>
+                provider
+                    .ForFieldsWithAttribute(
+                        "Sample.MemberMarkAttribute",
+                        MemberProviderTestGenerator.ValuesStepName
+                    )
+                    .Select(static (item, _) => item.Field.Name)
+            ),
+            "public class Widget { [Sample.MemberMark] public int value; }"
+        );
+    }
+
+    private static void AssertMemberStepUnchangedAfterTriviaEdit(
+        MemberProviderTestGenerator generator,
+        string markedSource
+    )
+    {
+        GeneratorHarness.AssertCacheable(
+            generator,
+            new GeneratorHarnessInput { Sources = [markedSource, MemberMarkAttributeSource] },
+            [MemberProviderTestGenerator.ValuesStepName],
+            options: new CacheabilityOptions { RequireRecomputationAfterTriviaEdit = true }
+        );
+    }
+
+    // Runs one member provider and consumes each member's name, so tests can pick the provider under test.
+    private sealed class MemberProviderTestGenerator(
+        Func<SyntaxValueProvider, IncrementalValuesProvider<string>> discover
+    ) : IIncrementalGenerator
+    {
+        public const string ValuesStepName = "MemberProviderTestGenerator.Values";
+
+        public void Initialize(IncrementalGeneratorInitializationContext context)
+        {
+            context.RegisterSourceOutput(discover(context.SyntaxProvider), static (_, _) => { });
+        }
+    }
 }
