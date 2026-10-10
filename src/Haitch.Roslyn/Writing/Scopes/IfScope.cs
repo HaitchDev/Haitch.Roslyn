@@ -100,6 +100,14 @@ internal ref struct IfScope
         return this;
     }
 
+    public readonly IfScope Return(string? expression = null)
+    {
+        RequireInnermost();
+        _writer.WriteLine(expression is null ? "return;" : $"return {expression};");
+
+        return this;
+    }
+
     public readonly BodyScope Using(string resource)
     {
         RequireInnermost();
