@@ -240,38 +240,89 @@ internal sealed record ConstantValue
         return Kind switch
         {
             ConstantValueKind.Null => "null",
-            ConstantValueKind.Enum => $"({Type!.FullyQualifiedName}){RenderPrimitive(Value!)}",
+            ConstantValueKind.Enum => RenderEnum(),
             ConstantValueKind.String => SymbolDisplay.FormatLiteral((string)Value!, quote: true),
-            _ => RenderPrimitive(Value!),
+            ConstantValueKind.Primitive => RenderPrimitive(Value!),
+            _ => throw new InvalidOperationException($"A constant value of kind {Kind} has no literal."),
         };
     }
 
+    // A negative underlying value renders as "(global::E)-1", which the compiler parses as a
+    // subtraction (the cast-ambiguity rule does not treat '-' as an unambiguous follow token), so
+    // the literal is parenthesized to force the cast: "(global::E)(-1)".
+    private string RenderEnum()
+    {
+        var literal = RenderPrimitive(Value!);
+
+        if (literal.StartsWith("-", StringComparison.Ordinal))
+        {
+            literal = $"({literal})";
+        }
+
+        return $"({Type!.FullyQualifiedName}){literal}";
+    }
+
+    // Every number is formatted with the invariant culture, so generated source does not depend on
+    // the build machine's decimal separator.
     private static string RenderPrimitive(object value)
     {
         return value switch
         {
             bool boolValue => boolValue ? "true" : "false",
             char charValue => SymbolDisplay.FormatLiteral(charValue, quote: true),
-            _ => Invariant(value) + Suffix(value),
+            float floatValue => RenderFloat(floatValue),
+            double doubleValue => RenderDouble(doubleValue),
+            decimal decimalValue => decimalValue.ToString(CultureInfo.InvariantCulture) + "m",
+            long longValue => longValue.ToString(CultureInfo.InvariantCulture) + "L",
+            ulong ulongValue => ulongValue.ToString(CultureInfo.InvariantCulture) + "UL",
+            uint uintValue => uintValue.ToString(CultureInfo.InvariantCulture) + "U",
+            int or short or ushort or byte or sbyte =>
+                Convert.ToInt64(value, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture),
+            _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported primitive constant value."),
         };
     }
 
-    // Without its suffix a real literal is read back as a double, and a decimal or float initializer would not compile.
-    private static string Suffix(object value)
+    // NaN and the infinities have no literal token in C#; the well-known static fields are the
+    // only way to express them in source. Finite values round-trip through "G9" (float) / "G17"
+    // (double), the exact-round-trip precision for each type.
+    private static string RenderFloat(float value)
     {
-        return value switch
+        if (float.IsNaN(value))
         {
-            decimal => "m",
-            double => "d",
-            float => "f",
-            _ => "",
-        };
+            return "float.NaN";
+        }
+
+        if (float.IsPositiveInfinity(value))
+        {
+            return "float.PositiveInfinity";
+        }
+
+        if (float.IsNegativeInfinity(value))
+        {
+            return "float.NegativeInfinity";
+        }
+
+        return value.ToString("G9", CultureInfo.InvariantCulture) + "f";
     }
 
-    // Generated source must not depend on the build machine's culture, e.g. a comma decimal separator.
-    private static string Invariant(object value)
+    private static string RenderDouble(double value)
     {
-        return Convert.ToString(value, CultureInfo.InvariantCulture)!;
+        if (double.IsNaN(value))
+        {
+            return "double.NaN";
+        }
+
+        if (double.IsPositiveInfinity(value))
+        {
+            return "double.PositiveInfinity";
+        }
+
+        if (double.IsNegativeInfinity(value))
+        {
+            return "double.NegativeInfinity";
+        }
+
+        return value.ToString("G17", CultureInfo.InvariantCulture) + "d";
     }
 
     public static ConstantValue From(TypedConstant constant)

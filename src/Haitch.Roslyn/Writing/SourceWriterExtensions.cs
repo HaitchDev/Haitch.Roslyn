@@ -1114,12 +1114,12 @@ internal static class SourceWriterExtensions
     {
         return value.Kind switch
         {
-            ConstantValueKind.Null => forAttribute && value.Type is not null ? RenderTypedNull(value.Type) : "null",
-            ConstantValueKind.String => SymbolDisplay.FormatLiteral((string)value.Value!, quote: true),
-            ConstantValueKind.Primitive => forAttribute ? RenderAttributePrimitive(value.Value!) : RenderPrimitive(value.Value!),
-            ConstantValueKind.Enum => forAttribute && value.EnumMemberName is not null
-                ? $"{value.Type!.FullyQualifiedName}.{EscapeKeyword(value.EnumMemberName)}"
-                : RenderEnum(value),
+            ConstantValueKind.Null when forAttribute && value.Type is not null => RenderTypedNull(value.Type),
+            ConstantValueKind.Primitive when forAttribute => RenderAttributePrimitive(value),
+            ConstantValueKind.Enum when forAttribute && value.EnumMemberName is not null =>
+                $"{value.Type!.FullyQualifiedName}.{EscapeKeyword(value.EnumMemberName)}",
+            ConstantValueKind.Null or ConstantValueKind.String or ConstantValueKind.Primitive or ConstantValueKind.Enum =>
+                value.ToLiteral(),
             ConstantValueKind.Type => $"typeof({StripNullableAnnotationForTypeof(value.Type!)})",
             ConstantValueKind.Array => RenderArray(value, forAttribute),
             ConstantValueKind.Error => throw new ArgumentException(
@@ -1129,87 +1129,11 @@ internal static class SourceWriterExtensions
         };
     }
 
-    // A negative underlying value renders as "(global::E)-1", which the compiler parses as a
-    // subtraction (the cast-ambiguity rule does not treat '-' as an unambiguous follow token), so
-    // the literal is parenthesized to force the cast: "(global::E)(-1)".
-    private static string RenderEnum(ConstantValue value)
+    private static string RenderAttributePrimitive(ConstantValue value)
     {
-        var literal = RenderPrimitive(value.Value!);
+        var literal = value.ToLiteral();
 
-        if (literal.StartsWith("-", StringComparison.Ordinal))
-        {
-            literal = $"({literal})";
-        }
-
-        return $"({value.Type!.FullyQualifiedName}){literal}";
-    }
-
-    private static string RenderPrimitive(object value)
-    {
-        return value switch
-        {
-            bool boolValue => boolValue ? "true" : "false",
-            char charValue => SymbolDisplay.FormatLiteral(charValue, quote: true),
-            float floatValue => RenderFloat(floatValue),
-            double doubleValue => RenderDouble(doubleValue),
-            decimal decimalValue => decimalValue.ToString(CultureInfo.InvariantCulture) + "m",
-            long longValue => longValue.ToString(CultureInfo.InvariantCulture) + "L",
-            ulong ulongValue => ulongValue.ToString(CultureInfo.InvariantCulture) + "UL",
-            uint uintValue => uintValue.ToString(CultureInfo.InvariantCulture) + "U",
-            int or short or ushort or byte or sbyte =>
-                Convert.ToInt64(value, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture),
-            _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported primitive constant value."),
-        };
-    }
-
-    // NaN and the infinities have no literal token in C#; the well-known static fields are the
-    // only way to express them in source. Finite values round-trip through "G9" (float) / "G17"
-    // (double), the exact-round-trip precision for each type.
-    private static string RenderFloat(float value)
-    {
-        if (float.IsNaN(value))
-        {
-            return "float.NaN";
-        }
-
-        if (float.IsPositiveInfinity(value))
-        {
-            return "float.PositiveInfinity";
-        }
-
-        if (float.IsNegativeInfinity(value))
-        {
-            return "float.NegativeInfinity";
-        }
-
-        return value.ToString("G9", CultureInfo.InvariantCulture) + "f";
-    }
-
-    private static string RenderDouble(double value)
-    {
-        if (double.IsNaN(value))
-        {
-            return "double.NaN";
-        }
-
-        if (double.IsPositiveInfinity(value))
-        {
-            return "double.PositiveInfinity";
-        }
-
-        if (double.IsNegativeInfinity(value))
-        {
-            return "double.NegativeInfinity";
-        }
-
-        return value.ToString("G17", CultureInfo.InvariantCulture) + "d";
-    }
-
-    private static string RenderAttributePrimitive(object value)
-    {
-        var literal = RenderPrimitive(value);
-
-        return value switch
+        return value.Value switch
         {
             byte => $"(byte){literal}",
             sbyte => $"(sbyte){literal}",
