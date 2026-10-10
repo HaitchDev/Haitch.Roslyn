@@ -5,6 +5,10 @@ using Microsoft.CodeAnalysis;
 
 namespace Haitch.Roslyn.Semantics;
 
+/// <summary>
+/// Reads the shapes of a type a generator asks about, so it does not compare special types or
+/// walk base types and interfaces by hand.
+/// </summary>
 internal static class TypeSymbolExtensions
 {
     public static ITypeSymbol? NullableUnderlying(this ITypeSymbol type)
