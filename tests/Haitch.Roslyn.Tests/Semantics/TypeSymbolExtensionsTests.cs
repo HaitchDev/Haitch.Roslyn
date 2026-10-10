@@ -106,18 +106,21 @@ public class TypeSymbolExtensionsTests
     [Test]
     public async Task Should_find_a_direct_base()
     {
-        INamedTypeSymbol? found = TypeOf("Ns.Tile").FindBase("Ns.Square");
+        string? found = BaseOf("Ns.Tile", "Ns.Square");
 
-        await Assert.That(found?.ToDisplayString()).IsEqualTo("Ns.Square");
+        await Assert.That(found).IsEqualTo("Ns.Square");
     }
 
     [Test]
     public async Task Should_not_find_a_base_a_type_does_not_derive_from()
     {
-        INamedTypeSymbol? found = TypeOf("Ns.Plain").FindBase("Ns.Square");
+        string? found = BaseOf("Ns.Plain", "Ns.Square");
 
         await Assert.That(found).IsNull();
     }
+
+    private static string? BaseOf(string type, string metadataName) =>
+        TypeOf(type).FindBase(metadataName)?.ToDisplayString();
 
     private static bool IsOrImplementsShape(string type) =>
         TypeOf(type).IsOrImplements("Ns.IShape`1");
