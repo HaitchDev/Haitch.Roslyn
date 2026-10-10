@@ -85,6 +85,11 @@ internal static class InvocationExtensions
 
     private static string FullMetadataName(INamedTypeSymbol type)
     {
+        if (type.ContainingType is { } outer)
+        {
+            return FullMetadataName(outer) + "+" + type.MetadataName;
+        }
+
         return type.ContainingNamespace is { IsGlobalNamespace: false } ns
             ? ns.ToDisplayString() + "." + type.MetadataName
             : type.MetadataName;
