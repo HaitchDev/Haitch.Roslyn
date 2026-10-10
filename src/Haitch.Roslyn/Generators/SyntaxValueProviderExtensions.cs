@@ -104,7 +104,6 @@ internal static class SyntaxValueProviderExtensions
             });
     }
 
-    // The tracking name goes on the transform's step, ahead of WhereKept; see ForTypesWithAttribute.
     private static IncrementalValuesProvider<T> ForTypes<T>(
         SyntaxValueProvider provider,
         string fullyQualifiedMetadataName,
@@ -113,9 +112,29 @@ internal static class SyntaxValueProviderExtensions
         Func<GeneratorAttributeSyntaxContext, CancellationToken, T?> transform)
         where T : struct
     {
+        return ForKept(
+            provider,
+            fullyQualifiedMetadataName,
+            trackingName,
+            static (node, _) => node is TypeDeclarationSyntax,
+            predicate,
+            transform);
+    }
+
+    // Every provider goes through here. The tracking name goes on the transform's step, ahead of WhereKept;
+    // see ForTypesWithAttribute.
+    private static IncrementalValuesProvider<T> ForKept<T>(
+        SyntaxValueProvider provider,
+        string fullyQualifiedMetadataName,
+        string trackingName,
+        Func<SyntaxNode, CancellationToken, bool> kindCheck,
+        Func<SyntaxNode, CancellationToken, bool>? predicate,
+        Func<GeneratorAttributeSyntaxContext, CancellationToken, T?> transform)
+        where T : struct
+    {
         return provider.ForAttributeWithMetadataName(
                 fullyQualifiedMetadataName,
-                predicate: WithKindCheck(static (node, _) => node is TypeDeclarationSyntax, predicate),
+                predicate: WithKindCheck(kindCheck, predicate),
                 transform: transform)
             .WithTrackingName(trackingName)
             .WhereKept();
@@ -299,12 +318,13 @@ internal static class SyntaxValueProviderExtensions
             bool includeContainingTypeMembers,
             Func<GeneratorAttributeSyntaxContext, bool, CancellationToken, (TModel Member, TypeModel ContainingType, SyntaxInfo Syntax, EquatableArray<AttributeModel> Attributes)?> transform)
     {
-        return provider.ForAttributeWithMetadataName(
-                fullyQualifiedMetadataName,
-                WithKindCheck(kindPredicate, userPredicate),
-                (context, cancellationToken) => transform(context, includeContainingTypeMembers, cancellationToken))
-            .WithTrackingName(trackingName)
-            .WhereKept();
+        return ForKept(
+            provider,
+            fullyQualifiedMetadataName,
+            trackingName,
+            kindPredicate,
+            userPredicate,
+            (context, cancellationToken) => transform(context, includeContainingTypeMembers, cancellationToken));
     }
 
     // definition is the symbol the model and attributes come from: the definition part for a partial
