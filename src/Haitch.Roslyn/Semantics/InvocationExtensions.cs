@@ -54,7 +54,12 @@ internal static class InvocationExtensions
     {
         var method = model.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
 
-        return method?.ContainingType.MetadataName == containingType ? method : null;
+        return method is not null && IsIn(method, containingType) ? method : null;
+    }
+
+    private static bool IsIn(IMethodSymbol method, string containingType)
+    {
+        return method.ContainingType.MetadataName == containingType;
     }
 
     // The compiler fills an omitted optional parameter with its default; the caller wrote nothing.
