@@ -87,42 +87,12 @@ internal readonly ref struct FileScope
     /// </exception>
     public TypeScope Type(TypeModel type, EquatableArray<TypeRef> baseTypes = default)
     {
-        try
-        {
-            ValidateType(type);
-            BeginMember();
-
-            return new TypeScope(_writer, type, _writer.WriteTypeDeclaration(type, baseTypes));
-        }
-        catch
-        {
-            _state.Pending.Clear();
-
-            throw;
-        }
+        return OpenType(type, baseTypes, namespaceName: null);
     }
 
     public TypeScope TypeIn(TypeModel type, EquatableArray<TypeRef> baseTypes = default)
     {
-        if (type.Namespace is null)
-        {
-            return Type(type, baseTypes);
-        }
-
-        try
-        {
-            ValidateType(type);
-            SourceWriter.BlockScope namespaceBlock = OpenNamespace(type.Namespace);
-            WritePending();
-
-            return new TypeScope(_writer, type, _writer.WriteTypeDeclaration(type, baseTypes), namespaceBlock);
-        }
-        catch
-        {
-            _state.Pending.Clear();
-
-            throw;
-        }
+        return OpenType(type, baseTypes, type.Namespace);
     }
 
     /// <summary>
@@ -194,18 +164,43 @@ internal readonly ref struct FileScope
         }
     }
 
-    private readonly void ValidateType(TypeModel type)
+    // A null namespaceName writes the type at file level; otherwise the returned scope also owns the
+    // namespace block, so disposing it closes both.
+    private TypeScope OpenType(TypeModel type, EquatableArray<TypeRef> baseTypes, string? namespaceName)
     {
-        RequireInnermost();
-
-        if (_state.Pending.Count > 0 && type.ContainingTypes.Count > 0)
+        try
         {
-            throw new ArgumentException(
-                $"A pending attribute would land on the outermost containing type of '{type.Name}'.",
-                nameof(type));
-        }
+            RequireInnermost();
 
-        TypeScope.ThrowIfFileLocal(type);
+            if (_state.Pending.Count > 0 && type.ContainingTypes.Count > 0)
+            {
+                throw new ArgumentException(
+                    $"A pending attribute would land on the outermost containing type of '{type.Name}'.",
+                    nameof(type));
+            }
+
+            TypeScope.ThrowIfFileLocal(type);
+
+            SourceWriter.BlockScope namespaceBlock = default;
+
+            if (namespaceName is null)
+            {
+                BeginMember();
+            }
+            else
+            {
+                namespaceBlock = OpenNamespace(namespaceName);
+                WritePending();
+            }
+
+            return new TypeScope(_writer, type, _writer.WriteTypeDeclaration(type, baseTypes), namespaceBlock);
+        }
+        catch
+        {
+            _state.Pending.Clear();
+
+            throw;
+        }
     }
 
     private readonly SourceWriter.BlockScope OpenNamespace(string name)
