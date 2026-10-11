@@ -104,6 +104,46 @@ public class TypeSymbolExtensionsTests
     }
 
     [Test]
+    public async Task Should_find_a_constructed_interface_a_type_implements_with_the_given_argument()
+    {
+        bool found = IsOrImplementsEquatableTo("Ns.Own", "Ns.Own");
+
+        await Assert.That(found).IsTrue();
+    }
+
+    [Test]
+    public async Task Should_not_find_a_constructed_interface_a_type_implements_only_with_another_argument()
+    {
+        bool found = IsOrImplementsEquatableTo("Ns.Foreign", "Ns.Foreign");
+
+        await Assert.That(found).IsFalse();
+    }
+
+    [Test]
+    public async Task Should_find_a_constructed_interface_as_itself_with_the_given_argument()
+    {
+        bool found = IsOrImplementsEquatableTo("IEquatable<Ns.Other>", "Ns.Other");
+
+        await Assert.That(found).IsTrue();
+    }
+
+    [Test]
+    public async Task Should_find_a_constructed_interface_a_type_implements_with_the_given_and_another_argument()
+    {
+        bool found = IsOrImplementsEquatableTo("Ns.Twice", "Ns.Twice");
+
+        await Assert.That(found).IsTrue();
+    }
+
+    private static bool IsOrImplementsEquatableTo(string type, string argument)
+    {
+        INamedTypeSymbol holder = Holder(type, argument);
+
+        return FieldType(holder, "Value")
+            .IsOrImplements("System.IEquatable`1", FieldType(holder, "Argument"));
+    }
+
+    [Test]
     public async Task Should_find_a_direct_base()
     {
         string? found = BaseOf("Ns.Tile", "Ns.Square");
@@ -189,9 +229,14 @@ public class TypeSymbolExtensionsTests
     private static string? UnderlyingOf(string type) =>
         TypeOf(type).NullableUnderlying()?.ToDisplayString();
 
-    private static ITypeSymbol TypeOf(string type)
+    private static ITypeSymbol TypeOf(string type) => FieldType(Holder(type, "int"), "Value");
+
+    private static ITypeSymbol FieldType(INamedTypeSymbol holder, string field) =>
+        ((IFieldSymbol)holder.GetMembers(field).Single()).Type;
+
+    private static INamedTypeSymbol Holder(string type, string argument)
     {
-        INamedTypeSymbol holder = CompilationHelper.GetNamedTypeSymbol(
+        return CompilationHelper.GetNamedTypeSymbol(
             $$"""
             using System;
 
@@ -203,10 +248,31 @@ public class TypeSymbolExtensionsTests
             class Holder
             {
                 public {{type}} Value = default!;
+
+                public {{argument}} Argument = default!;
             }
 
             namespace Ns
             {
+                struct Other { }
+
+                struct Own : IEquatable<Own>
+                {
+                    public bool Equals(Own other) => true;
+                }
+
+                struct Foreign : IEquatable<Other>
+                {
+                    public bool Equals(Other other) => true;
+                }
+
+                struct Twice : IEquatable<Twice>, IEquatable<Other>
+                {
+                    public bool Equals(Twice other) => true;
+
+                    public bool Equals(Other other) => true;
+                }
+
                 interface IShape<T> { }
 
                 class Square : IShape<int> { }
@@ -249,7 +315,5 @@ public class TypeSymbolExtensionsTests
             """,
             "Holder"
         );
-
-        return ((IFieldSymbol)holder.GetMembers("Value").Single()).Type;
     }
 }
