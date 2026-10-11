@@ -62,41 +62,47 @@ internal static class InvocationExtensions
         string containingType,
         CancellationToken cancellationToken)
     {
-        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol bound)
-        {
-            return null;
-        }
-
-        var method = Declaration(bound);
-
-        return IsIn(method, containingType) ? method : null;
+        return Bound(invocation, model, cancellationToken) is { } bound
+            ? InType(bound.ReducedFrom ?? bound, containingType)
+            : null;
     }
 
+    /// <summary>
+    /// Finds the method <paramref name="invocation"/> calls, constructed with the type arguments the
+    /// call binds, when it is declared in <paramref name="containingType"/>; null when the method is
+    /// declared elsewhere or the call does not bind.
+    /// </summary>
+    /// <param name="invocation">The invocation to read.</param>
+    /// <param name="model">The semantic model of the invocation's syntax tree.</param>
+    /// <param name="containingType">The containing type's metadata name, such as <c>Ns.Outer+Inner</c> or <c>Ns.Type`1</c>.</param>
+    /// <param name="cancellationToken">Cancels binding the invocation.</param>
+    /// <returns>The called method with its type arguments, an extension method as the constructed method it reduces from.</returns>
     public static IMethodSymbol? ResolveConstructedMethodIn(
         this InvocationExpressionSyntax invocation,
         SemanticModel model,
         string containingType,
         CancellationToken cancellationToken)
     {
-        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol bound)
-        {
-            return null;
-        }
-
-        var method = bound.GetConstructedReducedFrom() ?? bound;
-
-        return IsIn(method, containingType) ? method : null;
+        return Bound(invocation, model, cancellationToken) is { } bound
+            ? InType(bound.GetConstructedReducedFrom() ?? bound, containingType)
+            : null;
     }
 
-    // An extension method called on its receiver binds to a reduced copy without the this parameter.
-    private static IMethodSymbol Declaration(IMethodSymbol method)
+    // An extension method called on its receiver binds to a reduced copy without the this parameter;
+    // callers map it back to the declared method.
+    private static IMethodSymbol? Bound(
+        InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        CancellationToken cancellationToken)
     {
-        return method.ReducedFrom ?? method;
+        return model.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
     }
 
-    private static bool IsIn(IMethodSymbol method, string containingType)
+    private static IMethodSymbol? InType(IMethodSymbol method, string containingType)
     {
-        return method.ContainingType.OriginalDefinition.FullMetadataName() == containingType;
+        return method.ContainingType.OriginalDefinition.FullMetadataName() == containingType
+            ? method
+            : null;
     }
 
     // The compiler fills an omitted optional parameter with its default; the caller wrote nothing.
