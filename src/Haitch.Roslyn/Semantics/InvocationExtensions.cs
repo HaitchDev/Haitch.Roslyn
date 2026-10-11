@@ -72,6 +72,22 @@ internal static class InvocationExtensions
         return IsIn(method, containingType) ? method : null;
     }
 
+    public static IMethodSymbol? ResolveConstructedMethodIn(
+        this InvocationExpressionSyntax invocation,
+        SemanticModel model,
+        string containingType,
+        CancellationToken cancellationToken)
+    {
+        if (model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol bound)
+        {
+            return null;
+        }
+
+        var method = bound.GetConstructedReducedFrom() ?? bound;
+
+        return IsIn(method, containingType) ? method : null;
+    }
+
     // An extension method called on its receiver binds to a reduced copy without the this parameter.
     private static IMethodSymbol Declaration(IMethodSymbol method)
     {
