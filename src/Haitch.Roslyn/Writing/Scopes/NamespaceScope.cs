@@ -29,6 +29,14 @@ internal ref struct NamespaceScope
         _state = new State();
     }
 
+    /// <summary>
+    /// Writes <c>using <paramref name="namespaceName"/>;</c> inside the namespace block, in call order and
+    /// without removing duplicates. A blank line separates the usings from the first type, and a pending
+    /// <see cref="Attribute"/> stays buffered for that type.
+    /// </summary>
+    /// <exception cref="System.InvalidOperationException">
+    /// A type has already been written in this namespace; a using after a member is invalid C# (CS1529).
+    /// </exception>
     public void Using(string namespaceName)
     {
         RequireInnermost();
