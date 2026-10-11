@@ -44,23 +44,40 @@ internal static class TypeSymbolExtensions
     /// <returns>True when the type is or implements the interface.</returns>
     public static bool IsOrImplements(this ITypeSymbol type, string metadataName)
     {
-        return type is INamedTypeSymbol named && IsNamed(named, metadataName)
-            || type.AllInterfaces.Any(@interface => IsNamed(@interface, metadataName));
+        return IsOrImplementsMatching(type, metadataName, typeArgument: null);
     }
 
+    /// <summary>
+    /// Tells whether <paramref name="type"/> is, or implements, the generic interface named
+    /// <paramref name="metadataName"/> constructed with exactly <paramref name="typeArgument"/>, so
+    /// a type implementing <c>IEquatable&lt;Other&gt;</c> is not taken as equatable to itself.
+    /// </summary>
+    /// <param name="type">The type to read.</param>
+    /// <param name="metadataName">The generic interface's metadata name, such as <c>System.IEquatable`1</c>.</param>
+    /// <param name="typeArgument">The interface's single type argument, compared by symbol equality.</param>
+    /// <returns>True when the type is or implements the interface constructed with that argument.</returns>
     public static bool IsOrImplements(
         this ITypeSymbol type,
         string metadataName,
         ITypeSymbol typeArgument)
     {
-        if (type is INamedTypeSymbol named && IsNamed(named, metadataName, typeArgument))
+        return IsOrImplementsMatching(type, metadataName, typeArgument);
+    }
+
+    // A null type argument matches the interface by its definition alone.
+    private static bool IsOrImplementsMatching(
+        ITypeSymbol type,
+        string metadataName,
+        ITypeSymbol? typeArgument)
+    {
+        if (type is INamedTypeSymbol named && Matches(named, metadataName, typeArgument))
         {
             return true;
         }
 
         foreach (var @interface in type.AllInterfaces)
         {
-            if (IsNamed(@interface, metadataName, typeArgument))
+            if (Matches(@interface, metadataName, typeArgument))
             {
                 return true;
             }
@@ -69,11 +86,14 @@ internal static class TypeSymbolExtensions
         return false;
     }
 
-    private static bool IsNamed(INamedTypeSymbol type, string metadataName, ITypeSymbol typeArgument)
+    private static bool Matches(INamedTypeSymbol type, string metadataName, ITypeSymbol? typeArgument)
     {
         return IsNamed(type, metadataName)
-            && type.TypeArguments.Length == 1
-            && SymbolEqualityComparer.Default.Equals(type.TypeArguments[0], typeArgument);
+            && (
+                typeArgument is null
+                || type.TypeArguments.Length == 1
+                    && SymbolEqualityComparer.Default.Equals(type.TypeArguments[0], typeArgument)
+            );
     }
 
     /// <summary>
