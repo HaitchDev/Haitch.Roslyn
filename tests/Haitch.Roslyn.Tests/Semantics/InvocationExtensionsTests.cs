@@ -104,6 +104,46 @@ public class InvocationExtensionsTests
         await Assert.That(method).IsNull();
     }
 
+    [Test]
+    public async Task Should_resolve_a_generic_extension_call_to_its_constructed_method()
+    {
+        string? typeArguments = ConstructedTypeArgumentsIn("1.Pair(\"a\")", "Rules");
+
+        await Assert.That(typeArguments).IsEqualTo("int, string");
+    }
+
+    [Test]
+    public async Task Should_resolve_a_generic_call_to_its_constructed_method()
+    {
+        string? typeArguments = ConstructedTypeArgumentsIn("Rules.Echo(1L)", "Rules");
+
+        await Assert.That(typeArguments).IsEqualTo("long");
+    }
+
+    [Test]
+    public async Task Should_not_resolve_a_constructed_method_on_another_type()
+    {
+        IMethodSymbol? method = ResolveConstructedMethodIn("Rules.Echo(1L)", "Caller");
+
+        await Assert.That(method).IsNull();
+    }
+
+    private static string? ConstructedTypeArgumentsIn(string call, string containingType)
+    {
+        IMethodSymbol? method = ResolveConstructedMethodIn(call, containingType);
+
+        return method is null
+            ? null
+            : string.Join(", ", method.TypeArguments.Select(type => type.ToDisplayString()));
+    }
+
+    private static IMethodSymbol? ResolveConstructedMethodIn(string call, string containingType)
+    {
+        (InvocationExpressionSyntax invocation, SemanticModel model) = Bind(call);
+
+        return invocation.ResolveConstructedMethodIn(model, containingType, CancellationToken.None);
+    }
+
     private static string? ResolvedNameIn(string call, string containingType) =>
         ResolveMethodIn(call, containingType)?.Name;
 
@@ -133,6 +173,10 @@ public class InvocationExtensionsTests
                 public static void Length(int min, int max = 10) { }
 
                 public static void Matches(this string text, string pattern) { }
+
+                public static void Pair<TFirst, TSecond>(this TFirst first, TSecond second) { }
+
+                public static void Echo<T>(T value) { }
             }
 
             namespace Ns
