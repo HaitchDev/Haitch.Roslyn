@@ -29,6 +29,20 @@ internal ref struct NamespaceScope
         _state = new State();
     }
 
+    public void Using(string namespaceName)
+    {
+        RequireInnermost();
+
+        if (_state.HasMember)
+        {
+            throw new System.InvalidOperationException(
+                "A using directive must come before the namespace's first member.");
+        }
+
+        _writer.WriteLine($"using {namespaceName};");
+        _state.NeedsBlankLine = true;
+    }
+
     /// <summary>
     /// Writes <paramref name="type"/>'s partial declaration (containing types included) and returns the
     /// scope of its innermost block. A blank line separates it from a preceding sibling type.
@@ -148,6 +162,7 @@ internal ref struct NamespaceScope
 
         _state.Pending.Clear();
         _state.NeedsBlankLine = true;
+        _state.HasMember = true;
     }
 
     private readonly void RequireInnermost()
@@ -170,6 +185,7 @@ internal ref struct NamespaceScope
     private sealed class State
     {
         public bool NeedsBlankLine;
+        public bool HasMember;
         public readonly List<string> Pending = new();
     }
 }
