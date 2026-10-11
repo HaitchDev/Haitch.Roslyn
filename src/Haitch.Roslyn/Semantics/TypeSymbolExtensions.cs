@@ -48,6 +48,34 @@ internal static class TypeSymbolExtensions
             || type.AllInterfaces.Any(@interface => IsNamed(@interface, metadataName));
     }
 
+    public static bool IsOrImplements(
+        this ITypeSymbol type,
+        string metadataName,
+        ITypeSymbol typeArgument)
+    {
+        if (type is INamedTypeSymbol named && IsNamed(named, metadataName, typeArgument))
+        {
+            return true;
+        }
+
+        foreach (var @interface in type.AllInterfaces)
+        {
+            if (IsNamed(@interface, metadataName, typeArgument))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsNamed(INamedTypeSymbol type, string metadataName, ITypeSymbol typeArgument)
+    {
+        return IsNamed(type, metadataName)
+            && type.TypeArguments.Length == 1
+            && SymbolEqualityComparer.Default.Equals(type.TypeArguments[0], typeArgument);
+    }
+
     /// <summary>
     /// Finds the first base class of <paramref name="type"/>, the type itself excluded, whose
     /// definition is named <paramref name="metadataName"/>; null when the type does not derive from it.
