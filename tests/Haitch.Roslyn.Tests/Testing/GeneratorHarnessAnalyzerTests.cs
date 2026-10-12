@@ -103,6 +103,60 @@ public class GeneratorHarnessAnalyzerTests
         await Assert.That(result.AnalyzerDiagnostics.Length).IsEqualTo(0);
     }
 
+    [Test]
+    public async Task Should_leave_out_a_warning_a_pragma_disables()
+    {
+        var result = RunWithClassAnalyzer(
+            NoOutput,
+            new GeneratorHarnessInput
+            {
+                Sources =
+                [
+                    "#pragma warning disable HRA001\nclass Input { }\n#pragma warning restore HRA001",
+                ],
+            }
+        );
+
+        await Assert.That(result.AnalyzerDiagnostics.Length).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task Should_leave_out_a_warning_a_suppress_message_attribute_suppresses()
+    {
+        var result = RunWithClassAnalyzer(
+            NoOutput,
+            new GeneratorHarnessInput
+            {
+                Sources =
+                [
+                    "[System.Diagnostics.CodeAnalysis.SuppressMessage(\"Test\", \"HRA001\")]\nclass Input { }",
+                ],
+            }
+        );
+
+        await Assert.That(result.AnalyzerDiagnostics.Length).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task Should_report_an_analyzer_warning_in_a_generated_source()
+    {
+        var generator = new DelegateGenerator(context =>
+            context.RegisterPostInitializationOutput(ctx =>
+                ctx.AddSource("Generated.g.cs", "class Generated { }")
+            )
+        );
+
+        var result = RunWithClassAnalyzer(
+            generator,
+            new GeneratorHarnessInput { Sources = ["namespace Empty;"] }
+        );
+
+        await Assert.That(result.AnalyzerDiagnostics.Length).IsEqualTo(1);
+        await Assert
+            .That(result.AnalyzerDiagnostics[0].Location.GetLineSpan().Path)
+            .EndsWith("Generated.g.cs");
+    }
+
 #pragma warning disable RS1001
     private sealed class ThrowingAnalyzer : DiagnosticAnalyzer
 #pragma warning restore RS1001
