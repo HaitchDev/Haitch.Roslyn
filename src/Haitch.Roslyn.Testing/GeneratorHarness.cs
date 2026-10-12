@@ -170,18 +170,18 @@ public static class GeneratorHarness
             return [];
         }
 
+        // One provider feeds both the severities the driver filters on and the options analyzers read, as one
+        // .editorconfig does in a build.
+        var options = NewOptionsProvider(input);
         var diagnostics = output
             .WithOptions(
                 output.Options.WithSyntaxTreeOptionsProvider(
-                    new HarnessSyntaxTreeOptionsProvider(input)
+                    new HarnessSyntaxTreeOptionsProvider(options)
                 )
             )
             .WithAnalyzers(
                 analyzers,
-                new AnalyzerOptions(
-                    input.AdditionalTexts?.ToImmutableArray() ?? [],
-                    NewOptionsProvider(input)
-                )
+                new AnalyzerOptions(input.AdditionalTexts?.ToImmutableArray() ?? [], options)
             )
             .GetAnalyzerDiagnosticsAsync()
             .GetAwaiter()
@@ -497,11 +497,9 @@ public static class GeneratorHarness
 
     // A real build turns dotnet_diagnostic.<id>.severity into per-tree compilation options, not analyzer options;
     // the analyzer driver filters on these, so the harness must supply them the same way.
-    private sealed class HarnessSyntaxTreeOptionsProvider(GeneratorHarnessInput input)
+    private sealed class HarnessSyntaxTreeOptionsProvider(AnalyzerConfigOptionsProvider options)
         : SyntaxTreeOptionsProvider
     {
-        private readonly HarnessAnalyzerConfigOptionsProvider _options = NewOptionsProvider(input);
-
         public override GeneratedKind IsGenerated(
             SyntaxTree tree,
             CancellationToken cancellationToken
@@ -512,13 +510,13 @@ public static class GeneratorHarness
             string diagnosticId,
             CancellationToken cancellationToken,
             out ReportDiagnostic severity
-        ) => TryGetSeverity(_options.GetOptions(tree), diagnosticId, out severity);
+        ) => TryGetSeverity(options.GetOptions(tree), diagnosticId, out severity);
 
         public override bool TryGetGlobalDiagnosticValue(
             string diagnosticId,
             CancellationToken cancellationToken,
             out ReportDiagnostic severity
-        ) => TryGetSeverity(_options.GlobalOptions, diagnosticId, out severity);
+        ) => TryGetSeverity(options.GlobalOptions, diagnosticId, out severity);
 
         private static bool TryGetSeverity(
             AnalyzerConfigOptions options,
