@@ -38,6 +38,9 @@ public sealed class GeneratorHarnessResult
     /// </summary>
     public ImmutableArray<Diagnostic> InputDiagnostics { get; }
 
+    /// <summary>Diagnostics reported by analyzers run over <see cref="Compilation"/>; empty when the run had no analyzers.</summary>
+    public ImmutableArray<Diagnostic> AnalyzerDiagnostics { get; init; } = [];
+
     /// <summary>The compilation after the generator's sources were added.</summary>
     public Compilation Compilation { get; }
 
