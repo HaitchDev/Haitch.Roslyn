@@ -158,7 +158,18 @@ public static class GeneratorHarness
             AnalyzerDiagnostics = analyzers.IsDefaultOrEmpty
                 ? []
                 : output
-                    .WithAnalyzers(analyzers)
+                    .WithOptions(
+                        output.Options.WithSyntaxTreeOptionsProvider(
+                            new HarnessSyntaxTreeOptionsProvider(input)
+                        )
+                    )
+                    .WithAnalyzers(
+                        analyzers,
+                        new AnalyzerOptions(
+                            input.AdditionalTexts?.ToImmutableArray() ?? [],
+                            NewOptionsProvider(input)
+                        )
+                    )
                     .GetAnalyzerDiagnosticsAsync()
                     .GetAwaiter()
                     .GetResult(),
@@ -458,5 +469,55 @@ public static class GeneratorHarness
         var span = diagnostic.Location.GetLineSpan();
         var file = string.IsNullOrEmpty(span.Path) ? "<no file>" : span.Path;
         return $"{file}:{span.StartLinePosition.Line + 1}: {diagnostic.Id}: {diagnostic.GetMessage()}";
+    }
+
+    // A real build turns dotnet_diagnostic.<id>.severity into per-tree compilation options, not analyzer options;
+    // the analyzer driver filters on these, so the harness must supply them the same way.
+    private sealed class HarnessSyntaxTreeOptionsProvider(GeneratorHarnessInput input)
+        : SyntaxTreeOptionsProvider
+    {
+        private readonly HarnessAnalyzerConfigOptionsProvider _options = NewOptionsProvider(input);
+
+        public override GeneratedKind IsGenerated(
+            SyntaxTree tree,
+            CancellationToken cancellationToken
+        ) => GeneratedKind.Unknown;
+
+        public override bool TryGetDiagnosticValue(
+            SyntaxTree tree,
+            string diagnosticId,
+            CancellationToken cancellationToken,
+            out ReportDiagnostic severity
+        ) => TryGetSeverity(_options.GetOptions(tree), diagnosticId, out severity);
+
+        public override bool TryGetGlobalDiagnosticValue(
+            string diagnosticId,
+            CancellationToken cancellationToken,
+            out ReportDiagnostic severity
+        ) => TryGetSeverity(_options.GlobalOptions, diagnosticId, out severity);
+
+        private static bool TryGetSeverity(
+            AnalyzerConfigOptions options,
+            string diagnosticId,
+            out ReportDiagnostic severity
+        )
+        {
+            severity = ReportDiagnostic.Default;
+            if (!options.TryGetValue($"dotnet_diagnostic.{diagnosticId}.severity", out var value))
+            {
+                return false;
+            }
+
+            severity = value.ToLowerInvariant() switch
+            {
+                "none" => ReportDiagnostic.Suppress,
+                "silent" => ReportDiagnostic.Hidden,
+                "suggestion" => ReportDiagnostic.Info,
+                "warning" => ReportDiagnostic.Warn,
+                "error" => ReportDiagnostic.Error,
+                _ => ReportDiagnostic.Default,
+            };
+            return severity != ReportDiagnostic.Default;
+        }
     }
 }
