@@ -83,6 +83,27 @@ public class GeneratorHarnessAnalyzerTests
     }
 
     [Test]
+    public async Task Should_leave_out_a_warning_whose_severity_the_input_config_sets_to_none()
+    {
+        var result = RunWithClassAnalyzer(
+            NoOutput,
+            new GeneratorHarnessInput
+            {
+                Sources = ["class Input { }"],
+                PerFileOptions = new Dictionary<string, IReadOnlyDictionary<string, string>>
+                {
+                    ["Source0.cs"] = new Dictionary<string, string>
+                    {
+                        ["dotnet_diagnostic.HRA001.severity"] = "none",
+                    },
+                },
+            }
+        );
+
+        await Assert.That(result.AnalyzerDiagnostics.Length).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task Should_report_no_analyzer_diagnostics_when_run_without_analyzers()
     {
         var result = GeneratorHarness.Run(NoOutput, "class Input { }");
