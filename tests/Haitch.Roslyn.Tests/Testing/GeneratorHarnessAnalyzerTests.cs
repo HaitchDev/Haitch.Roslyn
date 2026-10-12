@@ -103,6 +103,39 @@ public class GeneratorHarnessAnalyzerTests
         await Assert.That(result.AnalyzerDiagnostics.Length).IsEqualTo(0);
     }
 
+#pragma warning disable RS1001
+    private sealed class ThrowingAnalyzer : DiagnosticAnalyzer
+#pragma warning restore RS1001
+    {
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [ClassFound];
+
+        public override void Initialize(AnalysisContext context)
+        {
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.EnableConcurrentExecution();
+            context.RegisterSyntaxNodeAction(
+                _ => throw new InvalidOperationException("analyzer boom"),
+                SyntaxKind.ClassDeclaration
+            );
+        }
+    }
+
+    [Test]
+    public async Task Should_fail_the_run_when_an_analyzer_throws()
+    {
+        var exception = await Assert
+            .That(() =>
+                GeneratorHarness.Run(
+                    NoOutput,
+                    new GeneratorHarnessInput { Sources = ["class Input { }"] },
+                    [new ThrowingAnalyzer()]
+                )
+            )
+            .Throws<GeneratorTestException>();
+
+        await Assert.That(exception!.Message).Contains("analyzer boom");
+    }
+
     [Test]
     public async Task Should_report_no_analyzer_diagnostics_when_run_without_analyzers()
     {
