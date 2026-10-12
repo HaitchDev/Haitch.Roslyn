@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Haitch.Roslyn.Testing;
@@ -29,6 +30,22 @@ public static class GeneratorHarness
     public static GeneratorHarnessResult Run(
         IIncrementalGenerator generator,
         GeneratorHarnessInput input
+    ) => Run(generator, input, []);
+
+    /// <summary>
+    /// Runs <paramref name="generator"/> over <paramref name="input"/>, then runs <paramref name="analyzers"/> over the
+    /// compilation that includes the generated sources.
+    /// </summary>
+    /// <param name="generator">The generator under test.</param>
+    /// <param name="input">The sources, references and options the generator runs against.</param>
+    /// <param name="analyzers">The analyzers to run over the generated compilation.</param>
+    /// <returns>As <see cref="Run(IIncrementalGenerator, GeneratorHarnessInput)"/>, plus <see cref="GeneratorHarnessResult.AnalyzerDiagnostics"/>.</returns>
+    /// <exception cref="GeneratorTestException">As <see cref="Run(IIncrementalGenerator, GeneratorHarnessInput)"/>.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="input"/> is <see langword="null"/>.</exception>
+    public static GeneratorHarnessResult Run(
+        IIncrementalGenerator generator,
+        GeneratorHarnessInput input,
+        ImmutableArray<DiagnosticAnalyzer> analyzers
     )
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -136,7 +153,16 @@ public static class GeneratorHarness
             compilation,
             runResult,
             [.. inputErrors]
-        );
+        )
+        {
+            AnalyzerDiagnostics = analyzers.IsDefaultOrEmpty
+                ? []
+                : output
+                    .WithAnalyzers(analyzers)
+                    .GetAnalyzerDiagnosticsAsync()
+                    .GetAwaiter()
+                    .GetResult(),
+        };
     }
 
     /// <summary>

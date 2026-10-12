@@ -28,8 +28,10 @@ public class GeneratorHarnessAnalyzerTests
     );
 #pragma warning restore RS2008
 
-    [DiagnosticAnalyzer(LanguageNames.CSharp)]
+    // Unattributed and passed to the harness directly: the attribute would make this a shipped analyzer (RS1036).
+#pragma warning disable RS1001
     private sealed class ClassAnalyzer : DiagnosticAnalyzer
+#pragma warning restore RS1001
     {
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [ClassFound];
 
