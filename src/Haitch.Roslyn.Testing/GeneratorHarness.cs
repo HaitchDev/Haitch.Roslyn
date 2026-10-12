@@ -40,7 +40,7 @@ public static class GeneratorHarness
     /// <param name="input">The sources, references and options the generator runs against.</param>
     /// <param name="analyzers">The analyzers to run over the generated compilation.</param>
     /// <returns>As <see cref="Run(IIncrementalGenerator, GeneratorHarnessInput)"/>, plus <see cref="GeneratorHarnessResult.AnalyzerDiagnostics"/>.</returns>
-    /// <exception cref="GeneratorTestException">As <see cref="Run(IIncrementalGenerator, GeneratorHarnessInput)"/>.</exception>
+    /// <exception cref="GeneratorTestException">As <see cref="Run(IIncrementalGenerator, GeneratorHarnessInput)"/>; also an analyzer threw.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="input"/> is <see langword="null"/>.</exception>
     public static GeneratorHarnessResult Run(
         IIncrementalGenerator generator,
@@ -155,25 +155,49 @@ public static class GeneratorHarness
             [.. inputErrors]
         )
         {
-            AnalyzerDiagnostics = analyzers.IsDefaultOrEmpty
-                ? []
-                : output
-                    .WithOptions(
-                        output.Options.WithSyntaxTreeOptionsProvider(
-                            new HarnessSyntaxTreeOptionsProvider(input)
-                        )
-                    )
-                    .WithAnalyzers(
-                        analyzers,
-                        new AnalyzerOptions(
-                            input.AdditionalTexts?.ToImmutableArray() ?? [],
-                            NewOptionsProvider(input)
-                        )
-                    )
-                    .GetAnalyzerDiagnosticsAsync()
-                    .GetAwaiter()
-                    .GetResult(),
+            AnalyzerDiagnostics = RunAnalyzers(output, input, analyzers),
         };
+    }
+
+    private static ImmutableArray<Diagnostic> RunAnalyzers(
+        Compilation output,
+        GeneratorHarnessInput input,
+        ImmutableArray<DiagnosticAnalyzer> analyzers
+    )
+    {
+        if (analyzers.IsDefaultOrEmpty)
+        {
+            return [];
+        }
+
+        var diagnostics = output
+            .WithOptions(
+                output.Options.WithSyntaxTreeOptionsProvider(
+                    new HarnessSyntaxTreeOptionsProvider(input)
+                )
+            )
+            .WithAnalyzers(
+                analyzers,
+                new AnalyzerOptions(
+                    input.AdditionalTexts?.ToImmutableArray() ?? [],
+                    NewOptionsProvider(input)
+                )
+            )
+            .GetAnalyzerDiagnosticsAsync()
+            .GetAwaiter()
+            .GetResult();
+
+        // The driver turns an analyzer exception into an AD0001 diagnostic; a test must fail on it, not pass with fewer results.
+        var failures = diagnostics.Where(d => d.Id == "AD0001").ToList();
+        if (failures.Count > 0)
+        {
+            throw new GeneratorTestException(
+                "Analyzer threw:"
+                    + string.Concat(failures.Select(f => Environment.NewLine + f.GetMessage()))
+            );
+        }
+
+        return diagnostics;
     }
 
     /// <summary>
