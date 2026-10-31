@@ -462,8 +462,10 @@ internal ref struct TypeScope
     /// <summary>
     /// Buffers <c>/// &lt;summary&gt;text&lt;/summary&gt;</c> to be written directly above the next type or
     /// member this scope writes, after a blank line when one is due and above its pending attributes. Returns
-    /// this scope for chaining. <paramref name="text"/> is plain text: <c>&amp;</c>, <c>&lt;</c> and <c>&gt;</c> are
-    /// escaped, so the caller passes it unescaped.
+    /// this scope for chaining. <paramref name="text"/> is plain text, so the caller passes it unescaped:
+    /// <c>&amp;</c>, <c>&lt;</c> and <c>&gt;</c> are escaped, a character XML 1.0 cannot hold is written as the
+    /// text <c>\uXXXX</c>, and text holding a C# line terminator is written as one <c>///</c> line per line
+    /// between <c>/// &lt;summary&gt;</c> and <c>/// &lt;/summary&gt;</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">A summary is already pending.</exception>
     public TypeScope Summary(string text)
@@ -481,14 +483,15 @@ internal ref struct TypeScope
         return this;
     }
 
-    // The C# line terminators: a doc comment line ends at any of them. Declared first so it is initialized first.
+    // The C# line terminators: a doc comment line ends at any of them.
     private static readonly char[] LineTerminators = ['\r', '\n', '\x0085', '\x2028', '\x2029'];
-    private static readonly char[] SummarySpecials = ['&', '<', '>', .. LineTerminators];
 
-    // One pass over the text appending unchanged runs, so the plain case allocates only its line.
+    private const string HexDigits = "0123456789ABCDEF";
+
+    // Appends unchanged runs to one builder, so plain text allocates only the line it writes.
     private static string RenderSummary(string text)
     {
-        if (text.IndexOfAny(SummarySpecials) < 0 && !HasUnrepresentable(text))
+        if (IsPlain(text))
         {
             return $"/// <summary>{text}</summary>";
         }
@@ -509,7 +512,7 @@ internal ref struct TypeScope
 
         for (var i = 0; i < text.Length; i++)
         {
-            if (Array.IndexOf(LineTerminators, text[i]) < 0)
+            if (!IsLineTerminator(text[i]))
             {
                 continue;
             }
@@ -527,6 +530,19 @@ internal ref struct TypeScope
         AppendSummaryLine(builder, text, lineStart, text.Length);
 
         return builder.Append("/// </summary>").ToString();
+    }
+
+    private static bool IsPlain(string text)
+    {
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (text[i] is '&' or '<' or '>' || IsLineTerminator(text[i]) || IsUnrepresentable(text, i, 0, text.Length))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static void AppendSummaryLine(StringBuilder builder, string text, int start, int end)
@@ -549,7 +565,7 @@ internal ref struct TypeScope
 
         for (var i = start; i < end; i++)
         {
-            var replacement = text[i] switch
+            var entity = text[i] switch
             {
                 '&' => "&amp;",
                 '<' => "&lt;",
@@ -557,37 +573,42 @@ internal ref struct TypeScope
                 _ => null,
             };
 
-            if (replacement is null && IsUnrepresentable(text, i, start, end))
-            {
-                builder.Append(text, run, i - run).Append("\\u").Append(((int)text[i]).ToString("X4"));
-                run = i + 1;
-
-                continue;
-            }
-
-            if (replacement is null)
+            if (entity is null && !IsUnrepresentable(text, i, start, end))
             {
                 continue;
             }
 
-            builder.Append(text, run, i - run).Append(replacement);
+            builder.Append(text, run, i - run);
+
+            if (entity is not null)
+            {
+                builder.Append(entity);
+            }
+            else
+            {
+                AppendUnicodeEscape(builder, text[i]);
+            }
+
             run = i + 1;
         }
 
         builder.Append(text, run, end - run);
     }
 
-    private static bool HasUnrepresentable(string text)
+    // Written as text, not a character reference: XML 1.0 rejects &#x1; too.
+    private static void AppendUnicodeEscape(StringBuilder builder, char c)
     {
-        for (var i = 0; i < text.Length; i++)
-        {
-            if (IsUnrepresentable(text, i, 0, text.Length))
-            {
-                return true;
-            }
-        }
+        builder
+            .Append("\\u")
+            .Append(HexDigits[(c >> 12) & 0xF])
+            .Append(HexDigits[(c >> 8) & 0xF])
+            .Append(HexDigits[(c >> 4) & 0xF])
+            .Append(HexDigits[c & 0xF]);
+    }
 
-        return false;
+    private static bool IsLineTerminator(char c)
+    {
+        return c is '\r' or '\n' or '\x0085' or '\x2028' or '\x2029';
     }
 
     // XML 1.0 cannot hold a control character other than tab, U+FFFE, U+FFFF or a lone surrogate.
