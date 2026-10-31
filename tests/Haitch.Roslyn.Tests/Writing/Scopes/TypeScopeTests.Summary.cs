@@ -1,5 +1,8 @@
 using Haitch.Roslyn.Models;
+using Haitch.Roslyn.Tests.Models;
 using Haitch.Roslyn.Writing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 
 namespace Haitch.Roslyn.Tests.Writing.Scopes;
 
@@ -69,6 +72,30 @@ public partial class TypeScopeTests
         await Assert
             .That(source)
             .Contains("/// <summary>a\\u0001b\\u001Fc\td\\uFFFEe\\uFFFFf\\uD800g</summary>\n");
+    }
+
+    [Test]
+    public async Task Should_compile_a_summary_holding_a_newline_and_xml_markup_without_doc_comment_diagnostics()
+    {
+        string source = WriteSummaryAboveMethod("Fails when a < b\nand b & c.");
+
+        await Assert.That(DocumentationDiagnostics(source)).IsEmpty();
+    }
+
+    private static string[] DocumentationDiagnostics(string source)
+    {
+        CSharpCompilation compilation = CompilationHelper.Compile(source, allowErrors: true);
+        SyntaxTree tree = compilation.SyntaxTrees[0];
+        SyntaxTree documented = CSharpSyntaxTree.ParseText(
+            source,
+            ((CSharpParseOptions)tree.Options).WithDocumentationMode(DocumentationMode.Diagnose)
+        );
+
+        return compilation
+            .ReplaceSyntaxTree(tree, documented)
+            .GetDiagnostics()
+            .Select(diagnostic => diagnostic.ToString())
+            .ToArray();
     }
 
     [Test]
