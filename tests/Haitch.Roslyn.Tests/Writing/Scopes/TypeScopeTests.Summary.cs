@@ -1,0 +1,100 @@
+using Haitch.Roslyn.Models;
+using Haitch.Roslyn.Writing;
+
+namespace Haitch.Roslyn.Tests.Writing.Scopes;
+
+public partial class TypeScopeTests
+{
+    [Test]
+    public async Task Should_write_a_summary_after_the_blank_separator_directly_above_the_header()
+    {
+        SourceWriter writer = new();
+
+        using (var file = writer.File())
+        {
+            using var type = file.Type(Plain("A"));
+
+            using (type.Block("public void M()")) { }
+
+            type.Summary("Does N.");
+
+            using (type.Block("public void N()")) { }
+        }
+
+        await Assert
+            .That(writer.ToString())
+            .EndsWith(
+                """
+                    }
+
+                    /// <summary>Does N.</summary>
+                    public void N()
+                    {
+                    }
+                }
+
+                """
+            );
+    }
+
+    [Test]
+    public async Task Should_write_a_summary_above_pending_attributes()
+    {
+        SourceWriter writer = new();
+
+        using (var file = writer.File())
+        {
+            using var type = file.Type(Plain("A"));
+
+            type.Attribute(WellKnownAttributes.EditorBrowsableNever);
+            type.Summary("Does M.");
+
+            using (type.Block("public void M()")) { }
+        }
+
+        await Assert
+            .That(writer.ToString())
+            .EndsWith(
+                """
+                {
+                    /// <summary>Does M.</summary>
+                    [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
+                    public void M()
+                    {
+                    }
+                }
+
+                """
+            );
+    }
+
+    [Test]
+    public async Task Should_not_throw_on_dispose_but_throw_from_to_string_when_a_summary_is_pending()
+    {
+        SourceWriter writer = new();
+
+        using (var file = writer.File())
+        {
+            using var type = file.Type(Plain("A"));
+            type.Summary("Dangling.");
+        }
+
+        await Assert.That(() => writer.ToString()).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task Should_reject_a_second_summary_before_a_member()
+    {
+        SourceWriter writer = new();
+
+        await Assert
+            .That(() =>
+            {
+                using var file = writer.File();
+                using var type = file.Type(Plain("A"));
+                type.Summary("First.");
+                type.Summary("Second.");
+            })
+            .Throws<InvalidOperationException>();
+    }
+}
