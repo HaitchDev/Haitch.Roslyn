@@ -475,7 +475,23 @@ internal ref struct TypeScope
                 $"A summary is already pending on TypeScope '{_model.Name}'; write a member before the next summary.");
         }
 
-        _state.Summary = $"/// <summary>{text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;")}</summary>";
+        var lines = text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\r\n", "\n").Split('\n');
+
+        if (lines.Length == 1)
+        {
+            _state.Summary = $"/// <summary>{lines[0]}</summary>";
+        }
+        else
+        {
+            var builder = new System.Text.StringBuilder("/// <summary>\n");
+
+            foreach (var line in lines)
+            {
+                builder.Append(line.Length == 0 ? "///" : "/// " + line).Append('\n');
+            }
+
+            _state.Summary = builder.Append("/// </summary>").ToString();
+        }
 
         return this;
     }
