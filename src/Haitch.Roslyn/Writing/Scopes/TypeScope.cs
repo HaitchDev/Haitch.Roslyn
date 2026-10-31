@@ -481,8 +481,8 @@ internal ref struct TypeScope
         return this;
     }
 
-    private static readonly char[] SummarySpecials = ['&', '<', '>', '\r', '\n'];
-    private static readonly char[] LineTerminators = ['\r', '\n'];
+    private static readonly char[] SummarySpecials = ['&', '<', '>', '\r', '\n', '\x0085', '\x2028', '\x2029'];
+    private static readonly char[] LineTerminators = ['\r', '\n', '\x0085', '\x2028', '\x2029'];
 
     // One pass over the text appending unchanged runs, so the plain case allocates only its line.
     private static string RenderSummary(string text)
@@ -508,7 +508,7 @@ internal ref struct TypeScope
 
         for (var i = 0; i < text.Length; i++)
         {
-            if (text[i] is not ('\r' or '\n'))
+            if (text[i] is not ('\r' or '\n' or '\x0085' or '\x2028' or '\x2029'))
             {
                 continue;
             }
