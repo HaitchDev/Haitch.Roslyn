@@ -37,6 +37,30 @@ public partial class TypeScopeTests
     }
 
     [Test]
+    [Arguments("First.\nSecond.\n\nFourth.")]
+    [Arguments("First.\r\nSecond.\r\n\r\nFourth.")]
+    public async Task Should_write_one_doc_comment_line_per_line_of_a_multi_line_summary(
+        string text
+    )
+    {
+        string source = WriteSummaryAboveMethod(text);
+
+        await Assert
+            .That(source)
+            .Contains(
+                """
+                    /// <summary>
+                    /// First.
+                    /// Second.
+                    ///
+                    /// Fourth.
+                    /// </summary>
+                    public void M()
+                """
+            );
+    }
+
+    [Test]
     public async Task Should_write_a_summary_after_the_blank_separator_directly_above_the_header()
     {
         SourceWriter writer = new();
