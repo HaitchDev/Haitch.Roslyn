@@ -5,6 +5,37 @@ namespace Haitch.Roslyn.Tests.Writing.Scopes;
 
 public partial class TypeScopeTests
 {
+    private static string WriteSummaryAboveMethod(string text)
+    {
+        SourceWriter writer = new();
+
+        using (var file = writer.File())
+        {
+            using var type = file.Type(Plain("A"));
+
+            type.Summary(text);
+
+            using (type.Block("public void M()")) { }
+        }
+
+        return writer.ToString();
+    }
+
+    [Test]
+    public async Task Should_escape_xml_markup_characters_in_a_summary()
+    {
+        string source = WriteSummaryAboveMethod("a < b > c & d");
+
+        await Assert
+            .That(source)
+            .Contains(
+                """
+                    /// <summary>a &lt; b &gt; c &amp; d</summary>
+                    public void M()
+                """
+            );
+    }
+
     [Test]
     public async Task Should_write_a_summary_after_the_blank_separator_directly_above_the_header()
     {
