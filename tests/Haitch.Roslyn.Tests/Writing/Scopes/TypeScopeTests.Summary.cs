@@ -62,6 +62,16 @@ public partial class TypeScopeTests
     }
 
     [Test]
+    public async Task Should_write_a_character_xml_cannot_hold_as_its_unicode_escape_in_a_summary()
+    {
+        string source = WriteSummaryAboveMethod("a\x0001b\x001Fc\td\xFFFEe\xFFFFf\xD800g");
+
+        await Assert
+            .That(source)
+            .Contains("/// <summary>a\\u0001b\\u001Fc\td\\uFFFEe\\uFFFFf\\uD800g</summary>\n");
+    }
+
+    [Test]
     public async Task Should_write_a_summary_after_the_blank_separator_directly_above_the_header()
     {
         SourceWriter writer = new();
