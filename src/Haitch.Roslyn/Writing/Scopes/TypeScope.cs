@@ -488,7 +488,7 @@ internal ref struct TypeScope
     // One pass over the text appending unchanged runs, so the plain case allocates only its line.
     private static string RenderSummary(string text)
     {
-        if (text.IndexOfAny(SummarySpecials) < 0)
+        if (text.IndexOfAny(SummarySpecials) < 0 && !HasUnrepresentable(text))
         {
             return $"/// <summary>{text}</summary>";
         }
@@ -557,6 +557,14 @@ internal ref struct TypeScope
                 _ => null,
             };
 
+            if (replacement is null && IsUnrepresentable(text, i, start, end))
+            {
+                builder.Append(text, run, i - run).Append("\\u").Append(((int)text[i]).ToString("X4"));
+                run = i + 1;
+
+                continue;
+            }
+
             if (replacement is null)
             {
                 continue;
@@ -567,6 +575,37 @@ internal ref struct TypeScope
         }
 
         builder.Append(text, run, end - run);
+    }
+
+    private static bool HasUnrepresentable(string text)
+    {
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (IsUnrepresentable(text, i, 0, text.Length))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // XML 1.0 cannot hold a control character other than tab, U+FFFE, U+FFFF or a lone surrogate.
+    private static bool IsUnrepresentable(string text, int i, int start, int end)
+    {
+        var c = text[i];
+
+        if (char.IsHighSurrogate(c))
+        {
+            return i + 1 >= end || !char.IsLowSurrogate(text[i + 1]);
+        }
+
+        if (char.IsLowSurrogate(c))
+        {
+            return i - 1 < start || !char.IsHighSurrogate(text[i - 1]);
+        }
+
+        return (c < '\x0020' && c != '\t') || c is '\xFFFE' or '\xFFFF';
     }
 
     /// <summary>
