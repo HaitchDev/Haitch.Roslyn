@@ -461,7 +461,8 @@ internal ref struct TypeScope
     /// <summary>
     /// Buffers <c>/// &lt;summary&gt;text&lt;/summary&gt;</c> to be written directly above the next type or
     /// member this scope writes, after a blank line when one is due and above its pending attributes. Returns
-    /// this scope for chaining. <paramref name="text"/> is written verbatim, so the caller escapes XML.
+    /// this scope for chaining. <paramref name="text"/> is plain text: <c>&amp;</c>, <c>&lt;</c> and <c>&gt;</c> are
+    /// escaped, so the caller passes it unescaped.
     /// </summary>
     /// <exception cref="InvalidOperationException">A summary is already pending.</exception>
     public TypeScope Summary(string text)
@@ -474,7 +475,7 @@ internal ref struct TypeScope
                 $"A summary is already pending on TypeScope '{_model.Name}'; write a member before the next summary.");
         }
 
-        _state.Summary = $"/// <summary>{text}</summary>";
+        _state.Summary = $"/// <summary>{text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;")}</summary>";
 
         return this;
     }
