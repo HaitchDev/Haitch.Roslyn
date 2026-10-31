@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text;
 using Haitch.Roslyn.Models;
 using Haitch.Roslyn.Types;
 using Microsoft.CodeAnalysis;
@@ -475,25 +476,96 @@ internal ref struct TypeScope
                 $"A summary is already pending on TypeScope '{_model.Name}'; write a member before the next summary.");
         }
 
-        var lines = text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\r\n", "\n").Split('\n');
-
-        if (lines.Length == 1)
-        {
-            _state.Summary = $"/// <summary>{lines[0]}</summary>";
-        }
-        else
-        {
-            var builder = new System.Text.StringBuilder("/// <summary>\n");
-
-            foreach (var line in lines)
-            {
-                builder.Append(line.Length == 0 ? "///" : "/// " + line).Append('\n');
-            }
-
-            _state.Summary = builder.Append("/// </summary>").ToString();
-        }
+        _state.Summary = RenderSummary(text);
 
         return this;
+    }
+
+    private static readonly char[] SummarySpecials = ['&', '<', '>', '\r', '\n'];
+    private static readonly char[] LineTerminators = ['\r', '\n'];
+
+    // One pass over the text appending unchanged runs, so the plain case allocates only its line.
+    private static string RenderSummary(string text)
+    {
+        if (text.IndexOfAny(SummarySpecials) < 0)
+        {
+            return $"/// <summary>{text}</summary>";
+        }
+
+        var builder = new StringBuilder();
+
+        if (text.IndexOfAny(LineTerminators) < 0)
+        {
+            builder.Append("/// <summary>");
+            AppendEscaped(builder, text, 0, text.Length);
+
+            return builder.Append("</summary>").ToString();
+        }
+
+        builder.Append("/// <summary>\n");
+
+        var lineStart = 0;
+
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (text[i] is not ('\r' or '\n'))
+            {
+                continue;
+            }
+
+            AppendSummaryLine(builder, text, lineStart, i);
+
+            if (text[i] == '\r' && i + 1 < text.Length && text[i + 1] == '\n')
+            {
+                i++;
+            }
+
+            lineStart = i + 1;
+        }
+
+        AppendSummaryLine(builder, text, lineStart, text.Length);
+
+        return builder.Append("/// </summary>").ToString();
+    }
+
+    private static void AppendSummaryLine(StringBuilder builder, string text, int start, int end)
+    {
+        if (start == end)
+        {
+            builder.Append("///\n");
+
+            return;
+        }
+
+        builder.Append("/// ");
+        AppendEscaped(builder, text, start, end);
+        builder.Append('\n');
+    }
+
+    private static void AppendEscaped(StringBuilder builder, string text, int start, int end)
+    {
+        var run = start;
+
+        for (var i = start; i < end; i++)
+        {
+            var replacement = text[i] switch
+            {
+                '&' => "&amp;",
+                '<' => "&lt;",
+                '>' => "&gt;",
+                _ => null,
+            };
+
+            if (replacement is null)
+            {
+                continue;
+            }
+
+            builder.Append(text, run, i - run).Append(replacement);
+            run = i + 1;
+        }
+
+        builder.Append(text, run, end - run);
     }
 
     /// <summary>
